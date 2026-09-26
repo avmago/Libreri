@@ -53,6 +53,7 @@ uuid_id!(
 );
 
 /// Identifier of a book: the lowercase hex BLAKE3 hash of the file content.
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct BookId(String);

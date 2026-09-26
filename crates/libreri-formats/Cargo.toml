@@ -1,0 +1,22 @@
+[package]
+name = "libreri-formats"
+description = "Reads metadata, page counts and covers from book files (PDF, EPUB, Markdown, FB2, comics…)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+base64 = "0.23.1"
+libreri-core.workspace = true
+lopdf = { version = "0.45.0", default-features = false }
+quick-xml = "0.42.0"
+zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
+
+[dev-dependencies]
+lopdf = { version = "0.45.0", default-features = false }
+tempfile.workspace = true
+
+[lints]
+workspace = true

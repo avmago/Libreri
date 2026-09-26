@@ -15,7 +15,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-libreri-core.workspace = true
+libreri-core = { workspace = true, features = ["specta"] }
 libreri-library.workspace = true
 libreri-jobs.workspace = true
 serde.workspace = true
@@ -26,6 +26,8 @@ tauri-plugin-dialog = "2"
 specta = { version = "=2.0.0-rc.25", features = ["derive"] }
 specta-typescript = "0.0.12"
 tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
+tauri-plugin-opener = "2.5.5"
+base64 = "0.23.1"
 
 [lints]
 workspace = true

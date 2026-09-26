@@ -13,6 +13,11 @@ serde_json.workspace = true
 thiserror.workspace = true
 uuid.workspace = true
 chrono.workspace = true
+# Only the desktop shell turns this on, to generate TypeScript types.
+specta = { version = "=2.0.0-rc.25", features = ["derive"], optional = true }
+
+[features]
+specta = ["dep:specta"]
 
 [lints]
 workspace = true

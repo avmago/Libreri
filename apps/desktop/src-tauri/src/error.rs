@@ -17,6 +17,14 @@ pub enum AppErrorKind {
     AlreadyOpenHere,
     Storage,
     Io,
+    /// No library is open (the window is on the Welcome screen).
+    NoLibrary,
+    NotFound,
+    /// Something the user typed was refused; the message says why.
+    InvalidInput,
+    NameTaken,
+    Trash,
+    Cancelled,
 }
 
 #[derive(Debug, Clone, Serialize, Type, thiserror::Error)]
@@ -46,8 +54,13 @@ impl From<libreri_library::Error> for AppError {
             E::FormatTooNew { .. } => AppErrorKind::FormatTooNew,
             E::LockedElsewhere { .. } => AppErrorKind::LockedElsewhere,
             E::AlreadyOpenHere => AppErrorKind::AlreadyOpenHere,
-            E::Db(_) | E::BadInfo(_) => AppErrorKind::Storage,
+            E::Db(_) | E::BadInfo(_) | E::Closed => AppErrorKind::Storage,
             E::Io(_) => AppErrorKind::Io,
+            E::BookNotFound => AppErrorKind::NotFound,
+            E::InvalidInput(_) => AppErrorKind::InvalidInput,
+            E::NameTaken(_) => AppErrorKind::NameTaken,
+            E::Trash(_) => AppErrorKind::Trash,
+            E::Cancelled => AppErrorKind::Cancelled,
         };
         Self::new(kind, err.to_string())
     }
@@ -56,6 +69,16 @@ impl From<libreri_library::Error> for AppError {
 impl From<std::io::Error> for AppError {
     fn from(err: std::io::Error) -> Self {
         Self::new(AppErrorKind::Io, err.to_string())
+    }
+}
+
+impl AppError {
+    pub fn no_library() -> Self {
+        Self::new(AppErrorKind::NoLibrary, "no library is open")
+    }
+
+    pub fn invalid(message: impl Into<String>) -> Self {
+        Self::new(AppErrorKind::InvalidInput, message)
     }
 }
 

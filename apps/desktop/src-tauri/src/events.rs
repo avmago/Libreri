@@ -54,3 +54,67 @@ impl From<libreri_jobs::JobEvent> for JobEventPayload {
         }
     }
 }
+
+/// The books or folders changed (import, scan, rebuild). The interface
+/// refetches its lists.
+#[derive(Debug, Clone, Default, Serialize, Type, Event)]
+pub struct LibraryChanged {}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DuplicateDto {
+    pub file: String,
+    pub existing_title: String,
+    pub existing_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct FailedFileDto {
+    pub file: String,
+    pub reason: String,
+}
+
+/// Summary of a finished import, for the report shown to the user.
+#[derive(Debug, Clone, Serialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportFinished {
+    pub job_id: String,
+    pub added: u32,
+    pub added_ids: Vec<String>,
+    pub duplicates: Vec<DuplicateDto>,
+    pub relinked: u32,
+    pub unsupported: u32,
+    pub failed: Vec<FailedFileDto>,
+    pub warnings: Vec<String>,
+}
+
+impl ImportFinished {
+    pub fn new(job: libreri_jobs::JobId, r: &libreri_library::ImportReport) -> Self {
+        Self {
+            job_id: job.to_string(),
+            added: r.added_ids.len() as u32,
+            added_ids: r.added_ids.iter().map(ToString::to_string).collect(),
+            duplicates: r
+                .duplicates
+                .iter()
+                .map(|d| DuplicateDto {
+                    file: d.file.clone(),
+                    existing_title: d.existing_title.clone(),
+                    existing_id: d.existing_id.to_string(),
+                })
+                .collect(),
+            relinked: r.relinked,
+            unsupported: r.unsupported,
+            failed: r
+                .failed
+                .iter()
+                .map(|(file, reason)| FailedFileDto {
+                    file: file.clone(),
+                    reason: reason.clone(),
+                })
+                .collect(),
+            warnings: r.warnings.clone(),
+        }
+    }
+}

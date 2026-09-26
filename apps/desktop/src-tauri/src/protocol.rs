@@ -15,8 +15,7 @@ pub fn handle(ctx: UriSchemeContext<'_, Wry>, request: Request<Vec<u8>>) -> Resp
     let Some(state) = ctx.app_handle().try_state::<AppState>() else {
         return status(StatusCode::SERVICE_UNAVAILABLE);
     };
-    let guard = state.library.lock().expect("library lock poisoned");
-    let Some(library) = guard.as_ref() else {
+    let Some(library) = state.library_if_open() else {
         return status(StatusCode::NOT_FOUND);
     };
 
@@ -33,6 +32,9 @@ pub fn handle(ctx: UriSchemeContext<'_, Wry>, request: Request<Vec<u8>>) -> Resp
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, content_type(&relative))
             .header(header::CACHE_CONTROL, "no-cache")
+            // The dev server runs on another origin; the app itself is the
+            // only page this webview ever loads.
+            .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
             .body(bytes)
             .unwrap_or_else(|_| status(StatusCode::INTERNAL_SERVER_ERROR)),
         Err(_) => status(StatusCode::NOT_FOUND),

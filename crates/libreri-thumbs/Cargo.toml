@@ -1,0 +1,15 @@
+[package]
+name = "libreri-thumbs"
+description = "Cover images and thumbnails for the library grid."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp"] }
+thiserror.workspace = true
+
+[lints]
+workspace = true

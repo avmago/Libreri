@@ -4,7 +4,7 @@ A local-first library for PDFs, ebooks, Markdown, comics, DjVu and audiobooks �
 
 Your library is an ordinary folder: books stay as plain files, notes are Markdown, and everything can be exported and moved to another computer with every link intact.
 
-> **Status:** Phase 0 (foundations) — you can create and open libraries. Importing books arrives in Phase 1. See [docs/development-phases.md](docs/development-phases.md).
+> **Status:** Phase 1 (library) — import books and folders, organise them in real folders, edit their details, search and filter. The reader arrives in Phase 2. See [docs/development-phases.md](docs/development-phases.md).
 
 ## Run it
 
@@ -31,6 +31,7 @@ Other commands:
 | `pnpm lint` | ESLint, TypeScript and Clippy |
 | `pnpm format` | Prettier and rustfmt |
 | `pnpm gen:ipc` | Regenerates TypeScript types from the Rust commands |
+| `cargo run -p libreri-library --release --example seed -- <books> <library>` | Creates a library from a folder of books, for trying things out |
 
 ## How the code is organised
 
@@ -39,7 +40,9 @@ apps/desktop/src        React UI, one folder per feature
 apps/desktop/src-tauri  Thin Tauri shell: commands, events, book:// protocol
 crates/libreri-core     Domain types, IDs, library layout (no dependencies on the app)
 crates/libreri-db       SQLite and migrations
-crates/libreri-library  Create, open and lock library folders
+crates/libreri-library  Library folders: import, folders, scan, watcher, sidecars
+crates/libreri-formats  Reads details and covers from PDF, EPUB, Markdown, FB2, CBZ
+crates/libreri-thumbs   Covers and grid thumbnails
 crates/libreri-jobs     Background job queue with progress and cancel
 docs/                   Architecture, phases, decisions (docs/adr)
 ```

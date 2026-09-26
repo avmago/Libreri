@@ -3,11 +3,13 @@
 //! All SQL lives in this crate. Other crates use [`Database`] and the
 //! repository functions it exposes; they never write SQL themselves.
 
+mod books;
 mod migrations;
 
 use rusqlite::{Connection, OpenFlags};
 use std::path::Path;
 
+pub use books::{Facets, FileRecord};
 pub use migrations::{latest_version, MIGRATIONS};
 
 /// Errors from the storage layer.

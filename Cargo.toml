@@ -6,6 +6,8 @@ members = [
   "crates/libreri-db",
   "crates/libreri-library",
   "crates/libreri-jobs",
+  "crates/libreri-formats",
+  "crates/libreri-thumbs",
 ]
 
 [workspace.package]
@@ -21,6 +23,8 @@ libreri-core = { path = "crates/libreri-core" }
 libreri-db = { path = "crates/libreri-db" }
 libreri-library = { path = "crates/libreri-library" }
 libreri-jobs = { path = "crates/libreri-jobs" }
+libreri-formats = { path = "crates/libreri-formats" }
+libreri-thumbs = { path = "crates/libreri-thumbs" }
 
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -42,3 +46,22 @@ codegen-units = 1
 lto = true
 opt-level = "s"
 strip = true
+
+# Image decoding, hashing and PDF parsing are painfully slow unoptimised;
+# optimise just these dependencies in debug builds.
+[profile.dev.package.image]
+opt-level = 3
+[profile.dev.package.zune-jpeg]
+opt-level = 3
+[profile.dev.package.png]
+opt-level = 3
+[profile.dev.package.image-webp]
+opt-level = 3
+[profile.dev.package.fdeflate]
+opt-level = 3
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+[profile.dev.package.blake3]
+opt-level = 3
+[profile.dev.package.lopdf]
+opt-level = 2

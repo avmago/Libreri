@@ -14,7 +14,8 @@ export class IpcError extends Error {
   readonly kind: AppErrorKind;
 
   constructor(error: AppError) {
-    super(error.message);
+    // Rust messages start lower-case so they read well inside other text.
+    super(error.message.charAt(0).toUpperCase() + error.message.slice(1));
     this.name = "IpcError";
     this.kind = error.kind;
   }

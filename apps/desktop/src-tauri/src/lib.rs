@@ -30,8 +30,32 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::library::close_library,
             commands::library::current_library,
             commands::library::inspect_folder,
+            commands::library::rescan_library,
+            commands::library::rebuild_library_index,
+            commands::library::cancel_job,
+            commands::books::list_books,
+            commands::books::get_book,
+            commands::books::library_facets,
+            commands::books::update_book,
+            commands::books::set_book_state,
+            commands::books::move_books,
+            commands::books::trash_books,
+            commands::books::save_cover,
+            commands::books::open_book_externally,
+            commands::books::reveal_book,
+            commands::folders::list_folders,
+            commands::folders::create_folder,
+            commands::folders::rename_folder,
+            commands::folders::move_folder,
+            commands::folders::trash_folder,
+            commands::folders::reveal_folder,
+            commands::folders::import_paths,
         ])
-        .events(tauri_specta::collect_events![events::JobEventPayload])
+        .events(tauri_specta::collect_events![
+            events::JobEventPayload,
+            events::LibraryChanged,
+            events::ImportFinished,
+        ])
 }
 
 /// Starts the desktop app.
@@ -40,12 +64,14 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(builder.invoke_handler())
         .register_uri_scheme_protocol("book", protocol::handle)
         .setup(move |app| {
             builder.mount_events(app);
             let state = AppState::initialise(app.handle())?;
             app.manage(state);
+            app.state::<AppState>().reopen_last_library();
             Ok(())
         })
         .on_window_event(|window, event| {

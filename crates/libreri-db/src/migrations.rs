@@ -33,6 +33,91 @@ pub const MIGRATIONS: &[&str] = &[
         added_at    TEXT NOT NULL
     ) STRICT;
     "#,
+    // 2 — library MVP (Phase 1): full book records, tags, categories,
+    // per-profile state and metadata search. `books` was always empty in v1.
+    r#"
+    DROP TABLE books;
+
+    CREATE TABLE books (
+        id            TEXT PRIMARY KEY,          -- BLAKE3 content hash (hex)
+        rel_path      TEXT NOT NULL UNIQUE,      -- "Books/…", '/' separators
+        file_type     TEXT NOT NULL,
+        file_size     INTEGER NOT NULL,
+        file_mtime    INTEGER NOT NULL DEFAULT 0, -- seconds; skips re-hashing unchanged files
+        has_cover     INTEGER NOT NULL DEFAULT 0,
+        missing       INTEGER NOT NULL DEFAULT 0,
+        added_at      TEXT NOT NULL,
+        modified_at   TEXT NOT NULL,
+        title         TEXT NOT NULL,
+        sort_title    TEXT NOT NULL,
+        subtitle      TEXT,
+        authors       TEXT NOT NULL DEFAULT '[]', -- JSON array
+        sort_author   TEXT NOT NULL DEFAULT '',
+        contributors  TEXT NOT NULL DEFAULT '[]', -- JSON array
+        about         TEXT,
+        year          INTEGER,
+        publisher     TEXT,
+        pages         INTEGER,
+        isbn13        TEXT,
+        isbn10        TEXT,
+        edition       TEXT,
+        language      TEXT,
+        content_type  TEXT NOT NULL DEFAULT 'book',
+        series        TEXT,
+        series_number REAL,
+        doi           TEXT,
+        arxiv_id      TEXT,
+        journal       TEXT,
+        volume        TEXT,
+        issue         TEXT,
+        url           TEXT
+    ) STRICT;
+    CREATE INDEX books_isbn13 ON books(isbn13);
+
+    -- Earlier ids of a book whose file changed, so old links still resolve.
+    CREATE TABLE book_aliases (
+        old_id   TEXT PRIMARY KEY,
+        book_id  TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE ON UPDATE CASCADE
+    ) STRICT;
+
+    CREATE TABLE tags (
+        id    INTEGER PRIMARY KEY,
+        name  TEXT NOT NULL UNIQUE COLLATE NOCASE
+    ) STRICT;
+    CREATE TABLE book_tags (
+        book_id  TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE ON UPDATE CASCADE,
+        tag_id   INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+        PRIMARY KEY (book_id, tag_id)
+    ) STRICT;
+
+    CREATE TABLE categories (
+        id    INTEGER PRIMARY KEY,
+        path  TEXT NOT NULL UNIQUE COLLATE NOCASE  -- "Science/Physics"
+    ) STRICT;
+    CREATE TABLE book_categories (
+        book_id      TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE ON UPDATE CASCADE,
+        category_id  INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+        PRIMARY KEY (book_id, category_id)
+    ) STRICT;
+
+    CREATE TABLE book_user (
+        book_id      TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE ON UPDATE CASCADE,
+        profile_id   TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+        status       TEXT NOT NULL DEFAULT 'none',
+        rating       INTEGER NOT NULL DEFAULT 0,
+        favorite     INTEGER NOT NULL DEFAULT 0,
+        progress     REAL NOT NULL DEFAULT 0,
+        last_opened  TEXT,
+        PRIMARY KEY (book_id, profile_id)
+    ) STRICT;
+
+    CREATE VIRTUAL TABLE books_fts USING fts5(
+        book_id UNINDEXED,
+        title, authors, about, tags, categories, publisher, series, identifiers,
+        tokenize = 'unicode61 remove_diacritics 2',
+        prefix = '2 3'
+    );
+    "#,
 ];
 
 /// Schema version this build of Libreri writes.

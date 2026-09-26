@@ -30,11 +30,64 @@ export const commands = {
 } | null>("current_library"),
 	/**  Tells the Welcome screen what the chosen folder contains. */
 	inspectFolder: (path: string) => __TAURI_INVOKE<FolderKind>("inspect_folder", { path }),
+	/**
+	 *  Checks the library folder for changes now (the watcher does this
+	 *  automatically; this is the manual "Refresh").
+	 */
+	rescanLibrary: () => typedError<string | null, AppError>(__TAURI_INVOKE("rescan_library")),
+	/**  Rebuilds the database from the book files and JSON sidecars. */
+	rebuildLibraryIndex: () => typedError<string, AppError>(__TAURI_INVOKE("rebuild_library_index")),
+	/**  Stops a running import or scan at the next file. */
+	cancelJob: (id: string) => __TAURI_INVOKE<boolean>("cancel_job", { id }),
+	listBooks: (query: BookQuery) => typedError<BookDto[], AppError>(__TAURI_INVOKE("list_books", { query })),
+	getBook: (id: string) => typedError<BookDto, AppError>(__TAURI_INVOKE("get_book", { id })),
+	libraryFacets: () => typedError<FacetsDto, AppError>(__TAURI_INVOKE("library_facets")),
+	/**
+	 *  Saves edited details. Refuses invalid ISBNs, an empty title, etc. with a
+	 *  message that says what to fix.
+	 */
+	updateBook: (id: string, metadata: BookMetadata) => typedError<BookDto, AppError>(__TAURI_INVOKE("update_book", { id, metadata })),
+	/**  Saves the current profile's reading status, rating and favourite flag. */
+	setBookState: (id: string, user: BookUserState) => typedError<BookDto, AppError>(__TAURI_INVOKE("set_book_state", { id, user })),
+	/**  Moves books into a folder (relative to `Books/`). Returns how many moved. */
+	moveBooks: (ids: string[], folder: string) => typedError<number, AppError>(__TAURI_INVOKE("move_books", { ids, folder })),
+	/**  Moves books to the system trash. Returns how many were removed. */
+	trashBooks: (ids: string[]) => typedError<number, AppError>(__TAURI_INVOKE("trash_books", { ids })),
+	/**
+	 *  Stores a cover sent by the interface (base64 of a JPEG or PNG), such as
+	 *  the first page of a PDF rendered with PDF.js.
+	 */
+	saveCover: (id: string, imageBase64: string) => typedError<null, AppError>(__TAURI_INVOKE("save_cover", { id, imageBase64 })),
+	/**
+	 *  Opens the book in the system's default app (until Libreri's own reader
+	 *  arrives in Phase 2).
+	 */
+	openBookExternally: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("open_book_externally", { id })),
+	/**  Shows the book's file in Finder / Explorer / the file manager. */
+	revealBook: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("reveal_book", { id })),
+	listFolders: () => typedError<FolderDto[], AppError>(__TAURI_INVOKE("list_folders")),
+	/**  Creates `name` inside `parent`; returns the new folder's path. */
+	createFolder: (parent: string, name: string) => typedError<string, AppError>(__TAURI_INVOKE("create_folder", { parent, name })),
+	renameFolder: (path: string, name: string) => typedError<string, AppError>(__TAURI_INVOKE("rename_folder", { path, name })),
+	moveFolder: (path: string, parent: string) => typedError<string, AppError>(__TAURI_INVOKE("move_folder", { path, parent })),
+	/**
+	 *  Moves a folder and its books to the system trash; returns the number of
+	 *  books removed.
+	 */
+	trashFolder: (path: string) => typedError<number, AppError>(__TAURI_INVOKE("trash_folder", { path })),
+	revealFolder: (path: string) => typedError<null, AppError>(__TAURI_INVOKE("reveal_folder", { path })),
+	/**
+	 *  Starts importing files and folders into `folder`. Returns the job id;
+	 *  progress arrives as job events and the summary as `ImportFinished`.
+	 */
+	importPaths: (paths: string[], folder: string, mode: ImportModeDto) => typedError<string, AppError>(__TAURI_INVOKE("import_paths", { paths, folder, mode })),
 };
 
 /** Events */
 export const events = {
+	importFinished: makeEvent<ImportFinished>("import-finished"),
 	jobEventPayload: makeEvent<JobEventPayload>("job-event-payload"),
+	libraryChanged: makeEvent<LibraryChanged>("library-changed"),
 };
 
 /* Types */
@@ -43,11 +96,159 @@ export type AppError = {
 	message: string,
 };
 
-export type AppErrorKind = "notALibrary" | "alreadyALibrary" | "folderNotEmpty" | "formatTooNew" | "lockedElsewhere" | "alreadyOpenHere" | "storage" | "io";
+export type AppErrorKind = "notALibrary" | "alreadyALibrary" | "folderNotEmpty" | "formatTooNew" | "lockedElsewhere" | "alreadyOpenHere" | "storage" | "io" | 
+/**  No library is open (the window is on the Welcome screen). */
+"noLibrary" | "notFound" | 
+/**  Something the user typed was refused; the message says why. */
+"invalidInput" | "nameTaken" | "trash" | "cancelled";
 
 export type AppInfo = {
 	version: string,
 	platform: string,
+};
+
+/**  Everything about one book in the library. */
+export type Book = {
+	id: BookId,
+	/**  Relative to the library root, with `/` separators: "Books/Physics/a.pdf". */
+	relPath: string,
+	fileType: FileType,
+	/**  Sent to TypeScript as a number; no file comes near 2^53 bytes. */
+	fileSize: number,
+	hasCover: boolean,
+	/**  The file could not be found at `rel_path` during the last scan. */
+	missing: boolean,
+	addedAt: string,
+	modifiedAt: string,
+	metadata: BookMetadata,
+	user: BookUserState,
+};
+
+/**
+ *  A book as the interface sees it: the stored record plus the paths of
+ *  its images (served by `book://`) and its folder.
+ */
+export type BookDto = {
+	/**  Folder relative to `Books/` ("" = top level). */
+	folder: string,
+	thumbnail: string | null,
+	cover: string | null,
+} & Book;
+
+/**  Identifier of a book: the lowercase hex BLAKE3 hash of the file content. */
+export type BookId = string;
+
+/**
+ *  Bibliographic details shared by every profile. This is what the details
+ *  panel edits and what the JSON sidecar stores.
+ */
+export type BookMetadata = {
+	title?: string,
+	subtitle?: string | null,
+	authors?: string[],
+	/**  Editors, translators, illustrators — free text such as "Jane Smith (translator)". */
+	contributors?: string[],
+	about?: string | null,
+	tags?: string[],
+	/**  Hierarchical, written as paths: "Science/Physics". */
+	categories?: string[],
+	year?: number | null,
+	publisher?: string | null,
+	pages?: number | null,
+	isbn13?: string | null,
+	isbn10?: string | null,
+	edition?: string | null,
+	/**  BCP 47 code such as "en" or "de". */
+	language?: string | null,
+	contentType?: ContentType,
+	series?: string | null,
+	seriesNumber?: number | null,
+	doi?: string | null,
+	arxivId?: string | null,
+	journal?: string | null,
+	volume?: string | null,
+	issue?: string | null,
+	url?: string | null,
+};
+
+/**  A filter for the book list. Empty lists mean "any". */
+export type BookQuery = {
+	/**  Folder relative to `Books/` ("" = top level). `None` = whole library. */
+	folder?: string | null,
+	/**  With `folder`, also include books in its subfolders. */
+	includeSubfolders?: boolean,
+	/**  Free text matched against title, authors, tags, ISBN, … */
+	search?: string | null,
+	fileTypes?: FileType[],
+	contentTypes?: ContentType[],
+	/**  Books must have every one of these tags. */
+	tags?: string[],
+	/**  Books must be in this category or one below it. */
+	category?: string | null,
+	status?: ReadingStatus | null,
+	favoritesOnly?: boolean,
+	/**  `Some(true)` only audiobooks, `Some(false)` hides them. */
+	audio?: boolean | null,
+	missingOnly?: boolean,
+	sort?: SortKey,
+	descending?: boolean,
+};
+
+/**  Personal state of one profile for one book. */
+export type BookUserState = {
+	status?: ReadingStatus,
+	/**  0 = not rated, 1–5 stars. */
+	rating?: number,
+	favorite?: boolean,
+	/**  0.0–1.0. */
+	progress?: number | null,
+	lastOpened?: string | null,
+};
+
+/**  What kind of document a book is. Chosen by the user; guessed on import. */
+export type ContentType = "book" | "textbook" | "researchPaper" | "conferencePaper" | "preprint" | "thesis" | "lectureNotes" | "slides" | "technicalReport" | "whitePaper" | "manual" | "reference" | "standard" | "magazine" | "article" | "comic" | "cheatSheet" | "personalNotes" | "audiobook" | "other";
+
+export type CountDto<T> = {
+	value: T,
+	count: number,
+};
+
+export type DuplicateDto = {
+	file: string,
+	existingTitle: string,
+	existingId: string,
+};
+
+/**  Counts for the sidebar and the filter menus. */
+export type FacetsDto = {
+	total: number,
+	wantToRead: number,
+	reading: number,
+	finished: number,
+	favorites: number,
+	audio: number,
+	missing: number,
+	fileTypes: CountDto<FileType>[],
+	contentTypes: CountDto<ContentType>[],
+	tags: CountDto<string>[],
+	categories: CountDto<string>[],
+};
+
+export type FailedFileDto = {
+	file: string,
+	reason: string,
+};
+
+/**  Every file format Libreri accepts, detected from the file extension. */
+export type FileType = "pdf" | "epub" | "mobi" | "azw3" | "fb2" | "txt" | "md" | "djvu" | "cbz" | "cbr" | "cb7" | "cba" | "cbt" | "mp3" | "m4b" | "m4a" | "aac" | "ogg" | "opus" | "flac";
+
+export type FolderDto = {
+	name: string,
+	/**  Relative to `Books/`, `/`-separated. */
+	path: string,
+	bookCount: number,
+	totalCount: number,
+	children: FolderDto[],
 };
 
 /**
@@ -55,6 +256,20 @@ export type AppInfo = {
  *  the right action.
  */
 export type FolderKind = "missing" | "empty" | "library" | "otherFiles";
+
+/**  Summary of a finished import, for the report shown to the user. */
+export type ImportFinished = {
+	jobId: string,
+	added: number,
+	addedIds: string[],
+	duplicates: DuplicateDto[],
+	relinked: number,
+	unsupported: number,
+	failed: FailedFileDto[],
+	warnings: string[],
+};
+
+export type ImportModeDto = "move" | "copy";
 
 /**  Progress of a background job, forwarded from `libreri-jobs`. */
 export type JobEventPayload = {
@@ -67,6 +282,12 @@ export type JobEventPayload = {
 	message: string | null,
 };
 
+/**
+ *  The books or folders changed (import, scan, rebuild). The interface
+ *  refetches its lists.
+ */
+export type LibraryChanged = Record<string, never>;
+
 export type LibrarySummary = {
 	id: string,
 	name: string,
@@ -74,6 +295,9 @@ export type LibrarySummary = {
 	/**  `u32` is plenty for a book count and maps to a plain TypeScript number. */
 	bookCount: number,
 };
+
+/**  Where a reader is with a book. Personal: stored per profile. */
+export type ReadingStatus = "none" | "wantToRead" | "reading" | "finished" | "abandoned";
 
 export type RecentLibraryDto = {
 	name: string,
@@ -87,6 +311,8 @@ export type SettingsDto = {
 	accent: string | null,
 	recentLibraries: RecentLibraryDto[],
 };
+
+export type SortKey = "title" | "author" | "added" | "year" | "size" | "pages" | "lastOpened" | "rating";
 
 export type Theme = "system" | "light" | "dark" | "highContrast";
 
