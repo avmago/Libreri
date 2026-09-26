@@ -1,0 +1,61 @@
+/*
+ * Design tokens. Light is the base; `.dark` and `.hc` (high contrast) override.
+ * Accent is black by default and turns near-white in dark mode so it stays
+ * visible. Components use these tokens only — never raw colours.
+ */
+:root {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #09090b;
+  --sidebar: #fafafa;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #18181b;
+  --primary: #18181b;
+  --primary-foreground: #fafafa;
+  --accent: #18181b;
+  --accent-foreground: #fafafa;
+  --popover: #ffffff;
+  --popover-foreground: #09090b;
+  --destructive: #b91c1c;
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #09090b;
+  --foreground: #fafafa;
+  --sidebar: #0f0f11;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  --border: #27272a;
+  --input: #3f3f46;
+  --ring: #d4d4d8;
+  --primary: #fafafa;
+  --primary-foreground: #18181b;
+  --accent: #fafafa;
+  --accent-foreground: #18181b;
+  --popover: #18181b;
+  --popover-foreground: #fafafa;
+  --destructive: #f87171;
+}
+
+.hc {
+  color-scheme: dark;
+  --background: #000000;
+  --foreground: #ffffff;
+  --sidebar: #000000;
+  --muted: #1a1a1a;
+  --muted-foreground: #e5e5e5;
+  --border: #ffffff;
+  --input: #ffffff;
+  --ring: #facc15;
+  --primary: #ffffff;
+  --primary-foreground: #000000;
+  --accent: #facc15;
+  --accent-foreground: #000000;
+  --popover: #000000;
+  --popover-foreground: #ffffff;
+  --destructive: #ff6b6b;
+}

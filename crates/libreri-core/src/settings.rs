@@ -1,0 +1,83 @@
+//! App-wide settings kept in the operating system's app-config folder
+//! (not inside a library), such as the theme and recently opened libraries.
+
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+
+/// How the app chooses light or dark.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ThemePreference {
+    #[default]
+    System,
+    Light,
+    Dark,
+    HighContrast,
+}
+
+/// A library the user opened before, shown on the Welcome screen.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecentLibrary {
+    pub name: String,
+    pub path: PathBuf,
+}
+
+/// Settings that belong to this computer rather than to a library.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct AppSettings {
+    pub theme: ThemePreference,
+    /// Accent colour as a hex string; `None` means the default (black).
+    pub accent: Option<String>,
+    pub recent_libraries: Vec<RecentLibrary>,
+}
+
+/// How many libraries the Welcome screen remembers.
+pub const MAX_RECENT_LIBRARIES: usize = 8;
+
+impl AppSettings {
+    /// Moves (or adds) a library to the top of the recent list.
+    pub fn remember_library(&mut self, name: impl Into<String>, path: PathBuf) {
+        self.recent_libraries.retain(|r| r.path != path);
+        self.recent_libraries.insert(
+            0,
+            RecentLibrary {
+                name: name.into(),
+                path,
+            },
+        );
+        self.recent_libraries.truncate(MAX_RECENT_LIBRARIES);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn remember_library_deduplicates_and_orders() {
+        let mut s = AppSettings::default();
+        s.remember_library("A", "/a".into());
+        s.remember_library("B", "/b".into());
+        s.remember_library("A again", "/a".into());
+        let names: Vec<_> = s.recent_libraries.iter().map(|r| r.name.as_str()).collect();
+        assert_eq!(names, ["A again", "B"]);
+    }
+
+    #[test]
+    fn remember_library_caps_the_list() {
+        let mut s = AppSettings::default();
+        for i in 0..20 {
+            s.remember_library(format!("L{i}"), format!("/l{i}").into());
+        }
+        assert_eq!(s.recent_libraries.len(), MAX_RECENT_LIBRARIES);
+        assert_eq!(s.recent_libraries[0].name, "L19");
+    }
+
+    #[test]
+    fn settings_tolerate_missing_fields() {
+        let s: AppSettings = serde_json::from_str("{}").unwrap();
+        assert_eq!(s, AppSettings::default());
+    }
+}

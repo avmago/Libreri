@@ -1,0 +1,18 @@
+[package]
+name = "libreri-core"
+description = "Libreri domain types, IDs, errors and ports. Depends on nothing app-specific."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+
+[lints]
+workspace = true

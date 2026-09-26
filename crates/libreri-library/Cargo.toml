@@ -1,0 +1,23 @@
+[package]
+name = "libreri-library"
+description = "Creating, opening and locking Libreri library folders."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+libreri-core.workspace = true
+libreri-db.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+gethostname = "1"
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

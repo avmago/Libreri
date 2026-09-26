@@ -1,0 +1,23 @@
+# Rust
+target/
+
+# Node
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+coverage/
+
+# Tauri
+apps/desktop/src-tauri/gen/schemas/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# Local test libraries
+/tmp-library*/
