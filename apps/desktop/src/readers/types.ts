@@ -90,8 +90,19 @@ export interface Renderer {
   setZoom(zoom: ZoomValue): void;
   zoom(): ZoomValue;
   clearSelection(): void;
-  /** True for PDFs (real pages you can jump to). */
+  /** True for PDFs, DjVu and comics (real pages you can jump to). */
   readonly paged: boolean;
+  /** Comics read right to left: the arrow keys turn the other way. */
+  readonly rightToLeft?: boolean;
+  /** Comics: how pages are laid out (null for other books). */
+  layoutOptions?(): PageLayout | null;
+  setLayout?(layout: Partial<PageLayout>): void;
+}
+
+/** How comic pages are shown. */
+export interface PageLayout {
+  mode: "scroll" | "single" | "spread";
+  rightToLeft: boolean;
 }
 
 export type PdfDarkMode = "recolour" | "invert" | "dim" | "off";

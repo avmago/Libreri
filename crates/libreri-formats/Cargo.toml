@@ -13,6 +13,12 @@ libreri-core.workspace = true
 lopdf = { version = "0.45.0", default-features = false }
 quick-xml = "0.42.0"
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
+libreri-helpers.workspace = true
+unrar = "0.5.8"
+sevenz-rust2 = { version = "0.23.0", default-features = false, features = ["compress"] }
+tar = "0.4.46"
+serde.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
 lopdf = { version = "0.45.0", default-features = false }

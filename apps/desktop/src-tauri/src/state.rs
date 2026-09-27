@@ -20,6 +20,9 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 
+/// Largest page cache kept between runs.
+pub const PAGE_CACHE_LIMIT: u64 = 2 * 1024 * 1024 * 1024;
+
 pub struct AppState {
     pub settings: Mutex<AppSettings>,
     pub settings_store: SettingsStore,
@@ -28,6 +31,8 @@ pub struct AppState {
     pub online_store: OnlineStore,
     /// Backups and files kept up to date, per library (per computer).
     pub backups: BackupStore,
+    /// Page images of comics and DjVu books (this computer only).
+    pub page_cache: std::path::PathBuf,
     /// A backup is running; the schedule does not start another.
     backup_running: Arc<AtomicBool>,
     /// Shared by all lookups, so connections are reused.
@@ -108,6 +113,12 @@ impl AppState {
         let online_store = OnlineStore::new(&config_dir);
         let online = online_store.load();
         let backups = BackupStore::new(&config_dir);
+        let page_cache = app.path().app_cache_dir()?.join("pages");
+        // Keep the page cache under 2 GB (least recently read books go first).
+        let cache = page_cache.clone();
+        std::thread::spawn(move || {
+            libreri_library::prune_page_cache(&cache, PAGE_CACHE_LIMIT);
+        });
 
         let handle = app.clone();
         let threads = std::thread::available_parallelism()
@@ -124,6 +135,7 @@ impl AppState {
             online: Mutex::new(online),
             online_store,
             backups,
+            page_cache,
             backup_running: Arc::default(),
             http: make_http(),
             phone: Mutex::new(None),

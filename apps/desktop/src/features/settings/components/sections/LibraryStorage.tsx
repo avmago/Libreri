@@ -29,6 +29,11 @@ export function LibrarySettings({
 }) {
   const { data: facets } = useFacets();
   const setHealth = usePortability((s) => s.setHealth);
+  const { data: pageCache, refetch: refetchCache } = useQuery({
+    queryKey: ["page-cache"],
+    queryFn: () => unwrap(commands.pageCacheSize()),
+    staleTime: 30_000,
+  });
   const { data: storage } = useQuery({
     queryKey: ["lib", "storage"],
     queryFn: () => unwrap(commands.libraryStorage()),
@@ -81,6 +86,24 @@ export function LibrarySettings({
         </Row>
         <Row label="Notes/" help="Everyone's Markdown notebooks, one folder per profile.">
           <span className="tabular-nums">{storage ? size(storage.notes ?? 0) : "…"}</span>
+        </Row>
+        <Row
+          label="Page cache (this computer)"
+          help="Pages of comics and DjVu books, kept to open them quickly. Up to 2 GB; made again when needed."
+        >
+          <span className="tabular-nums">{pageCache !== undefined ? size(pageCache ?? 0) : "…"}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              void commands.clearPageCache().then(() => {
+                toast("Page cache cleared");
+                void refetchCache();
+              })
+            }
+          >
+            Clear
+          </Button>
         </Row>
         <Row
           label=".library-data/"

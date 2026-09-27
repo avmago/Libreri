@@ -52,6 +52,7 @@ import {
   useLibraryView,
 } from "@/features/library";
 import { FindDetailsDialog, useDetailsEvents } from "@/features/details";
+import { HelperDialog } from "@/features/helpers";
 import { NotesHub } from "@/features/notes";
 import {
   CitationDialog,
@@ -644,6 +645,7 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
       <ImportArchiveDialog />
       <HealthDialog />
       <ForeignImportDialog />
+      <HelperDialog />
       <SaveCollectionDialog />
       <ImportDialog />
       <DropOverlay />

@@ -5,10 +5,12 @@
 //! Nothing here writes to disk.
 
 mod comic;
+pub mod djvu;
 mod epub;
 mod fb2;
 mod markdown;
 mod pdf;
+pub use comic::{extract_pages, list_pages, read_zip_page, ComicPages};
 #[doc(hidden)]
 pub use pdf::test_pdf;
 pub use pdf::{page_boxes, PageBox};
@@ -40,7 +42,10 @@ pub fn extract(path: &Path, file_type: FileType) -> Extracted {
         FileType::Epub => epub::read(path, &mut out),
         FileType::Md => markdown::read(path, &mut out),
         FileType::Fb2 => fb2::read(path, &mut out),
-        FileType::Cbz => comic::read_cbz(path, &mut out),
+        FileType::Djvu => djvu::read(path, &mut out),
+        FileType::Cbz | FileType::Cbr | FileType::Cb7 | FileType::Cbt | FileType::Cba => {
+            comic::read(path, file_type, &mut out)
+        }
         _ => Ok(()),
     };
     if let Err(e) = result {

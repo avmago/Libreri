@@ -298,3 +298,14 @@ impl ForeignImported {
         }
     }
 }
+
+/// Progress of installing a helper program.
+#[derive(Debug, Clone, Serialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct HelperInstall {
+    pub helper: libreri_helpers::Helper,
+    /// A line of the package manager's output.
+    pub line: Option<String>,
+    pub done: bool,
+    pub error: Option<String>,
+}

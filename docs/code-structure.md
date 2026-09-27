@@ -27,9 +27,10 @@ libreri/
 │  ├─ libreri-core        domain types, IDs, errors, ports
 │  ├─ libreri-db          SQLite, migrations, repositories, FTS5
 │  ├─ libreri-library     library folder, lock, scan, watcher, import/move, hashing, sidecars, versions
-│  ├─ libreri-formats     extractors: pdf, epub, mobi, fb2, txt, md, comic, djvu, audio
+│  ├─ libreri-formats     extractors: pdf, epub, mobi, fb2, txt, md, comics (zip/rar/7z/tar/ace), djvu (pages, text layer, outline), audio
 │  ├─ libreri-thumbs      thumbnails, covers
 │  ├─ libreri-metadata    online details: sources (Open Library, Google Books, Crossref, OpenAlex, Semantic Scholar, arXiv, ComicVine, ISBNdb), scoring, tag/category tidying, cover download
+│  ├─ libreri-helpers    helper programs (DjVuLibre, Tesseract, unar): find, version, install with the package manager, run
 │  ├─ libreri-scan        barcode reading (rxing) and the one-time phone page for scanning
 │  ├─ libreri-annotations highlights, comments, ink, voice notes, links, anchors
 │  ├─ libreri-profiles    6-digit PIN rules, Argon2 hashing, lockout, recovery codes
@@ -49,6 +50,7 @@ libreri/
 ## Flows
 - **Open book:** UI → reader feature → `lib/ipc.openBook` → `commands/reader.rs` → `libreri-library::open(bookId, profile)` → `libreri-db` (record + position) → `BookHandle` → renderer chosen by format → bytes streamed via `book://file/{token}` (range requests) → page at saved position.
 - **Import:** drop → `api.importFiles` → `commands/library.rs::import_files` → `libreri-jobs` queue → BLAKE3 hash → duplicate check (skip/replace/keep both) → move/copy into `Books/` → `libreri-formats` extract → `libreri-thumbs` → `libreri-db` insert → JSON sidecar → optional online lookup. Progress + books-changed events update the UI.
+- **Page images (5a):** `PageRenderer` asks `open_pages` for page count, sizes and outline → images load from `book://…/.pages/<bookId>/<page>?w=` → `libreri-library::pages` (CBZ read directly; CBR/CB7/CBT/CBA unpacked once; DjVu rendered by `ddjvu` at width steps) → per-computer page cache. DjVu text comes from `page_words` / `page_texts` (`djvutxt`).
 
 ## Where things go
 | Adding… | Put it in | Not in |

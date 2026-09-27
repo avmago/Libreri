@@ -58,6 +58,10 @@ fn serve(app: &AppHandle, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
     let Ok(relative) = percent_decode(raw) else {
         return status(StatusCode::BAD_REQUEST);
     };
+    // `.pages/<book id>/<page>?w=<width>`: a comic or DjVu page image.
+    if let Some(rest) = relative.strip_prefix(".pages/") {
+        return serve_page(&state, &library, rest, request.uri().query().unwrap_or(""));
+    }
     // Only books the signed-in profile may see, and covers.
     if !library.may_open(&relative) {
         return status(StatusCode::FORBIDDEN);
@@ -117,6 +121,39 @@ fn serve(app: &AppHandle, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
                 .body(buf)
                 .unwrap_or_else(|_| status(StatusCode::INTERNAL_SERVER_ERROR))
         }
+    }
+}
+
+fn serve_page(
+    state: &AppState,
+    library: &libreri_library::Library,
+    rest: &str,
+    query: &str,
+) -> Response<Vec<u8>> {
+    let Some((id, page)) = rest.split_once('/') else {
+        return status(StatusCode::BAD_REQUEST);
+    };
+    let (Ok(id), Ok(page)) = (libreri_core::BookId::from_hex(id), page.parse::<u32>()) else {
+        return status(StatusCode::BAD_REQUEST);
+    };
+    let width = query
+        .split('&')
+        .find_map(|kv| kv.strip_prefix("w="))
+        .and_then(|w| w.parse().ok())
+        .unwrap_or(1600);
+    match library.page_image(&id, page, width, &state.page_cache) {
+        Ok((bytes, mime)) => base(StatusCode::OK)
+            .header(header::CONTENT_TYPE, mime)
+            // Pages of a book never change (its id is its content).
+            .header(header::CACHE_CONTROL, "private, max-age=86400")
+            .header(header::CONTENT_LENGTH, bytes.len())
+            .body(bytes)
+            .unwrap_or_else(|_| status(StatusCode::INTERNAL_SERVER_ERROR)),
+        Err(libreri_library::Error::BookNotFound) => status(StatusCode::NOT_FOUND),
+        Err(e) => base(StatusCode::UNPROCESSABLE_ENTITY)
+            .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
+            .body(e.to_string().into_bytes())
+            .unwrap_or_else(|_| status(StatusCode::INTERNAL_SERVER_ERROR)),
     }
 }
 

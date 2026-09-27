@@ -1,9 +1,18 @@
 import { Check, Minus, Plus, Type } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, menuContent, menuLabel, menuSeparator } from "@/components/ui/menu";
-import { PAGE_THEMES, type PdfDarkMode, type PageThemeId } from "@/readers";
+import { PAGE_THEMES, type PageLayout, type PdfDarkMode, type PageThemeId } from "@/readers";
 import { cn } from "@/lib/utils";
 import { useReaderPrefs } from "../prefs";
+
+const LAYOUTS: [PageLayout["mode"], string][] = [
+  ["single", "One page"],
+  ["spread", "Two pages side by side"],
+  ["scroll", "Continuous (webtoon)"],
+];
+
+const itemClass =
+  "flex h-8 cursor-default items-center gap-2.5 rounded-md px-2 outline-none data-[highlighted]:bg-muted";
 
 const PDF_MODES: [PdfDarkMode, string][] = [
   ["recolour", "Recolour text, keep images"],
@@ -17,10 +26,15 @@ export function AppearanceMenu({
   isPdf,
   zoomLabel,
   onZoom,
+  pageLayout,
+  onPageLayout,
 }: {
   isPdf: boolean;
   zoomLabel: string;
   onZoom: (step: 1 | -1 | 0) => void;
+  /** Comics only. */
+  pageLayout?: PageLayout | null;
+  onPageLayout?: (change: Partial<PageLayout>) => void;
 }) {
   const prefs = useReaderPrefs();
   return (
@@ -51,6 +65,38 @@ export function AppearanceMenu({
               <Plus />
             </Button>
           </div>
+          {pageLayout && onPageLayout && (
+            <>
+              <DropdownMenu.Separator className={menuSeparator} />
+              <DropdownMenu.Label className={menuLabel}>COMIC PAGES</DropdownMenu.Label>
+              {LAYOUTS.map(([mode, label]) => (
+                <DropdownMenu.CheckboxItem
+                  key={mode}
+                  checked={pageLayout.mode === mode}
+                  onCheckedChange={() => onPageLayout({ mode })}
+                  onSelect={(e) => e.preventDefault()}
+                  className={itemClass}
+                >
+                  <span className="flex size-4 items-center justify-center">
+                    {pageLayout.mode === mode && <Check className="size-4" />}
+                  </span>
+                  {label}
+                </DropdownMenu.CheckboxItem>
+              ))}
+              <DropdownMenu.CheckboxItem
+                checked={pageLayout.rightToLeft}
+                disabled={pageLayout.mode === "scroll"}
+                onCheckedChange={(v) => onPageLayout({ rightToLeft: v })}
+                onSelect={(e) => e.preventDefault()}
+                className={cn(itemClass, "data-[disabled]:opacity-50")}
+              >
+                <span className="flex size-4 items-center justify-center">
+                  {pageLayout.rightToLeft && <Check className="size-4" />}
+                </span>
+                Right to left (manga)
+              </DropdownMenu.CheckboxItem>
+            </>
+          )}
           <DropdownMenu.Separator className={menuSeparator} />
           <DropdownMenu.Label className={menuLabel}>PAGE</DropdownMenu.Label>
           <div className="grid grid-cols-3 gap-1.5 px-1 pb-2">
@@ -89,7 +135,7 @@ export function AppearanceMenu({
           {isPdf && (
             <>
               <DropdownMenu.Separator className={menuSeparator} />
-              <DropdownMenu.Label className={menuLabel}>DARK PDF PAGES</DropdownMenu.Label>
+              <DropdownMenu.Label className={menuLabel}>DARK PAGES</DropdownMenu.Label>
               {PDF_MODES.map(([mode, label]) => (
                 <DropdownMenu.CheckboxItem
                   key={mode}

@@ -64,6 +64,20 @@ fn jpeg(img: &RgbImage, quality: u8) -> Result<Vec<u8>, Error> {
     Ok(buf)
 }
 
+/// Decodes any supported image (including the PNM pages DjVuLibre writes)
+/// and encodes it as JPEG, for pages shown in the reader.
+pub fn to_jpeg(bytes: &[u8], quality: u8) -> Result<Vec<u8>, Error> {
+    let mut reader = ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()
+        .map_err(|e| Error::Decode(e.into()))?;
+    let mut limits = Limits::default();
+    limits.max_image_width = Some(20_000);
+    limits.max_image_height = Some(20_000);
+    reader.limits(limits);
+    let img = reader.decode()?;
+    jpeg(&flatten(&img), quality)
+}
+
 /// Decodes `bytes` (JPEG, PNG, GIF, WebP or BMP) and makes the cover and
 /// thumbnail.
 pub fn make_covers(bytes: &[u8]) -> Result<Covers, Error> {
@@ -97,6 +111,14 @@ pub fn make_covers(bytes: &[u8]) -> Result<Covers, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pnm_pages_become_jpeg() {
+        let pnm = b"P6\n2 1\n255\n\xff\x00\x00\x00\xff\x00".to_vec();
+        let jpg = to_jpeg(&pnm, 85).unwrap();
+        assert!(jpg.starts_with(&[0xFF, 0xD8]));
+        assert!(to_jpeg(b"nope", 85).is_err());
+    }
 
     #[test]
     fn blank_covers_are_recognised() {

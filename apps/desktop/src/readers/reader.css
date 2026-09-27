@@ -256,3 +256,91 @@ mark.lb-find-current {
 .lb-notebook blockquote {
   color: var(--muted-foreground);
 }
+
+/* ---- Page images: comics and DjVu --------------------------------------- */
+.lb-pages {
+  position: absolute;
+  inset: 0;
+  background: var(--page-surround, #e9e9ec);
+}
+.lb-pages-comic {
+  background: #18181b;
+}
+.lb-pages-scroller {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+}
+.lb-pages-stage {
+  display: flex;
+  min-height: 100%;
+}
+.lb-pages-stage.lb-mode-scroll {
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 0 40vh;
+  gap: 14px;
+}
+.lb-pages-comic .lb-pages-stage.lb-mode-scroll {
+  padding: 0 0 40vh;
+  gap: 0;
+}
+.lb-pages-stage.lb-mode-single,
+.lb-pages-stage.lb-mode-spread {
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0;
+}
+.lb-page {
+  position: relative;
+  flex: none;
+  background: #fff;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.16),
+    0 6px 18px -6px rgba(0, 0, 0, 0.22);
+}
+.lb-pages-comic .lb-page {
+  background: transparent;
+  box-shadow: none;
+}
+.lb-page-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  filter: var(--page-filter, none);
+}
+.lb-page-error::after {
+  content: attr(data-error);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  font: 13px var(--font-sans);
+  color: #71717a;
+}
+.lb-page-text {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  line-height: 1;
+}
+.lb-page-text span {
+  position: absolute;
+  white-space: pre;
+  color: transparent;
+  transform-origin: 0 0;
+  cursor: text;
+}
+.lb-page-text span::selection {
+  background: rgba(59, 130, 246, 0.3);
+}
+.lb-page-find {
+  position: absolute;
+  border-radius: 2px;
+  background: rgba(249, 115, 22, 0.45);
+}

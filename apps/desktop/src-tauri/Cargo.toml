@@ -20,6 +20,8 @@ libreri-library.workspace = true
 libreri-jobs.workspace = true
 libreri-metadata = { workspace = true, features = ["specta"] }
 libreri-scan.workspace = true
+libreri-helpers = { workspace = true, features = ["specta"] }
+libreri-thumbs.workspace = true
 libreri-export = { workspace = true, features = ["specta"] }
 chrono.workspace = true
 serde.workspace = true

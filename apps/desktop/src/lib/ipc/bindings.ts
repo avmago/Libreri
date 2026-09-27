@@ -249,6 +249,26 @@ export const commands = {
 	/**  Shows a file (an export or a backup) in the system file manager. */
 	revealPath: (path: string) => typedError<null, AppError>(__TAURI_INVOKE("reveal_path", { path })),
 	/**
+	 *  Opens a comic or DjVu book: page count, sizes and contents. Pages are
+	 *  then loaded from `book://localhost/.pages/<id>/<page>?w=<width>`.
+	 */
+	openPages: (id: string) => typedError<PageBookDto, AppError>(__TAURI_INVOKE("open_pages", { id })),
+	/**  The words of a DjVu page with their boxes, for selecting and finding. */
+	pageWords: (id: string, page: number) => typedError<WordDto[], AppError>(__TAURI_INVOKE("page_words", { id, page })),
+	/**  The plain text of every DjVu page, for Find in book. */
+	pageTexts: (id: string) => typedError<string[], AppError>(__TAURI_INVOKE("page_texts", { id })),
+	/**  Which helper programs are installed, and how to install the others. */
+	helpersStatus: () => typedError<HelpersDto, AppError>(__TAURI_INVOKE("helpers_status")),
+	/**
+	 *  Installs a helper with the computer's package manager. Progress arrives
+	 *  as `HelperInstall` events; the call returns when it is done.
+	 */
+	installHelper: (helper: Helper) => typedError<HelpersDto, AppError>(__TAURI_INVOKE("install_helper", { helper })),
+	/**  Bytes used by the page cache on this computer. */
+	pageCacheSize: () => typedError<number | null, AppError>(__TAURI_INVOKE("page_cache_size")),
+	/**  Empties the page cache (pages are made again when read). */
+	clearPageCache: () => typedError<null, AppError>(__TAURI_INVOKE("clear_page_cache")),
+	/**
 	 *  Reads a Calibre library, Zotero folder, BibTeX/RIS file or reading log
 	 *  and says what importing it would bring in.
 	 */
@@ -267,6 +287,7 @@ export const events = {
 	detailsFilled: makeEvent<DetailsFilled>("details-filled"),
 	exportFinished: makeEvent<ExportFinished>("export-finished"),
 	foreignImported: makeEvent<ForeignImported>("foreign-imported"),
+	helperInstall: makeEvent<HelperInstall>("helper-install"),
 	importFinished: makeEvent<ImportFinished>("import-finished"),
 	jobEventPayload: makeEvent<JobEventPayload>("job-event-payload"),
 	libraryChanged: makeEvent<LibraryChanged>("library-changed"),
@@ -771,6 +792,44 @@ export type HealthReportDto = {
 	fixable: boolean,
 };
 
+/**  A helper program (or a set of programs from one package). */
+export type Helper = "djvulibre" | "tesseract" | "unar";
+
+export type HelperInfo = {
+	name: string,
+	purpose: string,
+	licence: string,
+	/**  How Libreri would install it here, if it can. */
+	plan: InstallPlan | null,
+} & HelperStatus;
+
+/**  Progress of installing a helper program. */
+export type HelperInstall = {
+	helper: Helper,
+	/**  A line of the package manager's output. */
+	line: string | null,
+	done: boolean,
+	error: string | null,
+};
+
+/**  Is a helper there, and which version. */
+export type HelperStatus = {
+	helper: Helper,
+	installed: boolean,
+	/**  Where the main program is. */
+	path: string | null,
+	version: string | null,
+	/**  Programs that are missing. */
+	missing: string[],
+};
+
+export type HelpersDto = {
+	helpers: HelperInfo[],
+	installer: Installer | null,
+	/**  "macos" | "windows" | "linux" */
+	platform: string,
+};
+
 /**  The four highlight colours. */
 export type HighlightColor = "yellow" | "green" | "blue" | "pink";
 
@@ -787,6 +846,19 @@ export type ImportFinished = {
 };
 
 export type ImportModeDto = "move" | "copy";
+
+/**  What will be run to install a helper, shown to the user first. */
+export type InstallPlan = {
+	helper: Helper,
+	installer: Installer,
+	/**  The command as a person would type it. */
+	display: string,
+	/**  The system asks for an administrator password. */
+	needsAdmin: boolean,
+};
+
+/**  The package manager Libreri can use on this computer. */
+export type Installer = "homebrew" | "winget" | "apt" | "dnf" | "pacman" | "zypper";
 
 /**  Progress of a background job, forwarded from `libreri-jobs`. */
 export type JobEventPayload = {
@@ -859,6 +931,23 @@ export type OnlineChange = {
 export type OnlineSettingsDto = {
 	sources: SourceInfo[],
 	fillOnImport: boolean,
+};
+
+export type OutlineDto = {
+	title: string,
+	page: number | null,
+	children: OutlineDto[],
+};
+
+export type PageBookDto = {
+	/**  "comic" | "djvu" */
+	kind: string,
+	pages: number,
+	/**  Width and height of each page (DjVu). */
+	sizes: ([number, number])[],
+	rightToLeft: boolean,
+	outline: OutlineDto[],
+	hasText: boolean,
 };
 
 export type PhonePairingDto = {
@@ -1016,6 +1105,12 @@ export type TextQuote = {
 };
 
 export type Theme = "system" | "light" | "dark" | "highContrast";
+
+export type WordDto = {
+	text: string,
+	/**  x, y, width, height as fractions of the page from the top left. */
+	rect: [(number | null), (number | null), (number | null), (number | null)],
+};
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

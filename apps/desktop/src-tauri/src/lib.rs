@@ -115,6 +115,13 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::portability::set_backup_settings,
             commands::portability::back_up_now,
             commands::portability::reveal_path,
+            commands::pages::open_pages,
+            commands::pages::page_words,
+            commands::pages::page_texts,
+            commands::pages::helpers_status,
+            commands::pages::install_helper,
+            commands::pages::page_cache_size,
+            commands::pages::clear_page_cache,
             commands::portability::inspect_foreign,
             commands::portability::import_foreign,
         ])
@@ -129,6 +136,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::ArchiveImported,
             events::BackupFinished,
             events::ForeignImported,
+            events::HelperInstall,
         ])
 }
 

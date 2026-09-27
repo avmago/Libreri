@@ -7,6 +7,7 @@ import {
   HardDrive,
   Keyboard,
   NotebookPen,
+  Puzzle,
   Palette,
   Settings2,
   ShieldCheck,
@@ -22,6 +23,7 @@ import { NotesSettings } from "./sections/Notes";
 import { ProfileSettings } from "./sections/ProfilesSecurity";
 import { ReaderSettings } from "./sections/Reader";
 import { ExportImportSettings } from "./sections/ExportImport";
+import { HelperSettings } from "./sections/Helpers";
 import { OnlineDetailsSettings } from "./sections/OnlineDetails";
 import { ShortcutSettings } from "./sections/Shortcuts";
 
@@ -34,6 +36,7 @@ export type SettingsSection =
   | "reader"
   | "notes"
   | "online"
+  | "helpers"
   | "shortcuts";
 
 const SECTIONS: { id: SettingsSection; label: string; Icon: LucideIcon }[] = [
@@ -45,6 +48,7 @@ const SECTIONS: { id: SettingsSection; label: string; Icon: LucideIcon }[] = [
   { id: "reader", label: "Reader", Icon: BookOpen },
   { id: "notes", label: "Notes", Icon: NotebookPen },
   { id: "online", label: "Online details", Icon: Globe },
+  { id: "helpers", label: "Helper programs", Icon: Puzzle },
   { id: "shortcuts", label: "Shortcuts", Icon: Keyboard },
 ];
 
@@ -112,6 +116,7 @@ export function SettingsPage({
           {section === "reader" && <ReaderSettings />}
           {section === "notes" && <NotesSettings session={session} library={library} />}
           {section === "online" && <OnlineDetailsSettings />}
+          {section === "helpers" && <HelperSettings />}
           {section === "shortcuts" && <ShortcutSettings />}
         </div>
       </main>

@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useBook, useLibraryView } from "@/features/library";
+import { useHelperDialog } from "@/features/helpers";
 import { useProfilePrefs } from "@/features/profiles";
 import { bookUrl, commands, type Annotation, type HighlightColor } from "@/lib/ipc";
 import { keysLabel, platform, shortcutFor, useShortcut, type ActionId } from "@/lib/shortcuts";
@@ -18,10 +19,12 @@ import { useTabs, type BookTab } from "@/lib/tabs";
 import { cn } from "@/lib/utils";
 import {
   createRenderer,
+  isPaged,
   PAGE_THEMES,
   pageTheme,
   parseLocator,
   type Locator,
+  type PageLayout,
   type PdfDarkMode,
   type ReaderLocation,
   type Renderer,
@@ -114,6 +117,10 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
   // Jumps made from the app (contents, marks, links) can be undone with Back.
   const history = useRef<{ back: Locator[]; forward: Locator[] }>({ back: [], forward: [] });
   const [zoom, setZoom] = useState<ZoomValue>(1);
+  const [pageLayout, setPageLayout] = useState<PageLayout | null>(null);
+  // Bumped to open the book again (after installing a helper).
+  const [attempt, setAttempt] = useState(0);
+  const openHelper = useHelperDialog((s) => s.open);
   const [pageInput, setPageInput] = useState("");
   const pageInputRef = useRef<HTMLInputElement>(null);
 
@@ -184,22 +191,26 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
     const host = hostRef.current;
     void (async () => {
       try {
-        renderer = await createRenderer(fileType, {
-          relocate: (loc) => {
-            setLocation(loc);
-            // Ignore the start page shown while the saved place is restored.
-            if (!openedRef.current) return;
-            pending.current = loc;
-            clearTimeout(saveTimer.current);
-            saveTimer.current = setTimeout(flushPosition, 1200);
+        renderer = await createRenderer(
+          fileType,
+          {
+            relocate: (loc) => {
+              setLocation(loc);
+              // Ignore the start page shown while the saved place is restored.
+              if (!openedRef.current) return;
+              pending.current = loc;
+              clearTimeout(saveTimer.current);
+              saveTimer.current = setTimeout(flushPosition, 1200);
+            },
+            selection: (sel) => {
+              setSelection(sel);
+              if (sel) setMenu(null);
+            },
+            annotationClick: (id, rect) => setMenu({ id, rect, edit: false }),
+            externalLink: (href) => linkRef.current(href),
           },
-          selection: (sel) => {
-            setSelection(sel);
-            if (sel) setMenu(null);
-          },
-          annotationClick: (id, rect) => setMenu({ id, rect, edit: false }),
-          externalLink: (href) => linkRef.current(href),
-        });
+          bookId,
+        );
         if (cancelled) return;
         const resume = useProfilePrefs.getState().prefs.reader.resume;
         await renderer.open(host, bookUrl(relPath), resume ? parseLocator(position.data) : null);
@@ -214,6 +225,7 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
         if (!renderer.paged && reader.fontScale !== 100) renderer.setZoom(reader.fontScale / 100);
         setToc(renderer.toc());
         setZoom(renderer.zoom());
+        setPageLayout(renderer.layoutOptions?.() ?? null);
         setStatus("ready");
       } catch (e) {
         if (!cancelled) {
@@ -230,7 +242,7 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
     };
     // Open once per book; later moves of the file do not reload the page.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [Boolean(relPath), fileType, ready]);
+  }, [Boolean(relPath), fileType, ready, attempt]);
 
   useEffect(() => {
     if (status === "ready") rendererRef.current?.setAnnotations(annotations);
@@ -262,7 +274,15 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
   }, [profilePrefs.reader.lineHeight, status]);
 
   const r = () => rendererRef.current;
-  const isPdf = fileType === "pdf";
+  const isPdf = isPaged(fileType);
+  const changeLayout = (change: Partial<PageLayout>) => {
+    r()?.setLayout?.(change);
+    setPageLayout(r()?.layoutOptions?.() ?? null);
+    setZoom(r()?.zoom() ?? 1);
+  };
+  // Manga: the arrow keys turn pages the other way.
+  const forward = () => (r()?.rightToLeft ? r()?.prev() : r()?.next());
+  const backward = () => (r()?.rightToLeft ? r()?.next() : r()?.prev());
 
   const changeZoom = (dir: 1 | -1 | 0) => {
     const renderer = r();
@@ -415,8 +435,8 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
   };
 
   // Shortcuts (only while this tab is showing; see ShortcutScope).
-  useShortcut("reader.next", () => r()?.next());
-  useShortcut("reader.previous", () => r()?.prev());
+  useShortcut("reader.next", forward);
+  useShortcut("reader.previous", backward);
   useShortcut("reader.pageDown", () => r()?.next());
   useShortcut("reader.pageUp", () => r()?.prev());
   useShortcut("reader.space", () => r()?.next());
@@ -548,7 +568,13 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
         >
           <Search />
         </Button>
-        <AppearanceMenu isPdf={isPdf} zoomLabel={zoomLabel} onZoom={changeZoom} />
+        <AppearanceMenu
+          isPdf={isPdf}
+          zoomLabel={zoomLabel}
+          onZoom={changeZoom}
+          pageLayout={pageLayout}
+          onPageLayout={changeLayout}
+        />
         <Button
           variant="ghost"
           size="icon"
@@ -621,9 +647,24 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
               <AlertTriangle className="size-6 text-destructive" aria-hidden />
               <p className="max-w-md">Libreri could not open this book.</p>
               <p className="max-w-md font-mono text-[12px] text-muted-foreground">{error}</p>
-              <Button variant="outline" onClick={() => void commands.openBookExternally(bookId)}>
-                Open in another app
-              </Button>
+              <div className="flex gap-2">
+                {error && /DjVuLibre|unar/.test(error) && (
+                  <Button
+                    onClick={() =>
+                      openHelper(/DjVuLibre/.test(error) ? "djvulibre" : "unar", () => {
+                        setError(null);
+                        setStatus("loading");
+                        setAttempt((a) => a + 1);
+                      })
+                    }
+                  >
+                    Install {/DjVuLibre/.test(error) ? "DjVuLibre" : "unar"}…
+                  </Button>
+                )}
+                <Button variant="outline" onClick={() => void commands.openBookExternally(bookId)}>
+                  Open in another app
+                </Button>
+              </div>
             </div>
           )}
           {findOpen && (

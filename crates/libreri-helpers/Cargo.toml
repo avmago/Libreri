@@ -1,0 +1,22 @@
+[package]
+name = "libreri-helpers"
+description = "Finds and installs the helper programs Libreri uses (DjVuLibre, Tesseract, unar)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+# Only the desktop shell turns this on, to generate TypeScript types.
+specta = { version = "=2.0.0-rc.25", features = ["derive"], optional = true }
+
+[features]
+specta = ["dep:specta"]
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
