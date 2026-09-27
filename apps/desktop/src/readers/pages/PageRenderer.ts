@@ -673,6 +673,10 @@ export class PageRenderer implements Renderer {
     return { current: state.at + 1, total: state.hits.length };
   }
 
+  async prepareFind(hint: { page?: number | null; section?: number | null }) {
+    if (hint.page) await this.goTo({ type: "pdf", page: hint.page, top: 0 });
+  }
+
   clearFind() {
     this.findState = null;
     this.drawAll();

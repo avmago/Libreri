@@ -53,7 +53,8 @@ Requirement (user, 2026-09-27): when the database, metadata and every kind of no
 ## Page cache and helper programs (Phase 5a)
 - Rendered DjVu pages and unpacked comic pages are kept in the app cache folder on each computer (`pages/<bookId>/`, up to 2 GB). They can always be made again from the book file, so they are never exported or backed up.
 - Helper programs (DjVuLibre, Tesseract, unar) are installed per computer and are not part of the library. On a new computer, Libreri offers to install them the first time a book needs one. See `docs/adr/0016-helpers-comics-djvu.md`.
-- Coming in 5b: the full-text search index also lives in the app cache and rebuilds itself; OCR text is saved in the library folder so it is backed up and exported with the books.
+- The full-text search index lives in the app cache (`search/<libraryId>.sqlite`) and rebuilds itself on any computer; it is never exported.
+- OCR text is saved in the library (`.library-data/text/<bookId>.json`: each page's text and word boxes), included in backups and Libreri archives and restored with the book. OCR language files are per computer (app data `tessdata/`). See `docs/adr/0017-full-text-search-and-ocr.md`.
 
 ## Edited PDFs (versions)
 - Page edits create a new version with a **page map** (old page → new page). Anchors are migrated through the map; text-quote fallback catches the rest. Exports include the version history so links to older versions still resolve.

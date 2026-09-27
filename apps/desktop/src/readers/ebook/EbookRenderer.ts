@@ -55,7 +55,7 @@ interface FoliateView extends HTMLElement {
   search(opts: {
     query: string;
   }): AsyncGenerator<
-    "done" | { progress?: number; subitems?: { cfi: string; excerpt: unknown }[] }
+    "done" | { index?: number; progress?: number; subitems?: { cfi: string; excerpt: unknown }[] }
   >;
   clearSearch(): void;
   deselect(): void;
@@ -80,6 +80,9 @@ export class EbookRenderer implements Renderer {
   private lineHeight = 1.55;
   private theme: PageTheme | null = null;
   private findResults: string[] = [];
+  /** Chapter of each result, to start from a search result's chapter. */
+  private findSections: number[] = [];
+  private findFromSection: number | null = null;
   private findIndex = -1;
   private lastQuery = "";
   private cleanup: (() => void)[] = [];
@@ -296,14 +299,24 @@ export class EbookRenderer implements Renderer {
     if (query !== this.lastQuery) {
       this.lastQuery = query;
       this.findResults = [];
+      this.findSections = [];
       this.findIndex = -1;
       if (query.trim()) {
         for await (const r of this.view.search({ query })) {
           if (r === "done") break;
-          for (const s of r.subitems ?? []) this.findResults.push(s.cfi);
+          for (const s of r.subitems ?? []) {
+            this.findResults.push(s.cfi);
+            this.findSections.push(r.index ?? 0);
+          }
           if (this.findResults.length >= 1000) break;
         }
       }
+    }
+    if (this.findFromSection !== null) {
+      const from = this.findFromSection;
+      this.findFromSection = null;
+      const at = this.findSections.findIndex((i) => i >= from);
+      if (at > 0 && !backwards) this.findIndex = at - 1;
     }
     const total = this.findResults.length;
     if (!total) return { current: 0, total: 0 };
@@ -312,6 +325,16 @@ export class EbookRenderer implements Renderer {
       : (this.findIndex + 1) % total;
     await this.view.goTo(this.findResults[this.findIndex]!);
     return { current: this.findIndex + 1, total };
+  }
+
+  async prepareFind(hint: { page?: number | null; section?: number | null }) {
+    if (hint.section == null) return;
+    this.findFromSection = hint.section;
+    try {
+      await this.view.goTo(hint.section);
+    } catch {
+      /* the chapter may not exist any more */
+    }
   }
 
   clearFind() {

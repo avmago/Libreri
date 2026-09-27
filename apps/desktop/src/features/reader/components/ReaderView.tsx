@@ -260,6 +260,28 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
     clearJump(bookId);
   }, [status, tab.jumpTo, annotations, bookId, clearJump]);
 
+  // Open at a search match: go where it was found, then find the words.
+  const [findKey, setFindKey] = useState(0);
+  useEffect(() => {
+    const f = tab.findText;
+    if (status !== "ready" || !f) return;
+    clearJump(bookId);
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+    void (async () => {
+      renderer.clearFind();
+      try {
+        await renderer.prepareFind?.({ page: f.page, section: f.section });
+      } catch {
+        /* the place may be gone; find from here */
+      }
+      setLastQuery(f.query);
+      setFindKey((k) => k + 1);
+      setFindOpen(true);
+      setFindStep((s) => ({ backwards: false, seq: s.seq + 1 }));
+    })();
+  }, [status, tab.findText, bookId, clearJump]);
+
   // Keep the tab title in step with the book's details.
   const rename = useTabs((s) => s.rename);
   useEffect(() => {
@@ -669,6 +691,7 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
           )}
           {findOpen && (
             <FindBar
+              key={findKey}
               step={findStep}
               initialQuery={lastQuery}
               onQuery={setLastQuery}

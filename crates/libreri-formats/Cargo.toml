@@ -19,6 +19,9 @@ sevenz-rust2 = { version = "0.23.0", default-features = false, features = ["comp
 tar = "0.4.46"
 serde.workspace = true
 serde_json.workspace = true
+hayro = "0.7.1"
+kurbo = "0.13.0"
+png = "0.18.1"
 
 [dev-dependencies]
 lopdf = { version = "0.45.0", default-features = false }

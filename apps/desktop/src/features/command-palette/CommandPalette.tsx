@@ -1,4 +1,5 @@
-import type { LucideIcon } from "lucide-react";
+import { useState } from "react";
+import { FileSearch, type LucideIcon } from "lucide-react";
 import {
   CommandDialog,
   CommandEmpty,
@@ -26,11 +27,15 @@ export function CommandPalette({
   open,
   onOpenChange,
   actions,
+  onSearch,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   actions: PaletteAction[];
+  /** "Search for …": opens the search screen with what was typed. */
+  onSearch?: (query: string) => void;
 }) {
+  const [typed, setTyped] = useState("");
   const groups = [...new Set(actions.map((a) => a.group))];
   const run = (a: PaletteAction) => {
     onOpenChange(false);
@@ -39,9 +44,31 @@ export function CommandPalette({
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange} label="Command palette">
-      <CommandInput placeholder="Type a command…" />
+      <CommandInput
+        placeholder={onSearch ? "Search or type a command…" : "Type a command…"}
+        value={typed}
+        onValueChange={setTyped}
+      />
       <CommandList>
-        <CommandEmpty>No matching commands.</CommandEmpty>
+        {onSearch && typed.trim().length >= 2 && (
+          <CommandGroup heading="Search" forceMount>
+            <CommandItem
+              forceMount
+              value={`search ${typed}`}
+              onSelect={() => {
+                onOpenChange(false);
+                onSearch(typed.trim());
+                setTyped("");
+              }}
+            >
+              <FileSearch />
+              <span className="flex-1">Search books, text and notes for “{typed.trim()}”</span>
+            </CommandItem>
+          </CommandGroup>
+        )}
+        {!(onSearch && typed.trim().length >= 2) && (
+          <CommandEmpty>No matching commands.</CommandEmpty>
+        )}
         {groups.map((g) => (
           <CommandGroup key={g} heading={g}>
             {actions

@@ -58,11 +58,12 @@ export function useCloseLibrary() {
 
 // ---- Reading ---------------------------------------------------------------
 
-export function useBooks(query: BookQuery) {
+export function useBooks(query: BookQuery, enabled = true) {
   return useQuery({
     queryKey: [...libKey, "books", query],
     queryFn: async () => (await unwrap(commands.listBooks(query))).map(toView),
     placeholderData: (previous) => previous,
+    enabled,
   });
 }
 

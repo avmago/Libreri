@@ -15,4 +15,5 @@ pub mod portability;
 pub mod profiles;
 pub mod reader;
 pub mod scan;
+pub mod search;
 pub mod settings;

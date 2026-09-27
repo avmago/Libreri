@@ -13,6 +13,17 @@ export interface BookTab {
   fileType: FileType;
   /** Where to go when the tab opens (an annotation id), used once. */
   jumpTo?: string;
+  /** Words to find when the tab opens (from Search), used once. */
+  findText?: FindRequest;
+}
+
+/** Opening a book at a search match: the words and where they were found. */
+export interface FindRequest {
+  query: string;
+  /** 1-based page (PDF, DjVu). */
+  page?: number | null;
+  /** 0-based chapter (EPUB). */
+  section?: number | null;
 }
 
 /** Two books side by side. */
@@ -65,9 +76,14 @@ export const useTabs = create<TabsState>((set, get) => ({
         return {
           active: tab.bookId,
           lastBook: tab.bookId,
-          tabs: tab.jumpTo
-            ? s.tabs.map((t) => (t.bookId === tab.bookId ? { ...t, jumpTo: tab.jumpTo } : t))
-            : s.tabs,
+          tabs:
+            tab.jumpTo || tab.findText
+              ? s.tabs.map((t) =>
+                  t.bookId === tab.bookId
+                    ? { ...t, jumpTo: tab.jumpTo, findText: tab.findText }
+                    : t,
+                )
+              : s.tabs,
         };
       }
       return { tabs: [...s.tabs, tab], active: tab.bookId, lastBook: tab.bookId };
@@ -84,7 +100,7 @@ export const useTabs = create<TabsState>((set, get) => ({
         s.active !== bookId
           ? s.active
           : (partner ?? tabs[Math.min(i, tabs.length - 1)]?.bookId ?? null);
-      const closedTab: BookTab = { ...s.tabs[i]!, jumpTo: undefined };
+      const closedTab: BookTab = { ...s.tabs[i]!, jumpTo: undefined, findText: undefined };
       return {
         tabs,
         active,
@@ -123,7 +139,9 @@ export const useTabs = create<TabsState>((set, get) => ({
   },
   clearJump: (bookId) =>
     set((s) => ({
-      tabs: s.tabs.map((t) => (t.bookId === bookId ? { ...t, jumpTo: undefined } : t)),
+      tabs: s.tabs.map((t) =>
+        t.bookId === bookId ? { ...t, jumpTo: undefined, findText: undefined } : t,
+      ),
     })),
   toggleSplit: () => {
     const s = get();

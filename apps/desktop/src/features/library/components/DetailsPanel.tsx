@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { useDetailsDialog, useFillDetails } from "@/features/details";
 import { useLocateFile, usePortability } from "@/features/portability";
 import { usePermissions } from "@/features/profiles";
+import { TextStatusRow } from "@/features/search";
 import { useUpdateBook } from "../api";
 import { useLibraryDialogs } from "../dialogs";
 import { useBookActions } from "../hooks/useBookActions";
@@ -256,6 +257,7 @@ function SingleBook({ book }: { book: BookView }) {
           {book.folder || "Books"}
         </Row>
         <Row label="Added">{formatDate(book.addedAt)}</Row>
+        <TextStatusRow bookId={book.id} />
       </dl>
     </div>
   );

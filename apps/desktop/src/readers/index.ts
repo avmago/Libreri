@@ -29,7 +29,7 @@ export async function createRenderer(
   switch (type) {
     case "pdf": {
       const { PdfRenderer } = await import("./pdf/PdfRenderer");
-      return new PdfRenderer(events);
+      return new PdfRenderer(events, bookId);
     }
     case "md":
     case "txt": {

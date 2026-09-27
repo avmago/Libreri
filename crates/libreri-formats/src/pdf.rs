@@ -200,6 +200,52 @@ pub fn test_pdf(path: &Path, pages: u32) {
     doc.save(path).expect("the test PDF is written");
 }
 
+/// Writes a PDF with one page per entry of `pages`, each showing its text
+/// in Helvetica (lines split on `\n`), for tests. An empty entry makes a
+/// page without text, like a scan.
+#[doc(hidden)]
+pub fn test_text_pdf(path: &Path, pages: &[&str]) {
+    use lopdf::{dictionary, Document, Object, Stream};
+    let mut doc = Document::with_version("1.5");
+    let pages_id = doc.new_object_id();
+    let font = doc.add_object(dictionary! {
+        "Type" => "Font", "Subtype" => "Type1", "BaseFont" => "Helvetica",
+        "Encoding" => "WinAnsiEncoding",
+    });
+    let mut kids = Vec::new();
+    for text in pages {
+        let mut body = String::new();
+        for (i, line) in text.lines().enumerate() {
+            let line = line
+                .replace('\\', "\\\\")
+                .replace('(', "\\(")
+                .replace(')', "\\)");
+            body.push_str(&format!(
+                "BT /F1 12 Tf 72 {} Td ({line}) Tj ET\n",
+                700 - 16 * i as i64
+            ));
+        }
+        let content = doc.add_object(Stream::new(dictionary! {}, body.into_bytes()));
+        let page = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+            "Contents" => content,
+            "Resources" => dictionary! { "Font" => dictionary! { "F1" => font } },
+        });
+        kids.push(Object::Reference(page));
+    }
+    doc.objects.insert(
+        pages_id,
+        Object::Dictionary(dictionary! {
+            "Type" => "Pages", "Count" => kids.len() as i64, "Kids" => kids,
+        }),
+    );
+    let catalog = doc.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages_id });
+    doc.trailer.set("Root", catalog);
+    doc.save(path).expect("the test PDF is written");
+}
+
 #[cfg(test)]
 mod tests {
     use crate::extract;
@@ -249,32 +295,8 @@ mod tests {
         );
     }
 
-    /// A one-page PDF whose page shows `text` in Helvetica.
     fn text_pdf(path: &std::path::Path, text: &str) {
-        let mut doc = Document::with_version("1.5");
-        let pages_id = doc.new_object_id();
-        let font = doc.add_object(dictionary! {
-            "Type" => "Font", "Subtype" => "Type1", "BaseFont" => "Helvetica",
-            "Encoding" => "WinAnsiEncoding",
-        });
-        let body = format!("BT /F1 12 Tf 72 700 Td ({text}) Tj ET");
-        let content = doc.add_object(Stream::new(dictionary! {}, body.into_bytes()));
-        let page = doc.add_object(dictionary! {
-            "Type" => "Page",
-            "Parent" => pages_id,
-            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
-            "Contents" => content,
-            "Resources" => dictionary! { "Font" => dictionary! { "F1" => font } },
-        });
-        doc.objects.insert(
-            pages_id,
-            Object::Dictionary(dictionary! {
-                "Type" => "Pages", "Kids" => vec![Object::Reference(page)], "Count" => 1,
-            }),
-        );
-        let catalog = doc.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages_id });
-        doc.trailer.set("Root", catalog);
-        doc.save(path).unwrap();
+        crate::test_text_pdf(path, &[text]);
     }
 
     #[test]

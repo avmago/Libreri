@@ -29,6 +29,7 @@ pub const DATA_SUBDIRS: &[&str] = &[
     "versions",
     "users",
     "models",
+    "text",
 ];
 
 /// Resolves the well-known paths of one library folder.

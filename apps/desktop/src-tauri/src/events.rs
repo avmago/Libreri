@@ -309,3 +309,36 @@ pub struct HelperInstall {
     pub done: bool,
     pub error: Option<String>,
 }
+
+/// The search index is being brought up to date in the background.
+#[derive(Debug, Clone, Serialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchIndexProgress {
+    pub done: u32,
+    pub total: u32,
+    pub running: bool,
+}
+
+/// "Make searchable" finished (or stopped).
+#[derive(Debug, Clone, Serialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrFinished {
+    pub job_id: String,
+    pub book_ids: Vec<String>,
+    /// Books done.
+    pub books: u32,
+    pub pages_read: u32,
+    pub pages_failed: u32,
+    pub errors: Vec<String>,
+}
+
+/// Progress of downloading an OCR language.
+#[derive(Debug, Clone, Serialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrLanguageDownload {
+    pub code: String,
+    pub done: f64,
+    pub total: Option<f64>,
+    pub finished: bool,
+    pub error: Option<String>,
+}

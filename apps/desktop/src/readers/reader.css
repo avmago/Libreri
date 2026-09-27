@@ -344,3 +344,11 @@ mark.lb-find-current {
   border-radius: 2px;
   background: rgba(249, 115, 22, 0.45);
 }
+
+/* OCR words over a scanned PDF page: above PDF.js's (empty) text layer. */
+.lb-pdf .lb-ocr-text {
+  z-index: 3;
+}
+.lb-pdf .lb-page-find {
+  z-index: 1;
+}

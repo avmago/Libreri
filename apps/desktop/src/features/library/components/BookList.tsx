@@ -6,6 +6,7 @@ import { authorsText, FILE_TYPE_LABEL, formatDate, formatSize, type BookView } f
 import { useLibraryView } from "../store";
 import { useDrag } from "../drag";
 import { BookContextMenu } from "./BookContextMenu";
+import { NoTextMark } from "@/features/search";
 import { BookCover } from "./BookCover";
 import { useItemHandlers, type ItemHandlers } from "../hooks/useBookInteractions";
 
@@ -71,6 +72,7 @@ const BookRow = memo(function BookRow({
             {b.user.favorite && (
               <Heart className="size-3 shrink-0 fill-current" aria-label="Favourite" />
             )}
+            <NoTextMark id={b.id} />
           </span>
           {b.metadata.subtitle && (
             <span className="truncate text-[11.5px] text-muted-foreground">

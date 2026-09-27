@@ -32,6 +32,7 @@ mod profiles;
 mod reading;
 mod scan;
 mod sidecar;
+mod text;
 mod watcher;
 
 use libreri_core::{LibraryInfo, LibraryLayout, ProfileId, LIBRARY_FORMAT_VERSION};
@@ -62,12 +63,14 @@ pub use health::{list_backups, BackupFile, BrokenLink, HealthReport, LocateOutco
 pub use import::{Duplicate, ImportMode, ImportReport, ImportRequest};
 pub use libreri_db::Facets;
 pub use libreri_formats::djvu::{OutlineItem, Word};
+pub use libreri_search::{Hit, SearchIndex, SnippetPart, TextState};
 pub use lock::{LibraryLock, LockOwner};
 pub use notes::{NoteEntry, NotebookEntry};
 pub use pages::{page_cache_size, prune_page_cache, PageBook, PageKind};
 pub use profiles::{Collection, PinChange};
 pub use reading::Notebook;
 pub use scan::ScanReport;
+pub use text::{IndexReport, OcrOptions, OcrReport, OcrText, TextResult, TextStatus};
 pub use watcher::LibraryWatcher;
 
 /// Errors from library operations. Messages are written for people.

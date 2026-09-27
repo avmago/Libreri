@@ -120,7 +120,8 @@ impl Library {
             let info = self.djvu_info(&path, &dir)?;
             // A quick look at the first pages tells if there is a text layer.
             let has_text = (1..=info.sizes.len().min(5) as u32)
-                .any(|p| djvu::page_words(&path, p).is_ok_and(|w| !w.is_empty()));
+                .any(|p| djvu::page_words(&path, p).is_ok_and(|w| !w.is_empty()))
+                || self.ocr_cached(&self.book(id)?.id).is_some();
             return Ok(PageBook {
                 kind: PageKind::Djvu,
                 pages: info.sizes.len() as u32,
@@ -217,21 +218,58 @@ impl Library {
         Ok((fs::read(file)?, mime(&name)))
     }
 
-    /// The words of a DjVu page with their boxes (empty without a text
-    /// layer).
+    /// The words of a page with their boxes: a DjVu page's text layer, or
+    /// saved OCR text (DjVu and PDF). Empty when there is none.
     pub fn page_words(&self, id: &BookId, page: u32) -> Result<Vec<Word>> {
         let (path, kind) = self.page_source(id)?;
-        if kind != FileType::Djvu {
-            return Ok(Vec::new());
+        let id = self.book(id)?.id;
+        match kind {
+            FileType::Djvu => {
+                let words = djvu::page_words(&path, page).map_err(Error::InvalidInput)?;
+                if !words.is_empty() {
+                    return Ok(words);
+                }
+            }
+            FileType::Pdf => {}
+            _ => return Ok(Vec::new()),
         }
-        djvu::page_words(&path, page).map_err(Error::InvalidInput)
+        Ok(self.ocr_words(&id, page))
+    }
+
+    /// Pages of a PDF that have saved OCR text (the reader adds a hidden
+    /// text layer to them).
+    pub fn ocr_pages(&self, id: &BookId) -> Result<Vec<u32>> {
+        let id = self.book(id)?.id;
+        Ok(self
+            .ocr_cached(&id)
+            .map(|t| {
+                t.pages
+                    .iter()
+                    .filter(|p| !p.words.is_empty())
+                    .map(|p| p.page)
+                    .collect()
+            })
+            .unwrap_or_default())
     }
 }
 
 impl Library {
-    /// The plain text of every DjVu page (for finding), cached per computer.
+    /// The plain text of every DjVu page (for finding), cached per computer;
+    /// for a PDF, the text of its OCR-read pages.
     pub fn page_texts(&self, id: &BookId, cache: &Path) -> Result<Vec<String>> {
         let (path, kind) = self.page_source(id)?;
+        if kind == FileType::Pdf {
+            // Scanned PDFs: the OCR text, by page (PDF.js finds the rest).
+            let Some(ocr) = self.ocr_cached(&self.book(id)?.id) else {
+                return Ok(Vec::new());
+            };
+            let last = ocr.pages.iter().map(|p| p.page).max().unwrap_or(0) as usize;
+            let mut list = vec![String::new(); last];
+            for p in ocr.pages.iter().filter(|p| p.page > 0) {
+                list[p.page as usize - 1] = p.text.clone();
+            }
+            return Ok(list);
+        }
         if kind != FileType::Djvu {
             return Ok(Vec::new());
         }
@@ -239,7 +277,7 @@ impl Library {
         let file = dir.join("text.json");
         if let Ok(text) = fs::read_to_string(&file) {
             if let Ok(list) = serde_json::from_str(&text) {
-                return Ok(list);
+                return Ok(self.with_ocr(id, list));
             }
         }
         let info = self.djvu_info(&path, &dir)?;
@@ -249,7 +287,22 @@ impl Library {
             &file,
             serde_json::to_vec(&list).map_err(std::io::Error::other)?,
         );
-        Ok(list)
+        Ok(self.with_ocr(id, list))
+    }
+
+    /// Fills pages without a text layer from saved OCR text.
+    fn with_ocr(&self, id: &BookId, mut list: Vec<String>) -> Vec<String> {
+        let Some(ocr) = self.book(id).ok().and_then(|b| self.ocr_cached(&b.id)) else {
+            return list;
+        };
+        for p in &ocr.pages {
+            if let Some(slot) = list.get_mut(p.page.saturating_sub(1) as usize) {
+                if slot.chars().filter(|c| c.is_alphanumeric()).count() < 16 {
+                    *slot = p.text.clone();
+                }
+            }
+        }
+        list
     }
 }
 

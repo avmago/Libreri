@@ -6,7 +6,7 @@ import { DEFAULT_PREFS, useReaderPrefs, type ReaderPrefs } from "../prefs";
 
 interface Session {
   version: 1;
-  tabs: Omit<BookTab, "jumpTo">[];
+  tabs: Omit<BookTab, "jumpTo" | "findText">[];
   active: string | null;
   split?: Split | null;
   prefs: ReaderPrefs;

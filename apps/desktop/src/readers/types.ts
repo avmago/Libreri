@@ -85,6 +85,11 @@ export interface Renderer {
   showAnnotation(annotation: Annotation): Promise<void>;
   find(query: string, backwards?: boolean): Promise<FindResult>;
   clearFind(): void;
+  /**
+   * Before finding words from a search result: goes to where they were
+   * found, so the next `find` starts there.
+   */
+  prepareFind?(hint: { page?: number | null; section?: number | null }): Promise<void>;
   setTheme(theme: PageTheme, pdfMode: PdfDarkMode): void;
   /** Text size for reflowable books, page zoom for PDFs (1 = 100 %). */
   setZoom(zoom: ZoomValue): void;

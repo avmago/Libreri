@@ -7,6 +7,7 @@ import { useItemHandlers, type ItemHandlers } from "../hooks/useBookInteractions
 import { authorsText, type BookView } from "../model";
 import { useLibraryView } from "../store";
 import { BookContextMenu } from "./BookContextMenu";
+import { NoTextMark } from "@/features/search";
 import { BookCover } from "./BookCover";
 
 export function FolderTile({ folder, onOpen }: { folder: FolderDto; onOpen: () => void }) {
@@ -74,6 +75,7 @@ const BookCard = memo(function BookCard({
             {b.user.favorite && (
               <Heart className="size-3 shrink-0 fill-current" aria-label="Favourite" />
             )}
+            <NoTextMark id={b.id} />
           </span>
         </div>
       </div>

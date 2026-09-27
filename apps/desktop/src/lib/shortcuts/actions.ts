@@ -73,6 +73,12 @@ export const ACTIONS = {
     keys: "Mod+Shift+2",
     whileTyping: true,
   },
+  "go.search": {
+    label: "Search inside books, details and notes",
+    group: "General",
+    keys: "Mod+Alt+F",
+    whileTyping: true,
+  },
   "library.health": { label: "Check library health", group: "General", keys: null },
   "library.backup": { label: "Back up the library now", group: "General", keys: null },
   "library.importArchive": {

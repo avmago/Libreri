@@ -13,6 +13,7 @@ export type Nav =
   | { kind: "category"; path: string }
   | { kind: "collection"; id: string; name: string; query: BookQuery }
   | { kind: "notes" }
+  | { kind: "search"; query?: string }
   | { kind: "organize" };
 
 export type ViewMode = "grid" | "list" | "shelf";
@@ -182,6 +183,8 @@ export function navTitle(nav: Nav): string {
       return "Notes";
     case "organize":
       return "Organize";
+    case "search":
+      return "Search";
     case "all":
       return "All Books";
     case "favorites":

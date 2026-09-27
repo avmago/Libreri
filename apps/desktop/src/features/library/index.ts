@@ -1,5 +1,6 @@
 export {
   useBook,
+  useBooks,
   useCollections,
   useCurrentLibrary,
   useCloseLibrary,

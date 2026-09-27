@@ -88,6 +88,19 @@ fn source() -> (tempfile::TempDir, Library, BookId) {
         .unwrap();
     lib.sign_out().unwrap();
     lib.sign_in(&owner(&lib).id, None).unwrap();
+    // OCR text read earlier travels with the book.
+    let ocr = OcrText {
+        format_version: 1,
+        engine: "tesseract 5".into(),
+        languages: vec!["eng".into()],
+        updated_at: String::new(),
+        pages: vec![libreri_formats::ocr::OcrPage {
+            page: 1,
+            text: "Rays of light".into(),
+            ..Default::default()
+        }],
+    };
+    lib.save_ocr(&optics.id, &ocr).unwrap();
     (dir, lib, optics.id)
 }
 
@@ -166,6 +179,8 @@ fn everything_comes_back_in_a_new_library_at_another_path() {
     );
     let nb = b.notebook(&optics).unwrap();
     assert!(nb.content.contains("My thoughts"), "{}", nb.content);
+    let ocr = b.ocr_text(&optics).unwrap().expect("OCR text came along");
+    assert_eq!(ocr.pages[0].text, "Rays of light");
     assert_eq!(b.collections().unwrap()[0].name, "Light");
 
     // Sam's notes went to a new Sam, without the PIN (exports never carry it).

@@ -11,6 +11,7 @@ import {
   Heart,
   Library,
   NotebookText,
+  FileSearch,
   Pencil,
   Plus,
   Shapes,
@@ -40,6 +41,7 @@ import { useLibraryView, type Nav } from "../store";
 import { FolderTree, type FolderEditing } from "./FolderTree";
 
 function same(a: Nav, b: Nav) {
+  if (a.kind === "search" && b.kind === "search") return true;
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
@@ -174,6 +176,7 @@ function Rail() {
     ...(facets?.missing
       ? [{ nav: { kind: "missing" } as Nav, label: "Missing files", Icon: AlertTriangle }]
       : []),
+    { nav: { kind: "search" }, label: "Search", Icon: FileSearch },
     { nav: { kind: "notes" }, label: "Notes", Icon: NotebookText },
     ...(editLibrary ? [{ nav: { kind: "organize" } as Nav, label: "Organize", Icon: Tags }] : []),
     { nav: { kind: "folder", path: "" }, label: "Folders", Icon: Folder },
@@ -387,6 +390,7 @@ export function LibrarySidebar({
         </div>
         <div className="flex flex-col gap-px">
           <SectionTitle>YOURS</SectionTitle>
+          <NavItem nav={{ kind: "search" }} label="Search" Icon={FileSearch} count={0} />
           <NavItem nav={{ kind: "notes" }} label="Notes" Icon={NotebookText} count={0} />
           {editLibrary && (
             <NavItem nav={{ kind: "organize" }} label="Organize" Icon={Tags} count={0} />

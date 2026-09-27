@@ -31,6 +31,9 @@ pub struct AppSettings {
     /// Accent colour as a hex string; `None` means the default (black).
     pub accent: Option<String>,
     pub recent_libraries: Vec<RecentLibrary>,
+    /// Languages OCR reads when a book does not say its own (Tesseract
+    /// codes); empty means English.
+    pub ocr_languages: Vec<String>,
 }
 
 /// How many libraries the Welcome screen remembers.

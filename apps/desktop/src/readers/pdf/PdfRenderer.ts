@@ -8,7 +8,8 @@
  * a layer on top of each rendered page.
  */
 import type { PDFDocumentProxy } from "pdfjs-dist";
-import type { Annotation } from "@/lib/ipc";
+import { commands, unwrap, type Annotation, type WordDto } from "@/lib/ipc";
+import { findHits, matchRects, wordLayer } from "../ocrText";
 import { makeQuote } from "../quote";
 import type { PageTheme } from "../themes";
 import {
@@ -69,8 +70,18 @@ export class PdfRenderer implements Renderer {
   private lastQuery = "";
   private zoomValue: ZoomValue = "auto";
   private cleanup: (() => void)[] = [];
+  /** Pages read with OCR (scans): they get a hidden text layer. */
+  private ocrPages = new Set<number>();
+  private ocrWords = new Map<number, WordDto[]>();
+  private ocrTexts: string[] | null = null;
+  /** Finding in OCR text, when PDF.js finds nothing in the PDF's own text. */
+  private ocrFind: { query: string; hits: { page: number; index: number }[]; at: number } | null =
+    null;
 
-  constructor(private readonly events: RendererEvents) {}
+  constructor(
+    private readonly events: RendererEvents,
+    private readonly bookId?: string,
+  ) {}
 
   async open(host: HTMLElement, url: string, initial: Locator | null) {
     const { pdfjs, viewer: mod } = await loadPdfJs();
@@ -180,6 +191,7 @@ export class PdfRenderer implements Renderer {
 
     if (initial) await this.goTo(initial);
     this.emitLocation();
+    void this.loadOcr();
   }
 
   destroy() {
@@ -294,7 +306,10 @@ export class PdfRenderer implements Renderer {
     const range = sel.getRangeAt(0);
     if (!this.container.contains(range.commonAncestorContainer)) return;
     const pageDiv = (range.startContainer.parentElement ?? null)?.closest<HTMLElement>(".page");
-    const layer = pageDiv?.querySelector<HTMLElement>(".textLayer");
+    // Scanned pages: the OCR words stand in for the PDF's text layer.
+    const layer =
+      pageDiv?.querySelector<HTMLElement>(".lb-ocr-text") ??
+      pageDiv?.querySelector<HTMLElement>(".textLayer");
     if (!pageDiv || !layer) return;
     const page = Number(pageDiv.dataset.pageNumber);
     const box = pageDiv.getBoundingClientRect();
@@ -335,10 +350,42 @@ export class PdfRenderer implements Renderer {
     this.container.classList.toggle("lb-over-hl", under);
   }
 
+  /** Loads which pages have OCR text (after the book opens). */
+  private async loadOcr() {
+    if (!this.bookId) return;
+    const pages = await unwrap(commands.ocrPages(this.bookId)).catch(() => [] as number[]);
+    if (this.destroyed || !pages.length) return;
+    this.ocrPages = new Set(pages);
+    for (const p of pages) this.drawOcr(p);
+  }
+
+  private async wordsOf(page: number): Promise<WordDto[]> {
+    const cached = this.ocrWords.get(page);
+    if (cached) return cached;
+    const list = await unwrap(commands.pageWords(this.bookId!, page)).catch(() => []);
+    this.ocrWords.set(page, list);
+    return list;
+  }
+
+  /** A hidden layer of OCR words over a scanned page, so it can be selected. */
+  private async drawOcr(pageNumber: number) {
+    if (!this.ocrPages.has(pageNumber)) return;
+    const div = this.viewer.getPageView(pageNumber - 1)?.div as HTMLElement | undefined;
+    if (!div || !div.querySelector("canvas")) return;
+    const words = await this.wordsOf(pageNumber);
+    if (this.destroyed || !words.length) return;
+    // PDF.js may have drawn its own text layer since; use it if it has words.
+    const own = div.querySelector(".textLayer")?.textContent?.trim() ?? "";
+    if (own.length > 20) return;
+    div.querySelector(".lb-ocr-text")?.remove();
+    wordLayer(div, words, "lb-page-text lb-ocr-text");
+  }
+
   private drawPage(pageNumber: number) {
     const view = this.viewer.getPageView(pageNumber - 1);
     const div = view?.div as HTMLElement | undefined;
     if (!div) return;
+    void this.drawOcr(pageNumber);
     let layer = div.querySelector<HTMLElement>(".lb-pdf-hl-layer");
     if (!layer) {
       layer = document.createElement("div");
@@ -364,6 +411,20 @@ export class PdfRenderer implements Renderer {
         layer.append(r);
       }
     }
+    const f = this.ocrFind;
+    const hit = f?.hits[f.at];
+    if (f && hit?.page === pageNumber) {
+      for (const [x, y, w, h] of matchRects(
+        this.ocrWords.get(pageNumber) ?? [],
+        f.query,
+        hit.index,
+      )) {
+        const r = document.createElement("div");
+        r.className = "lb-page-find";
+        r.style.cssText = `left:${x * 100}%;top:${y * 100}%;width:${w * 100}%;height:${h * 100}%`;
+        layer.append(r);
+      }
+    }
   }
 
   setAnnotations(list: Annotation[]) {
@@ -379,7 +440,39 @@ export class PdfRenderer implements Renderer {
     }
   }
 
-  find(query: string, backwards = false): Promise<FindResult> {
+  async find(query: string, backwards = false): Promise<FindResult> {
+    if (this.ocrFind?.query === query) return this.findInOcr(query, backwards);
+    const found = await this.findInPdf(query, backwards);
+    if (found.total || !this.ocrPages.size) return found;
+    return this.findInOcr(query, backwards);
+  }
+
+  /** Finds in the OCR text of scanned pages, from the page shown. */
+  private async findInOcr(query: string, backwards: boolean): Promise<FindResult> {
+    const prevPage = this.ocrFind?.hits[this.ocrFind.at]?.page;
+    let f = this.ocrFind;
+    if (!f || f.query !== query) {
+      this.ocrTexts ??= await unwrap(commands.pageTexts(this.bookId!)).catch(() => []);
+      const hits = findHits(this.ocrTexts, query);
+      const here = this.viewer.currentPageNumber;
+      let at = hits.findIndex((h) => h.page >= here);
+      if (at < 0) at = 0;
+      if (backwards) at = Math.max(0, at - 1);
+      f = this.ocrFind = { query, hits, at };
+    } else if (f.hits.length) {
+      f.at = (f.at + (backwards ? -1 : 1) + f.hits.length) % f.hits.length;
+    }
+    const hit = f.hits[f.at];
+    if (!hit) return { current: 0, total: 0 };
+    await this.wordsOf(hit.page);
+    const rects = matchRects(this.ocrWords.get(hit.page) ?? [], query, hit.index);
+    await this.goTo({ type: "pdf", page: hit.page, top: Math.max(0, (rects[0]?.[1] ?? 0) - 0.15) });
+    if (prevPage && prevPage !== hit.page) this.drawPage(prevPage);
+    this.drawPage(hit.page);
+    return { current: f.at + 1, total: f.hits.length };
+  }
+
+  private findInPdf(query: string, backwards = false): Promise<FindResult> {
     const again = query === this.lastQuery;
     this.lastQuery = query;
     return new Promise((resolve) => {
@@ -402,7 +495,14 @@ export class PdfRenderer implements Renderer {
     });
   }
 
+  async prepareFind(hint: { page?: number | null; section?: number | null }) {
+    if (hint.page) await this.goTo({ type: "pdf", page: hint.page, top: 0 });
+  }
+
   clearFind() {
+    const page = this.ocrFind?.hits[this.ocrFind.at]?.page;
+    this.ocrFind = null;
+    if (page) this.drawPage(page);
     this.lastQuery = "";
     this.bus?.dispatch("findbarclose", { source: this });
   }

@@ -4,7 +4,7 @@ use crate::backup_store::{BackupSettings, BackupStore};
 use crate::error::{AppError, AppResult};
 use crate::events::{
     ArchiveImported, BackupFinished, DetailsFilled, ExportFinished, ForeignImported,
-    ImportFinished, JobEventPayload, LibraryChanged,
+    ImportFinished, JobEventPayload, LibraryChanged, OcrFinished, SearchIndexProgress,
 };
 use crate::online_store::OnlineStore;
 use crate::settings_store::SettingsStore;
@@ -12,7 +12,8 @@ use libreri_core::AppSettings;
 use libreri_core::BookId;
 use libreri_jobs::{JobContext, JobError, JobId, JobQueue};
 use libreri_library::{
-    ArchiveImport, ExportRequest, ImportRequest, Library, LibraryWatcher, Progress,
+    ArchiveImport, ExportRequest, ImportRequest, Library, LibraryWatcher, OcrOptions, Progress,
+    SearchIndex,
 };
 use libreri_metadata::Http;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -33,6 +34,15 @@ pub struct AppState {
     pub backups: BackupStore,
     /// Page images of comics and DjVu books (this computer only).
     pub page_cache: std::path::PathBuf,
+    /// Search indexes, one per library (this computer only).
+    search_dir: std::path::PathBuf,
+    /// The open library's search index.
+    search: Mutex<Option<Arc<SearchIndex>>>,
+    /// Indexing in the background: asked for, and running.
+    index_wanted: Arc<AtomicBool>,
+    index_running: Arc<AtomicBool>,
+    /// OCR language files downloaded by Libreri (this computer only).
+    pub tessdata: std::path::PathBuf,
     /// A backup is running; the schedule does not start another.
     backup_running: Arc<AtomicBool>,
     /// Shared by all lookups, so connections are reused.
@@ -81,6 +91,55 @@ impl Progress for JobProgress<'_> {
     }
 }
 
+/// Reports indexing to the interface a few times a second, and stops when
+/// the library is closed.
+struct IndexProgress {
+    handle: AppHandle,
+    library: std::sync::Weak<Library>,
+    last: Mutex<std::time::Instant>,
+}
+
+impl Progress for IndexProgress {
+    fn report(&self, done: u64, total: u64, _message: &str) {
+        let mut last = lock(&self.last);
+        if done == 0 || done >= total || last.elapsed().as_millis() > 400 {
+            *last = std::time::Instant::now();
+            let _ = SearchIndexProgress {
+                done: done as u32,
+                total: total as u32,
+                running: true,
+            }
+            .emit(&self.handle);
+        }
+    }
+    fn cancelled(&self) -> bool {
+        let open = self
+            .handle
+            .try_state::<AppState>()
+            .and_then(|s| s.library_if_open());
+        match (open, self.library.upgrade()) {
+            (Some(a), Some(b)) => !Arc::ptr_eq(&a, &b),
+            _ => true,
+        }
+    }
+}
+
+/// Job progress with the book's title in front, for OCR of many books.
+struct OcrProgress<'a> {
+    ctx: &'a JobContext,
+    prefix: String,
+}
+
+impl Progress for OcrProgress<'_> {
+    fn report(&self, done: u64, total: u64, message: &str) {
+        self.ctx
+            .progress(done, total, Some(format!("{}{message}", self.prefix)));
+    }
+    fn cancelled(&self) -> bool {
+        self.ctx.check_cancelled().is_err()
+    }
+}
+
 fn job_error(e: libreri_library::Error) -> JobError {
     match e {
         libreri_library::Error::Cancelled => JobError::Cancelled(libreri_jobs::Cancelled),
@@ -114,6 +173,8 @@ impl AppState {
         let online = online_store.load();
         let backups = BackupStore::new(&config_dir);
         let page_cache = app.path().app_cache_dir()?.join("pages");
+        let search_dir = app.path().app_cache_dir()?.join("search");
+        let tessdata = app.path().app_data_dir()?.join("tessdata");
         // Keep the page cache under 2 GB (least recently read books go first).
         let cache = page_cache.clone();
         std::thread::spawn(move || {
@@ -136,6 +197,11 @@ impl AppState {
             online_store,
             backups,
             page_cache,
+            search_dir,
+            search: Mutex::new(None),
+            index_wanted: Arc::default(),
+            index_running: Arc::default(),
+            tessdata,
             backup_running: Arc::default(),
             http: make_http(),
             phone: Mutex::new(None),
@@ -196,6 +262,13 @@ impl AppState {
     /// for changes made while Libreri was closed.
     pub fn adopt(&self, library: Library) {
         let books_dir = library.layout().books_dir();
+        let index_path = self
+            .search_dir
+            .join(format!("{}.sqlite", library.info().id));
+        match SearchIndex::open(&index_path) {
+            Ok(index) => *lock(&self.search) = Some(Arc::new(index)),
+            Err(e) => eprintln!("Libreri: the search index cannot be opened: {e}"),
+        }
         *lock(&self.library) = Some(Arc::new(library));
         let handle = self.app.clone();
         let watcher = LibraryWatcher::start(&books_dir, move || {
@@ -238,6 +311,10 @@ impl AppState {
                     let report = library.scan(&JobProgress(ctx)).map_err(job_error)?;
                     if report.changed_anything() {
                         let _ = LibraryChanged::default().emit(&handle);
+                    }
+                    // New or changed books get their words indexed.
+                    if let Some(state) = handle.try_state::<AppState>() {
+                        state.request_indexing();
                     }
                     Ok(())
                 }),
@@ -449,8 +526,124 @@ impl AppState {
             .submit("Rebuilding the library index", move |ctx| {
                 let result = library.rebuild_index(&JobProgress(ctx));
                 let _ = LibraryChanged::default().emit(&handle);
+                if let Some(state) = handle.try_state::<AppState>() {
+                    state.request_indexing();
+                }
                 result.map(|_| ()).map_err(job_error)
             }))
+    }
+
+    /// The open library's search index.
+    pub fn search_index(&self) -> AppResult<Arc<SearchIndex>> {
+        self.library()?;
+        lock(&self.search)
+            .clone()
+            .ok_or_else(|| AppError::invalid("the search index could not be opened"))
+    }
+
+    /// Indexing progress, for the interface.
+    pub fn indexing(&self) -> bool {
+        self.index_running.load(Ordering::SeqCst)
+    }
+
+    /// Brings the search index up to date in the background. Calls while
+    /// it runs make it go round once more when it finishes.
+    pub fn request_indexing(&self) {
+        self.index_wanted.store(true, Ordering::SeqCst);
+        if self.index_running.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        let handle = self.app.clone();
+        let wanted = Arc::clone(&self.index_wanted);
+        let running = Arc::clone(&self.index_running);
+        let spawned = std::thread::Builder::new()
+            .name("libreri-indexer".into())
+            .spawn(move || {
+                while wanted.swap(false, Ordering::SeqCst) {
+                    let Some(state) = handle.try_state::<AppState>() else {
+                        break;
+                    };
+                    let (Some(library), Ok(index)) =
+                        (state.library_if_open(), state.search_index())
+                    else {
+                        break;
+                    };
+                    let progress = IndexProgress {
+                        handle: handle.clone(),
+                        library: Arc::downgrade(&library),
+                        last: Mutex::new(std::time::Instant::now()),
+                    };
+                    if let Err(e) = library.update_index(&index, &progress) {
+                        eprintln!("Libreri: indexing stopped: {e}");
+                    }
+                }
+                running.store(false, Ordering::SeqCst);
+                let _ = SearchIndexProgress {
+                    done: 0,
+                    total: 0,
+                    running: false,
+                }
+                .emit(&handle);
+            });
+        if spawned.is_err() {
+            self.index_running.store(false, Ordering::SeqCst);
+        }
+    }
+
+    /// Reads scanned books with OCR, one after another; the result arrives
+    /// as `OcrFinished`.
+    pub fn start_ocr(&self, ids: Vec<BookId>, options: OcrOptions) -> AppResult<JobId> {
+        let library = self.library()?;
+        let index = self.search_index().ok();
+        let scratch = self.page_cache.join(".ocr");
+        let handle = self.app.clone();
+        let label = match ids.len() {
+            1 => "Making 1 book searchable".to_owned(),
+            n => format!("Making {n} books searchable"),
+        };
+        Ok(self.jobs.submit(label, move |ctx| {
+            let mut finished = OcrFinished {
+                job_id: ctx.id().to_string(),
+                books: 0,
+                pages_read: 0,
+                pages_failed: 0,
+                errors: Vec::new(),
+                book_ids: ids.iter().map(|i| i.to_string()).collect(),
+            };
+            let many = ids.len() > 1;
+            let mut outcome = Ok(());
+            for id in &ids {
+                let title = library
+                    .book(id)
+                    .map(|b| b.metadata.title)
+                    .unwrap_or_default();
+                let progress = OcrProgress {
+                    ctx,
+                    prefix: if many {
+                        format!("{title}: ")
+                    } else {
+                        String::new()
+                    },
+                };
+                match library.make_searchable(id, &options, &scratch, index.as_deref(), &progress) {
+                    Ok(r) => {
+                        finished.books += 1;
+                        finished.pages_read += r.pages_read;
+                        finished.pages_failed += r.pages_failed;
+                        for e in r.errors {
+                            finished.errors.push(format!("{title}: {e}"));
+                        }
+                    }
+                    Err(libreri_library::Error::Cancelled) => {
+                        outcome = Err(JobError::Cancelled(libreri_jobs::Cancelled));
+                        break;
+                    }
+                    Err(e) => finished.errors.push(format!("{title}: {e}")),
+                }
+            }
+            let _ = finished.emit(&handle);
+            outcome
+        }))
     }
 
     /// Closes the open library, if any. Errors are logged, not raised,
@@ -459,6 +652,7 @@ impl AppState {
     pub fn close_library(&self) {
         self.stop_phone_scan();
         lock(&self.watcher).take();
+        lock(&self.search).take();
         if let Some(library) = lock(&self.library).take() {
             if let Err(err) = library.shutdown() {
                 eprintln!("Libreri: failed to close library cleanly: {err}");

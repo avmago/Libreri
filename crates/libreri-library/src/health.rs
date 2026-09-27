@@ -154,13 +154,17 @@ impl Library {
         }
 
         // Covers of books that are gone.
-        for dir in ["covers", "thumbnails"] {
+        for (dir, ext) in [
+            ("covers", ".jpg"),
+            ("thumbnails", ".jpg"),
+            ("text", ".json"),
+        ] {
             let Ok(entries) = fs::read_dir(self.layout().data_dir().join(dir)) else {
                 continue;
             };
             for e in entries.flatten() {
                 let name = e.file_name().to_string_lossy().into_owned();
-                let Some(id) = name.strip_suffix(".jpg") else {
+                let Some(id) = name.strip_suffix(ext) else {
                     continue;
                 };
                 if !known.contains(id) {
@@ -215,15 +219,17 @@ impl Library {
                 fixed += 1;
             }
         }
-        for dir in ["covers", "thumbnails"] {
+        for (dir, ext) in [
+            ("covers", ".jpg"),
+            ("thumbnails", ".jpg"),
+            ("text", ".json"),
+        ] {
             let Ok(entries) = fs::read_dir(self.layout().data_dir().join(dir)) else {
                 continue;
             };
             for e in entries.flatten() {
                 let name = e.file_name().to_string_lossy().into_owned();
-                if name
-                    .strip_suffix(".jpg")
-                    .is_some_and(|id| !known.contains(id))
+                if name.strip_suffix(ext).is_some_and(|id| !known.contains(id))
                     && fs::remove_file(e.path()).is_ok()
                 {
                     fixed += 1;
@@ -314,6 +320,7 @@ impl Library {
             })?;
             sidecar::rename(self.layout(), &book.id, &new_id);
             covers::rename(self.layout(), &book.id, &new_id);
+            crate::text::rename(self.layout(), &book.id, &new_id);
             self.rename_annotation_backups(&book.id, &new_id);
             sidecar::write(self, &self.record(&new_id)?)?;
         }

@@ -248,6 +248,33 @@ export const commands = {
 	backUpNow: () => typedError<string | null, AppError>(__TAURI_INVOKE("back_up_now")),
 	/**  Shows a file (an export or a backup) in the system file manager. */
 	revealPath: (path: string) => typedError<null, AppError>(__TAURI_INVOKE("reveal_path", { path })),
+	/**  Books whose text matches `query` (words, "a phrase", -left-out). */
+	searchText: (query: string, limit: number) => typedError<TextMatchDto[], AppError>(__TAURI_INVOKE("search_text", { query, limit })),
+	/**  Every match in one book, in reading order. */
+	searchInBook: (id: string, query: string, limit: number) => typedError<Hit[], AppError>(__TAURI_INVOKE("search_in_book", { id, query, limit })),
+	/**  Whether a book's words can be searched, and its OCR text. */
+	textStatus: (id: string) => typedError<TextStatusDto, AppError>(__TAURI_INVOKE("text_status", { id })),
+	searchIndexStatus: () => typedError<IndexStatusDto, AppError>(__TAURI_INVOKE("search_index_status")),
+	/**  Empties the index and fills it again in the background. */
+	rebuildSearchIndex: () => typedError<null, AppError>(__TAURI_INVOKE("rebuild_search_index")),
+	/**  Starts indexing now (it also runs after every change to the library). */
+	updateSearchIndex: () => typedError<null, AppError>(__TAURI_INVOKE("update_search_index")),
+	/**
+	 *  Reads scanned PDF and DjVu books with OCR in the background. Returns
+	 *  the job id; the result arrives as `OcrFinished`.
+	 */
+	makeSearchable: (ids: string[], languages: string[], redo: boolean) => typedError<string, AppError>(__TAURI_INVOKE("make_searchable", { ids, languages, redo })),
+	/**  Removes a book's OCR text. */
+	forgetOcr: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("forget_ocr", { id })),
+	/**  Books whose pages are scans without text (all or some). */
+	booksWithoutText: () => typedError<UnsearchableDto[], AppError>(__TAURI_INVOKE("books_without_text")),
+	/**  Pages of a PDF that have OCR text, for the reader's hidden text layer. */
+	ocrPages: (id: string) => typedError<number[], AppError>(__TAURI_INVOKE("ocr_pages", { id })),
+	ocrLanguages: () => typedError<OcrLanguagesDto, AppError>(__TAURI_INVOKE("ocr_languages")),
+	setOcrLanguages: (languages: string[]) => typedError<null, AppError>(__TAURI_INVOKE("set_ocr_languages", { languages })),
+	/**  Downloads an OCR language; progress arrives as `OcrLanguageDownload`. */
+	downloadOcrLanguage: (code: string) => typedError<null, AppError>(__TAURI_INVOKE("download_ocr_language", { code })),
+	removeOcrLanguage: (code: string) => typedError<null, AppError>(__TAURI_INVOKE("remove_ocr_language", { code })),
 	/**
 	 *  Opens a comic or DjVu book: page count, sizes and contents. Pages are
 	 *  then loaded from `book://localhost/.pages/<id>/<page>?w=<width>`.
@@ -291,7 +318,10 @@ export const events = {
 	importFinished: makeEvent<ImportFinished>("import-finished"),
 	jobEventPayload: makeEvent<JobEventPayload>("job-event-payload"),
 	libraryChanged: makeEvent<LibraryChanged>("library-changed"),
+	ocrFinished: makeEvent<OcrFinished>("ocr-finished"),
+	ocrLanguageDownload: makeEvent<OcrLanguageDownload>("ocr-language-download"),
 	phoneScan: makeEvent<PhoneScan>("phone-scan"),
+	searchIndexProgress: makeEvent<SearchIndexProgress>("search-index-progress"),
 	sessionChanged: makeEvent<SessionChanged>("session-changed"),
 };
 
@@ -833,6 +863,14 @@ export type HelpersDto = {
 /**  The four highlight colours. */
 export type HighlightColor = "yellow" | "green" | "blue" | "pink";
 
+/**  One place in a book where the words were found. */
+export type Hit = {
+	page: number | null,
+	section: number | null,
+	label: string | null,
+	snippet: SnippetPart[],
+};
+
 /**  Summary of a finished import, for the report shown to the user. */
 export type ImportFinished = {
 	jobId: string,
@@ -846,6 +884,22 @@ export type ImportFinished = {
 };
 
 export type ImportModeDto = "move" | "copy";
+
+/**  Counts for Settings. */
+export type IndexCounts = {
+	books: number,
+	withText: number,
+	partial: number,
+	noText: number,
+	failed: number,
+};
+
+export type IndexStatusDto = {
+	counts: IndexCounts,
+	/**  Bytes on this computer. */
+	size: number | null,
+	running: boolean,
+};
 
 /**  What will be run to install a helper, shown to the user first. */
 export type InstallPlan = {
@@ -921,6 +975,46 @@ export type NotebookEntryDto = {
 	modified: number | null,
 	excerpt: string,
 	words: number,
+};
+
+/**  "Make searchable" finished (or stopped). */
+export type OcrFinished = {
+	jobId: string,
+	bookIds: string[],
+	/**  Books done. */
+	books: number,
+	pagesRead: number,
+	pagesFailed: number,
+	errors: string[],
+};
+
+/**
+ *  A language Tesseract can read on this computer, or could after a
+ *  download.
+ */
+export type OcrLanguage = {
+	code: string,
+	name: string,
+	/**  Came with Tesseract. */
+	builtIn: boolean,
+	/**  Downloaded by Libreri. */
+	downloaded: boolean,
+};
+
+/**  Progress of downloading an OCR language. */
+export type OcrLanguageDownload = {
+	code: string,
+	done: number | null,
+	total: number | null,
+	finished: boolean,
+	error: string | null,
+};
+
+export type OcrLanguagesDto = {
+	languages: OcrLanguage[],
+	/**  Used when a book does not say its language. */
+	defaults: string[],
+	tesseract: boolean,
 };
 
 export type OnlineChange = {
@@ -1036,6 +1130,13 @@ export type ScannedDto = {
 	isbn13: string | null,
 };
 
+/**  The search index is being brought up to date in the background. */
+export type SearchIndexProgress = {
+	done: number,
+	total: number,
+	running: boolean,
+};
+
 /**
  *  Someone signed in or out (in any window). Every window checks who is
  *  signed in now, so locking locks them all.
@@ -1060,6 +1161,12 @@ export type SettingsDto = {
 	theme: Theme,
 	accent: string | null,
 	recentLibraries: RecentLibraryDto[],
+};
+
+/**  Part of a snippet: matched words are marked. */
+export type SnippetPart = {
+	text: string,
+	hit: boolean,
 };
 
 export type SortKey = "title" | "author" | "added" | "year" | "size" | "pages" | "lastOpened" | "rating";
@@ -1094,6 +1201,15 @@ export type TagCountDto = {
 	count: number,
 };
 
+/**  One book whose words match. */
+export type TextMatchDto = {
+	book: BookDto,
+	/**  Pages or passages that match. */
+	total: number,
+	/**  The best few, in reading order. */
+	hits: Hit[],
+};
+
 /**
  *  The highlighted words with a little text before and after (W3C
  *  TextQuoteSelector).
@@ -1104,7 +1220,38 @@ export type TextQuote = {
 	suffix?: string,
 };
 
+/**  Whether a book's words can be searched. */
+export type TextState = 
+/**  Every page (or the whole book) has text. */
+"text" | 
+/**  Some pages have text, some are scans without it. */
+"partial" | 
+/**  A scan without text: OCR can make it searchable. */
+"noText" | 
+/**  A format without words (comics, audio). */
+"noWords" | 
+/**  The text could not be read (damaged, DRM, a helper is missing). */
+"failed";
+
+export type TextStatusDto = {
+	/**  `null` while the book waits to be indexed. */
+	state: TextState | null,
+	pages: number,
+	emptyPages: number,
+	ocrPages: number,
+	ocrLanguages: string[],
+	canOcr: boolean,
+	message: string | null,
+	/**  Languages to read it in: the book's own, else the usual ones. */
+	suggestedLanguages: string[],
+};
+
 export type Theme = "system" | "light" | "dark" | "highContrast";
+
+export type UnsearchableDto = {
+	id: string,
+	state: TextState,
+};
 
 export type WordDto = {
 	text: string,

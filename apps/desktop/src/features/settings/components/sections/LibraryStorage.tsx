@@ -7,6 +7,7 @@ import { useFacets } from "@/features/library";
 import { usePortability } from "@/features/portability";
 import { commands, unwrap, type LibrarySummary, type SessionDto } from "@/lib/ipc";
 import { Group, Row } from "../parts";
+import { SearchIndexGroup } from "./Search";
 
 function size(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -91,7 +92,9 @@ export function LibrarySettings({
           label="Page cache (this computer)"
           help="Pages of comics and DjVu books, kept to open them quickly. Up to 2 GB; made again when needed."
         >
-          <span className="tabular-nums">{pageCache !== undefined ? size(pageCache ?? 0) : "…"}</span>
+          <span className="tabular-nums">
+            {pageCache !== undefined ? size(pageCache ?? 0) : "…"}
+          </span>
           <Button
             variant="outline"
             size="sm"
@@ -112,6 +115,7 @@ export function LibrarySettings({
           <span className="tabular-nums">{storage ? size(storage.data ?? 0) : "…"}</span>
         </Row>
       </Group>
+      <SearchIndexGroup />
       <Group title="Maintenance" scope="library">
         <Row
           label="Check the folder for changes"

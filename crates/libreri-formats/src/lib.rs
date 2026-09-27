@@ -9,11 +9,15 @@ pub mod djvu;
 mod epub;
 mod fb2;
 mod markdown;
+mod mobi;
+pub mod ocr;
 mod pdf;
+pub mod pdftext;
+pub mod text;
 pub use comic::{extract_pages, list_pages, read_zip_page, ComicPages};
-#[doc(hidden)]
-pub use pdf::test_pdf;
 pub use pdf::{page_boxes, PageBox};
+#[doc(hidden)]
+pub use pdf::{test_pdf, test_text_pdf};
 pub mod xml;
 
 use libreri_core::{BookMetadata, FileType};
@@ -43,6 +47,7 @@ pub fn extract(path: &Path, file_type: FileType) -> Extracted {
         FileType::Md => markdown::read(path, &mut out),
         FileType::Fb2 => fb2::read(path, &mut out),
         FileType::Djvu => djvu::read(path, &mut out),
+        FileType::Mobi | FileType::Azw3 => mobi::read(path, &mut out),
         FileType::Cbz | FileType::Cbr | FileType::Cb7 | FileType::Cbt | FileType::Cba => {
             comic::read(path, file_type, &mut out)
         }
@@ -252,6 +257,15 @@ pub(crate) fn natural_key(s: &str) -> Vec<(u64, String)> {
         out.push((0, text));
     }
     out
+}
+
+/// True when `b` starts like a JPEG, PNG, GIF, WebP or BMP file.
+pub(crate) fn is_image_bytes(b: &[u8]) -> bool {
+    b.starts_with(&[0xFF, 0xD8, 0xFF])
+        || b.starts_with(b"\x89PNG")
+        || b.starts_with(b"GIF8")
+        || (b.starts_with(b"RIFF") && b.get(8..12) == Some(b"WEBP"))
+        || b.starts_with(b"BM")
 }
 
 pub(crate) fn is_image_name(name: &str) -> bool {

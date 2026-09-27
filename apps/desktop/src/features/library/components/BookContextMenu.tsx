@@ -13,12 +13,14 @@ import {
   ListChecks,
   Pencil,
   Quote,
+  ScanText,
   Star,
   Trash2,
 } from "lucide-react";
 import { useDetailsDialog, useFillDetails } from "@/features/details";
 import { usePortability } from "@/features/portability";
 import { usePermissions } from "@/features/profiles";
+import { useOcrDialog } from "@/features/search";
 import {
   ContextMenu,
   MenuShortcut,
@@ -54,6 +56,7 @@ function MenuItems({ book, targets }: { book: BookView; targets: BookView[] }) {
   const setDetailsOpen = useLibraryView((s) => s.setDetailsOpen);
   const { data: folders = [] } = useFolders();
   const single = targets.length === 1;
+  const scans = targets.filter((b) => b.fileType === "pdf" || b.fileType === "djvu");
   const allFavourite = targets.every((b) => b.user.favorite);
 
   return (
@@ -164,6 +167,17 @@ function MenuItems({ book, targets }: { book: BookView; targets: BookView[] }) {
             >
               <Globe /> Fill in missing details online
               <MenuShortcut>{keys("details.fill")}</MenuShortcut>
+            </ContextMenu.Item>
+          )}
+          {scans.length > 0 && (
+            <ContextMenu.Item
+              className={menuItem}
+              onSelect={() => useOcrDialog.getState().open(scans.map((b) => b.id))}
+            >
+              <ScanText />{" "}
+              {scans.length === 1
+                ? "Make searchable (OCR)…"
+                : `Make ${scans.length} books searchable…`}
             </ContextMenu.Item>
           )}
           <ContextMenu.Sub>

@@ -230,6 +230,11 @@ impl Library {
             if book.has_cover && cover.is_file() {
                 zip.add_file(&format!(".library-data/covers/{id}.jpg"), &cover)?;
             }
+            // OCR text took long to make; it travels with the book.
+            let ocr = crate::text::ocr_path(self.layout(), id);
+            if ocr.is_file() {
+                zip.add_file(&format!(".library-data/text/{id}.json"), &ocr)?;
+            }
             let mut included = false;
             if opts.book_files && !book.missing {
                 if let Some(src) = self.layout().resolve_relative(&book.rel_path) {
@@ -365,6 +370,20 @@ impl Library {
         progress.report(total, total, "");
         report.bytes = zip.finish(manifest)?;
         Ok(report)
+    }
+
+    /// Puts saved OCR text from an archive in place, unless the book here
+    /// already has some.
+    fn restore_ocr(&self, id: &BookId, bytes: Option<&[u8]>) {
+        let Some(bytes) = bytes else { return };
+        let path = crate::text::ocr_path(self.layout(), id);
+        let valid = serde_json::from_slice::<crate::OcrText>(bytes).is_ok();
+        if valid && !path.exists() {
+            if let Some(dir) = path.parent() {
+                let _ = fs::create_dir_all(dir);
+            }
+            let _ = fs::write(&path, bytes);
+        }
     }
 
     /// Writes a full backup (every book, everyone's data, PINs kept). Needs
@@ -660,10 +679,12 @@ impl Library {
         let cover = zip
             .read(&format!(".library-data/covers/{}.jpg", ab.id))
             .ok();
+        let ocr = zip.read(&format!(".library-data/text/{}.json", ab.id)).ok();
         match self.match_book(ab)? {
             Match::Exact(target) => {
                 report.linked += 1;
                 self.merge_details(&target, sc.as_ref(), ab, cover.as_deref(), report)?;
+                self.restore_ocr(&target, ocr.as_deref());
                 // Put the file back if it was missing here.
                 let here = self.record(&target)?;
                 if here.missing && ab.file_included {
@@ -740,6 +761,7 @@ impl Library {
                         report.warnings.push(format!("{}: cover: {e}", ab.title));
                     }
                 }
+                self.restore_ocr(&id, ocr.as_deref());
                 let registered =
                     self.register(&dest, id.clone(), ab.file_type, &mut report.warnings);
                 if let Err(e) = registered {
@@ -771,6 +793,7 @@ impl Library {
                 if let Some(bytes) = &cover {
                     book.has_cover = covers::store(self.layout(), &book.id, bytes).is_ok();
                 }
+                self.restore_ocr(&book.id, ocr.as_deref());
                 self.with_db(|db| {
                     db.insert_book(&book, 0)?;
                     for a in &ab.aliases {

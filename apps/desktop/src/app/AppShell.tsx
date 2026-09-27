@@ -21,6 +21,7 @@ import {
   Lock,
   Moon,
   NotebookText,
+  FileSearch,
   PanelLeft,
   RefreshCw,
   Search,
@@ -54,6 +55,7 @@ import {
 import { FindDetailsDialog, useDetailsEvents } from "@/features/details";
 import { HelperDialog } from "@/features/helpers";
 import { NotesHub } from "@/features/notes";
+import { OcrDialog, SearchView, useSearchEvents } from "@/features/search";
 import {
   CitationDialog,
   ExportDialog,
@@ -122,6 +124,7 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
   useLibraryEvents();
   useDetailsEvents();
   usePortabilityEvents();
+  useSearchEvents();
   const setHealth = usePortability((s) => s.setHealth);
   const showMissingRequest = usePortability((s) => s.showMissingRequest);
   const openExport = usePortability((s) => s.openExport);
@@ -189,12 +192,14 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
     }
   }, []);
   const goHome = useCallback(
-    (kind: "all" | "notes" | "organize") => {
+    (kind: "all" | "notes" | "organize" | "search", query?: string) => {
       tabs.activate(null);
       ui.closeSettings();
       if (kind === "all") {
-        if (nav.kind === "notes" || nav.kind === "organize") setNav({ kind: "all" });
-      } else setNav({ kind });
+        if (nav.kind === "notes" || nav.kind === "organize" || nav.kind === "search")
+          setNav({ kind: "all" });
+      } else if (kind === "search") setNav({ kind: "search", query });
+      else setNav({ kind });
     },
     [tabs, ui, nav.kind, setNav],
   );
@@ -216,6 +221,7 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
   useShortcut("library.close", () => void close());
   useShortcut("go.library", () => goHome("all"));
   useShortcut("go.notes", () => goHome("notes"));
+  useShortcut("go.search", () => goHome("search"));
   useShortcut("go.organize", () => session.canEditLibrary && goHome("organize"));
   useShortcut("library.health", () => session.canEditLibrary && setHealth(true));
   useShortcut("library.backup", () => isOwner && void backUpNow());
@@ -265,6 +271,14 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
         icon: NotebookText,
         shortcut: k("go.notes"),
         run: () => goHome("notes"),
+      },
+      {
+        id: "go.search",
+        group: "Go to",
+        label: "Search inside books, details and notes",
+        icon: FileSearch,
+        shortcut: k("go.search"),
+        run: () => goHome("search"),
       },
       {
         id: "go.organize",
@@ -526,6 +540,8 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
   const home =
     nav.kind === "notes" ? (
       <NotesHub />
+    ) : nav.kind === "search" ? (
+      <SearchView key={nav.query ?? ""} />
     ) : nav.kind === "organize" ? (
       <OrganizeView />
     ) : (
@@ -636,7 +652,12 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
         )}
       </div>
 
-      <CommandPalette open={ui.paletteOpen} onOpenChange={ui.setPaletteOpen} actions={actions} />
+      <CommandPalette
+        open={ui.paletteOpen}
+        onOpenChange={ui.setPaletteOpen}
+        actions={actions}
+        onSearch={(q) => goHome("search", q)}
+      />
       <ShortcutsSheet open={ui.shortcutsOpen} onOpenChange={ui.setShortcutsOpen} />
       <BulkEditDialog />
       <FindDetailsDialog />
@@ -646,6 +667,7 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
       <HealthDialog />
       <ForeignImportDialog />
       <HelperDialog />
+      <OcrDialog />
       <SaveCollectionDialog />
       <ImportDialog />
       <DropOverlay />

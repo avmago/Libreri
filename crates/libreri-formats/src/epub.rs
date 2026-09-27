@@ -44,7 +44,7 @@ fn decode_href(href: &str) -> String {
 }
 
 /// Joins an href onto the OPF's folder, resolving `..`.
-fn join(base_dir: &str, href: &str) -> String {
+pub(crate) fn join(base_dir: &str, href: &str) -> String {
     let href = decode_href(href.split('#').next().unwrap_or(href));
     let mut parts: Vec<&str> = base_dir.split('/').filter(|p| !p.is_empty()).collect();
     for p in href.split('/') {
