@@ -1,0 +1,258 @@
+/*
+ * Styles for book content drawn by the renderers. This is the one place
+ * serif type is used on purpose: it is the book's page, not the app
+ * (docs/code-structure.md, typography rules).
+ */
+
+/* ---- Markdown and plain text ------------------------------------------ */
+.lb-doc-scroller {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  background: var(--page-bg, #fff);
+  color: var(--page-fg, #1a1a1a);
+  --page-font-size: 17px;
+}
+.lb-doc {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 48px 32px 40vh;
+  font-family:
+    "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Noto Serif", ui-serif, serif;
+  font-size: var(--page-font-size);
+  line-height: 1.65;
+  overflow-wrap: break-word;
+}
+.lb-doc-txt {
+  white-space: pre-wrap;
+}
+.lb-doc h1,
+.lb-doc h2,
+.lb-doc h3,
+.lb-doc h4 {
+  line-height: 1.25;
+  margin: 1.6em 0 0.6em;
+  font-weight: 600;
+}
+.lb-doc h1 {
+  font-size: 1.9em;
+  margin-top: 0.4em;
+}
+.lb-doc h2 {
+  font-size: 1.45em;
+}
+.lb-doc h3 {
+  font-size: 1.2em;
+}
+.lb-doc p,
+.lb-doc ul,
+.lb-doc ol,
+.lb-doc blockquote,
+.lb-doc table,
+.lb-doc pre {
+  margin: 0 0 1em;
+}
+.lb-doc ul,
+.lb-doc ol {
+  padding-left: 1.5em;
+}
+.lb-doc ul {
+  list-style: disc;
+}
+.lb-doc ol {
+  list-style: decimal;
+}
+.lb-doc a {
+  color: var(--page-link, #1d4ed8);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.lb-doc blockquote {
+  border-left: 3px solid color-mix(in srgb, var(--page-fg) 25%, transparent);
+  padding-left: 1em;
+  color: color-mix(in srgb, var(--page-fg) 80%, transparent);
+}
+.lb-doc code,
+.lb-doc pre {
+  font-family: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.84em;
+}
+.lb-doc :not(pre) > code {
+  background: color-mix(in srgb, var(--page-fg) 8%, transparent);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+.lb-doc pre {
+  background: color-mix(in srgb, var(--page-fg) 6%, transparent);
+  padding: 12px 14px;
+  border-radius: 6px;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+.lb-doc table {
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+}
+.lb-doc th,
+.lb-doc td {
+  border: 1px solid color-mix(in srgb, var(--page-fg) 18%, transparent);
+  padding: 4px 10px;
+}
+.lb-doc img {
+  max-width: 100%;
+}
+.lb-doc hr {
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--page-fg) 18%, transparent);
+  margin: 2em 0;
+}
+.lb-doc .math-block {
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: 1em 0;
+}
+.lb-doc pre.mermaid {
+  background: transparent;
+  text-align: center;
+}
+
+/* Code colours that work on light and dark pages. */
+.lb-doc .hljs-keyword,
+.lb-doc .hljs-selector-tag,
+.lb-doc .hljs-built_in {
+  color: #cf222e;
+}
+.lb-doc .hljs-string,
+.lb-doc .hljs-attr {
+  color: #0a3069;
+}
+.lb-doc .hljs-comment {
+  color: #6e7781;
+  font-style: italic;
+}
+.lb-doc .hljs-number,
+.lb-doc .hljs-literal {
+  color: #0550ae;
+}
+.lb-doc .hljs-title,
+.lb-doc .hljs-function {
+  color: #8250df;
+}
+.lb-dark .lb-doc .hljs-keyword,
+.lb-dark .lb-doc .hljs-selector-tag,
+.lb-dark .lb-doc .hljs-built_in {
+  color: #ff7b72;
+}
+.lb-dark .lb-doc .hljs-string,
+.lb-dark .lb-doc .hljs-attr {
+  color: #a5d6ff;
+}
+.lb-dark .lb-doc .hljs-comment {
+  color: #8b949e;
+}
+.lb-dark .lb-doc .hljs-number,
+.lb-dark .lb-doc .hljs-literal {
+  color: #79c0ff;
+}
+.lb-dark .lb-doc .hljs-title,
+.lb-dark .lb-doc .hljs-function {
+  color: #d2a8ff;
+}
+
+/* ---- Highlights and find ------------------------------------------------ */
+mark.lb-hl {
+  color: inherit;
+  border-radius: 2px;
+  cursor: pointer;
+}
+mark.lb-hl-note {
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, currentColor 45%, transparent);
+}
+mark.lb-find {
+  background: rgba(250, 204, 21, 0.5);
+  color: inherit;
+}
+mark.lb-find-current {
+  background: #f97316;
+  color: #fff;
+}
+
+/* ---- PDF ---------------------------------------------------------------- */
+.lb-pdf {
+  position: absolute;
+  inset: 0;
+  background: var(--page-surround, #e9e9ec);
+}
+.lb-pdf-scroller {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+}
+.lb-pdf .pdfViewer {
+  padding: 16px 0 40vh;
+}
+.lb-pdf .pdfViewer .page {
+  margin: 0 auto 14px;
+  border: 0;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.16),
+    0 6px 18px -6px rgba(0, 0, 0, 0.22);
+}
+.lb-pdf .pdfViewer .page canvas {
+  filter: var(--pdf-filter, none);
+}
+.lb-pdf-hl-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+.lb-pdf-hl {
+  position: absolute;
+  border-radius: 2px;
+  mix-blend-mode: multiply;
+}
+.lb-pdf-dark .lb-pdf-hl {
+  mix-blend-mode: normal;
+}
+.lb-pdf-filters {
+  position: absolute;
+}
+.lb-pdf-hl.lb-hl-note {
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.35);
+}
+.lb-pdf .lb-over-hl,
+.lb-pdf-scroller.lb-over-hl .textLayer {
+  cursor: pointer;
+}
+
+/* ---- EPUB and other ebooks ------------------------------------------- */
+.lb-ebook {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+/* ---- Notebook preview (the app's own UI font, not a book page) -------- */
+.lb-notebook {
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1.6;
+  max-width: none;
+  --page-fg: var(--foreground);
+  --page-link: var(--foreground);
+  color: var(--foreground);
+}
+.lb-notebook h1 {
+  font-size: 1.35em;
+}
+.lb-notebook h2 {
+  font-size: 1.2em;
+}
+.lb-notebook h3 {
+  font-size: 1.05em;
+}
+.lb-notebook blockquote {
+  color: var(--muted-foreground);
+}

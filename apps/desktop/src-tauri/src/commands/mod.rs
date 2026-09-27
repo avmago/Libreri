@@ -7,4 +7,5 @@ pub mod app;
 pub mod books;
 pub mod folders;
 pub mod library;
+pub mod reader;
 pub mod settings;

@@ -68,7 +68,7 @@ export const useLibraryView = create<LibraryViewState>((set) => ({
   detailsOpen: true,
   expanded: {},
 
-  setNav: (nav) => set({ nav, selection: [], anchor: null }),
+  setNav: (nav) => set({ nav, selection: [], anchor: null, search: "" }),
   setSearch: (search) => set({ search }),
   toggleFileType: (t) => set((s) => ({ fileTypes: toggle(s.fileTypes, t) })),
   toggleContentType: (t) => set((s) => ({ contentTypes: toggle(s.contentTypes, t) })),

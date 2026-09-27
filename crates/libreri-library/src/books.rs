@@ -164,6 +164,7 @@ impl Library {
         };
         self.with_db(|db| db.insert_book(&book, mtime_secs(&meta)))?;
         sidecar::write(self.layout(), &book)?;
+        self.restore_annotations(&book.id)?;
         Ok(book)
     }
 }

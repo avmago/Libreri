@@ -118,6 +118,36 @@ pub const MIGRATIONS: &[&str] = &[
         prefix = '2 3'
     );
     "#,
+    // 3 — reader (Phase 2): reading position, highlights and bookmarks,
+    // and where each profile's notebook for a book lives.
+    r#"
+    ALTER TABLE book_user ADD COLUMN position TEXT;   -- JSON locator of the last place read
+
+    CREATE TABLE annotations (
+        id           TEXT PRIMARY KEY,                -- UUID
+        book_id      TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE ON UPDATE CASCADE,
+        profile_id   TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+        kind         TEXT NOT NULL,                   -- highlight | bookmark
+        color        TEXT,                            -- yellow | green | blue | pink
+        locator      TEXT NOT NULL,                   -- JSON, format specific
+        quote        TEXT,
+        prefix       TEXT,
+        suffix       TEXT,
+        note         TEXT,
+        label        TEXT,
+        position     REAL NOT NULL DEFAULT 0,
+        created_at   TEXT NOT NULL,
+        modified_at  TEXT NOT NULL
+    ) STRICT;
+    CREATE INDEX annotations_book ON annotations(book_id, profile_id, position);
+
+    CREATE TABLE notebooks (
+        book_id     TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE ON UPDATE CASCADE,
+        profile_id  TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+        rel_path    TEXT NOT NULL,                    -- "Notes/<profile>/<title>.md"
+        PRIMARY KEY (book_id, profile_id)
+    ) STRICT;
+    "#,
 ];
 
 /// Schema version this build of Libreri writes.

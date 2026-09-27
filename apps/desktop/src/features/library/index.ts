@@ -1,4 +1,4 @@
-export { useCurrentLibrary, useCloseLibrary, currentLibraryKey } from "./api";
+export { useBook, useCurrentLibrary, useCloseLibrary, currentLibraryKey } from "./api";
 export { useLibraryActions } from "./hooks/useLibraryActions";
 export { useLibraryEvents } from "./hooks/useLibraryEvents";
 export { WelcomeScreen } from "./components/WelcomeScreen";

@@ -111,6 +111,7 @@ impl Library {
                 self.with_db(|db| db.change_book_id(&rec.id, &id, f.size, f.mtime, &now()))?;
                 sidecar::rename(self.layout(), &rec.id, &id);
                 covers::rename(self.layout(), &rec.id, &id);
+                self.rename_annotation_backups(&rec.id, &id);
                 if let Ok(book) = self.book(&id) {
                     sidecar::write(self.layout(), &book)?;
                 }

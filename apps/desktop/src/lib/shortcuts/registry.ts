@@ -4,7 +4,7 @@
  * action handler here instead (docs/code-structure.md, "Where things go").
  * Later phases load user overrides from settings.
  */
-import { useEffect } from "react";
+import { createContext, createElement, useContext, useEffect, useRef, type ReactNode } from "react";
 import { detectPlatform, matches, parseShortcut, type ParsedShortcut } from "./keys";
 
 export const DEFAULT_SHORTCUTS = {
@@ -35,6 +35,22 @@ export const DEFAULT_SHORTCUTS = {
   "books.previous": "ArrowLeft",
   "books.down": "ArrowDown",
   "books.up": "ArrowUp",
+  "tabs.close": "Mod+W",
+  "tabs.next": "Ctrl+Tab",
+  "tabs.previous": "Ctrl+Shift+Tab",
+  "reader.next": "ArrowRight",
+  "reader.previous": "ArrowLeft",
+  "reader.pageDown": "PageDown",
+  "reader.pageUp": "PageUp",
+  "reader.space": "Space",
+  "reader.find": "Mod+F",
+  "reader.zoomIn": "Mod+=",
+  "reader.zoomOut": "Mod+-",
+  "reader.zoomReset": "Mod+0",
+  "reader.goToPage": "Mod+G",
+  "reader.bookmark": "Mod+D",
+  "reader.contents": "Mod+B",
+  "reader.notebook": "Mod+J",
 } as const;
 
 export type ActionId = keyof typeof DEFAULT_SHORTCUTS;
@@ -49,6 +65,10 @@ const WORK_WHILE_TYPING = new Set<ActionId>([
   "library.close",
   "library.search",
   "details.save",
+  "tabs.close",
+  "tabs.next",
+  "tabs.previous",
+  "reader.find",
 ]);
 
 function isTyping(target: EventTarget | null): boolean {
@@ -78,36 +98,72 @@ const parsed = new Map<ActionId, ParsedShortcut>(
   ]),
 );
 
-const handlers = new Map<ActionId, () => void>();
+interface Entry {
+  handler: () => void;
+  /** Registered inside a `ShortcutScope` (a view), not app-wide. */
+  scoped: boolean;
+  active: () => boolean;
+}
+
+/** Newest registration last. */
+const handlers = new Map<ActionId, Entry[]>();
 
 function onKeyDown(event: KeyboardEvent) {
   if (event.defaultPrevented) return;
   const typing = isTyping(event.target);
   const overlay = inOverlay(event.target);
+  let global: Entry | undefined;
   for (const [id, shortcut] of parsed) {
-    const handler = handlers.get(id);
-    if (!handler || !matches(event, shortcut)) continue;
-    const allowed = WORK_WHILE_TYPING.has(id) || (!typing && !overlay);
-    if (allowed) {
+    if (!matches(event, shortcut)) continue;
+    if (!(WORK_WHILE_TYPING.has(id) || (!typing && !overlay))) continue;
+    // Newest first.
+    const entries = (handlers.get(id) ?? []).filter((e) => e.active()).reverse();
+    const scoped = entries.find((e) => e.scoped);
+    if (scoped) {
+      // The view the user is looking at wins over app-wide actions.
       event.preventDefault();
-      handler();
+      scoped.handler();
       return;
     }
+    global ??= entries.find((e) => !e.scoped);
+  }
+  if (global) {
+    event.preventDefault();
+    global.handler();
   }
 }
 
 let listening = false;
 
+const ScopeContext = createContext<boolean | null>(null);
+
+/**
+ * Marks part of the interface (the library, one reader tab) whose shortcuts
+ * only work while it is showing.
+ */
+export function ShortcutScope({ active, children }: { active: boolean; children: ReactNode }) {
+  return createElement(ScopeContext.Provider, { value: active }, children);
+}
+
 /** Registers a handler for an action while the calling component is mounted. */
 export function useShortcut(id: ActionId, handler: () => void): void {
+  const scope = useContext(ScopeContext);
+  const activeRef = useRef(scope ?? true);
+  useEffect(() => {
+    activeRef.current = scope ?? true;
+  }, [scope]);
   useEffect(() => {
     if (!listening) {
       window.addEventListener("keydown", onKeyDown);
       listening = true;
     }
-    handlers.set(id, handler);
+    const entry: Entry = { handler, scoped: scope !== null, active: () => activeRef.current };
+    handlers.set(id, [...(handlers.get(id) ?? []), entry]);
     return () => {
-      if (handlers.get(id) === handler) handlers.delete(id);
+      handlers.set(
+        id,
+        (handlers.get(id) ?? []).filter((e) => e !== entry),
+      );
     };
-  }, [id, handler]);
+  }, [id, handler, scope]);
 }

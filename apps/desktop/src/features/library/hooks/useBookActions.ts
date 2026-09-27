@@ -2,6 +2,8 @@ import { useCallback } from "react";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
 import { commands, unwrap, type ReadingStatus } from "@/lib/ipc";
+import { useTabs } from "@/lib/tabs";
+import { canRead } from "@/readers";
 import { useMoveBooks, useSetBookState, useTrashBooks } from "../api";
 import type { BookView } from "../model";
 import { useLibraryView } from "../store";
@@ -17,13 +19,29 @@ export function useBookActions() {
   const setState = useSetBookState();
   const setSelection = useLibraryView((s) => s.setSelection);
 
-  const open = useCallback(async (book: BookView) => {
+  const openElsewhere = useCallback(async (book: BookView) => {
     try {
       await unwrap(commands.openBookExternally(book.id));
     } catch (e) {
       toast.error("Could not open the book", { description: errorText(e) });
     }
   }, []);
+
+  /** Opens the book in a reader tab, or in another app for formats Libreri cannot show yet. */
+  const open = useCallback(
+    async (book: BookView) => {
+      if (canRead(book.fileType) && !book.missing) {
+        useTabs.getState().open({
+          bookId: book.id,
+          title: book.metadata.title,
+          fileType: book.fileType,
+        });
+        return;
+      }
+      await openElsewhere(book);
+    },
+    [openElsewhere],
+  );
 
   const reveal = useCallback(async (book: BookView) => {
     try {
@@ -89,5 +107,5 @@ export function useBookActions() {
     [setState],
   );
 
-  return { open, reveal, moveToTrash, moveTo, setStatus, toggleFavorite, setRating };
+  return { open, openElsewhere, reveal, moveToTrash, moveTo, setStatus, toggleFavorite, setRating };
 }

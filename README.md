@@ -4,7 +4,7 @@ A local-first library for PDFs, ebooks, Markdown, comics, DjVu and audiobooks �
 
 Your library is an ordinary folder: books stay as plain files, notes are Markdown, and everything can be exported and moved to another computer with every link intact.
 
-> **Status:** Phase 1 (library) — import books and folders, organise them in real folders, edit their details, search and filter. The reader arrives in Phase 2. See [docs/development-phases.md](docs/development-phases.md).
+> **Status:** Phase 2 (reader) — read PDF, EPUB, MOBI, AZW3, FB2, comics (CBZ), Markdown with maths and plain text in tabs, with highlights, comments, bookmarks and a Markdown notebook per book. Profiles and settings arrive in Phase 3. See [docs/development-phases.md](docs/development-phases.md).
 
 ## Run it
 
@@ -36,7 +36,7 @@ Other commands:
 ## How the code is organised
 
 ```
-apps/desktop/src        React UI, one folder per feature
+apps/desktop/src        React UI, one folder per feature; readers/ holds the book renderers
 apps/desktop/src-tauri  Thin Tauri shell: commands, events, book:// protocol
 crates/libreri-core     Domain types, IDs, library layout (no dependencies on the app)
 crates/libreri-db       SQLite and migrations

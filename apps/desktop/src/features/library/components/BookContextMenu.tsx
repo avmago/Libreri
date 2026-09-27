@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import {
   BookOpen,
   Check,
+  ExternalLink,
   FolderInput,
   FolderSearch,
   Heart,
@@ -44,6 +45,9 @@ function MenuItems({ book, targets }: { book: BookView; targets: BookView[] }) {
         <>
           <ContextMenu.Item className={menuItem} onSelect={() => void actions.open(book)}>
             <BookOpen /> Open <MenuShortcut>{keys("books.open")}</MenuShortcut>
+          </ContextMenu.Item>
+          <ContextMenu.Item className={menuItem} onSelect={() => void actions.openElsewhere(book)}>
+            <ExternalLink /> Open in another app
           </ContextMenu.Item>
           <ContextMenu.Item className={menuItem} onSelect={() => void actions.reveal(book)}>
             <FolderSearch /> Show in file manager

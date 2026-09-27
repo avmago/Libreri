@@ -22,6 +22,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::<tauri::Wry>::new()
         .commands(tauri_specta::collect_commands![
             commands::app::app_info,
+            commands::app::open_external_url,
             commands::settings::get_settings,
             commands::settings::set_theme,
             commands::settings::forget_recent_library,
@@ -50,6 +51,15 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::folders::trash_folder,
             commands::folders::reveal_folder,
             commands::folders::import_paths,
+            commands::reader::get_position,
+            commands::reader::save_position,
+            commands::reader::list_annotations,
+            commands::reader::save_annotation,
+            commands::reader::delete_annotation,
+            commands::reader::get_notebook,
+            commands::reader::save_notebook,
+            commands::reader::get_session,
+            commands::reader::save_session,
         ])
         .events(tauri_specta::collect_events![
             events::JobEventPayload,
@@ -66,7 +76,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(builder.invoke_handler())
-        .register_uri_scheme_protocol("book", protocol::handle)
+        .register_asynchronous_uri_scheme_protocol("book", protocol::handle)
         .setup(move |app| {
             builder.mount_events(app);
             let state = AppState::initialise(app.handle())?;

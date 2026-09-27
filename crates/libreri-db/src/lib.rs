@@ -5,6 +5,7 @@
 
 mod books;
 mod migrations;
+mod reading;
 
 use rusqlite::{Connection, OpenFlags};
 use std::path::Path;

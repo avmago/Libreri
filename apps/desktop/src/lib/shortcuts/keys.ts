@@ -47,8 +47,11 @@ export function parseShortcut(shortcut: string, platform: Platform): ParsedShort
   return result;
 }
 
+const KEY_ALIASES: Record<string, string> = { Space: " ", Esc: "Escape", Plus: "+" };
+
 function normaliseKey(key: string): string {
-  return key.length === 1 ? key.toLowerCase() : key;
+  const k = KEY_ALIASES[key] ?? key;
+  return k.length === 1 ? k.toLowerCase() : k;
 }
 
 /** True when a keyboard event matches the shortcut exactly. */
@@ -77,6 +80,6 @@ export function displayKeys(shortcut: string, platform: Platform): string[] {
     if (p.shift) keys.push("Shift");
     if (p.meta) keys.push("Super");
   }
-  keys.push(p.key.length === 1 ? p.key.toUpperCase() : p.key);
+  keys.push(p.key === " " ? "Space" : p.key.length === 1 ? p.key.toUpperCase() : p.key);
   return keys;
 }

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   FileUp,
   FolderOpen,
@@ -6,11 +6,9 @@ import {
   FolderUp,
   Info,
   LayoutGrid,
-  Library,
   List,
   Moon,
   PanelLeft,
-  Plus,
   RefreshCw,
   Search,
   X,
@@ -35,7 +33,10 @@ import {
 } from "@/features/library";
 import { ThemeMenu, useSetTheme, useSettings } from "@/features/settings";
 import { commands, type LibrarySummary } from "@/lib/ipc";
-import { DEFAULT_SHORTCUTS, useShortcut } from "@/lib/shortcuts";
+import { DEFAULT_SHORTCUTS, ShortcutScope, useShortcut } from "@/lib/shortcuts";
+import { useTabs } from "@/lib/tabs";
+import { ReaderView, useSession } from "@/features/reader";
+import { TabStrip } from "./TabStrip";
 import { nextTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { useUi } from "./ui-store";
@@ -49,6 +50,11 @@ export function AppShell({ library }: { library: LibrarySummary }) {
   const { setView, toggleDetails } = useLibraryView();
   useLibraryEvents();
   useDesktopDrop();
+  useSession(library.id);
+  const { tabs, active: activeTab, close: closeTab, cycle } = useTabs();
+  // Readers are created the first time their tab is shown, then kept.
+  const [visited, setVisited] = useState<Set<string>>(() => new Set());
+  if (activeTab && !visited.has(activeTab)) setVisited(new Set(visited).add(activeTab));
 
   const cycleTheme = useCallback(
     () => setTheme.mutate(nextTheme(settings?.theme ?? "system")),
@@ -72,6 +78,9 @@ export function AppShell({ library }: { library: LibrarySummary }) {
   useShortcut("sidebar.toggle", toggleSidebar);
   useShortcut("theme.toggle", cycleTheme);
   useShortcut("library.close", close);
+  useShortcut("tabs.close", () => activeTab && closeTab(activeTab));
+  useShortcut("tabs.next", () => cycle(1));
+  useShortcut("tabs.previous", () => cycle(-1));
 
   const actions: PaletteAction[] = useMemo(
     () => [
@@ -175,59 +184,62 @@ export function AppShell({ library }: { library: LibrarySummary }) {
   return (
     <div className="flex h-full flex-col">
       {/* Tab strip */}
-      <div className="flex h-10 shrink-0 items-end gap-0.5 border-b bg-sidebar px-3">
-        <div className="-mb-px flex h-8 items-center gap-2 rounded-t-lg border border-b-background bg-background px-3.5 font-medium">
-          <Library className="size-4" aria-hidden /> Library
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="New tab"
-          disabled
-          title="Reader tabs arrive with the reader"
-          className="mb-0.5"
-        >
-          <Plus />
-        </Button>
-        <div className="flex-1" />
+      <div className="flex h-10 shrink-0 items-end gap-2 border-b bg-sidebar px-3">
+        <TabStrip />
         <button
           type="button"
           onClick={openPalette}
-          className="mb-1.5 flex h-7 w-72 items-center gap-2 rounded-md border bg-background px-2.5 text-muted-foreground"
+          className="mb-1.5 flex h-7 w-64 shrink-0 items-center gap-2 rounded-md border bg-background px-2.5 text-muted-foreground"
         >
           <Search className="size-3.5" aria-hidden />
-          <span className="flex-1 text-left">Search or run a command…</span>
+          <span className="flex-1 truncate text-left">Search or run a command…</span>
           <Kbd shortcut={DEFAULT_SHORTCUTS["palette.open"]} />
         </button>
-        <div className="mb-1 ml-1">
+        <div className="mb-1">
           <ThemeMenu />
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1">
-        <nav
-          aria-label="Library"
-          className={cn(
-            "flex shrink-0 flex-col gap-2 border-r bg-sidebar pt-2 transition-[width]",
-            sidebarCollapsed ? "w-14 items-center" : "w-60",
-          )}
-        >
-          <div className={cn("px-2.5", sidebarCollapsed && "px-0")}>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Show or hide sidebar"
-              onClick={toggleSidebar}
+      <div className="relative min-h-0 flex-1">
+        <ShortcutScope active={activeTab === null}>
+          <div className={cn("absolute inset-0 flex", activeTab !== null && "hidden")}>
+            <nav
+              aria-label="Library"
+              className={cn(
+                "flex shrink-0 flex-col gap-2 border-r bg-sidebar pt-2 transition-[width]",
+                sidebarCollapsed ? "w-14 items-center" : "w-60",
+              )}
             >
-              <PanelLeft />
-            </Button>
-          </div>
-          <LibrarySidebar library={library} collapsed={sidebarCollapsed} />
-        </nav>
+              <div className={cn("px-2.5", sidebarCollapsed && "px-0")}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Show or hide sidebar"
+                  onClick={toggleSidebar}
+                >
+                  <PanelLeft />
+                </Button>
+              </div>
+              <LibrarySidebar library={library} collapsed={sidebarCollapsed} />
+            </nav>
 
-        <main className="min-w-0 flex-1">
-          <LibraryView />
-        </main>
+            <main className="min-w-0 flex-1">
+              <LibraryView />
+            </main>
+          </div>
+        </ShortcutScope>
+        {tabs.map((t) =>
+          visited.has(t.bookId) || activeTab === t.bookId ? (
+            <ShortcutScope key={t.bookId} active={activeTab === t.bookId}>
+              <main
+                aria-label={t.title}
+                className={cn("absolute inset-0", activeTab !== t.bookId && "hidden")}
+              >
+                <ReaderView tab={t} active={activeTab === t.bookId} />
+              </main>
+            </ShortcutScope>
+          ) : null,
+        )}
       </div>
 
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} actions={actions} />

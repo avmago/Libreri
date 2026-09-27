@@ -4,6 +4,7 @@
 //! the library folder layout, library information and settings. It has no
 //! knowledge of Tauri, SQLite or the file system beyond path names.
 
+pub mod annotation;
 pub mod book;
 pub mod ids;
 pub mod isbn;
@@ -12,6 +13,7 @@ pub mod library;
 pub mod query;
 pub mod settings;
 
+pub use annotation::{Annotation, AnnotationKind, HighlightColor, TextQuote};
 pub use book::{Book, BookMetadata, BookUserState, ContentType, FileType, ReadingStatus};
 pub use ids::{BookId, LibraryId, ProfileId};
 pub use layout::LibraryLayout;

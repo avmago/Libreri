@@ -10,6 +10,11 @@ import * as __TAURI_EVENT from "@tauri-apps/api/event";
 export const commands = {
 	/**  Version and platform, for the About screen and diagnostics. */
 	appInfo: () => __TAURI_INVOKE<AppInfo>("app_info"),
+	/**
+	 *  Opens a web link in the system browser. Only `http`, `https` and
+	 *  `mailto` links are allowed.
+	 */
+	openExternalUrl: (url: string) => typedError<null, AppError>(__TAURI_INVOKE("open_external_url", { url })),
 	getSettings: () => __TAURI_INVOKE<SettingsDto>("get_settings"),
 	setTheme: (theme: Theme) => typedError<SettingsDto, AppError>(__TAURI_INVOKE("set_theme", { theme })),
 	forgetRecentLibrary: (path: string) => typedError<SettingsDto, AppError>(__TAURI_INVOKE("forget_recent_library", { path })),
@@ -81,6 +86,19 @@ export const commands = {
 	 *  progress arrives as job events and the summary as `ImportFinished`.
 	 */
 	importPaths: (paths: string[], folder: string, mode: ImportModeDto) => typedError<string, AppError>(__TAURI_INVOKE("import_paths", { paths, folder, mode })),
+	/**  Where the current profile stopped reading (JSON), if anywhere. */
+	getPosition: (id: string) => typedError<string | null, AppError>(__TAURI_INVOKE("get_position", { id })),
+	savePosition: (id: string, locator: string, progress: number | null) => typedError<null, AppError>(__TAURI_INVOKE("save_position", { id, locator, progress })),
+	listAnnotations: (id: string) => typedError<Annotation[], AppError>(__TAURI_INVOKE("list_annotations", { id })),
+	/**  Adds or updates a highlight or bookmark; returns it with timestamps set. */
+	saveAnnotation: (annotation: Annotation) => typedError<Annotation, AppError>(__TAURI_INVOKE("save_annotation", { annotation })),
+	deleteAnnotation: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_annotation", { id })),
+	/**  The Markdown notebook for a book, created on first use. */
+	getNotebook: (id: string) => typedError<NotebookDto, AppError>(__TAURI_INVOKE("get_notebook", { id })),
+	saveNotebook: (id: string, content: string) => typedError<NotebookDto, AppError>(__TAURI_INVOKE("save_notebook", { id, content })),
+	/**  The reader tabs that were open last time (JSON written by the interface). */
+	getSession: () => typedError<string | null, AppError>(__TAURI_INVOKE("get_session")),
+	saveSession: (session: string) => typedError<null, AppError>(__TAURI_INVOKE("save_session", { session })),
 };
 
 /** Events */
@@ -91,6 +109,27 @@ export const events = {
 };
 
 /* Types */
+export type Annotation = {
+	/**  UUID, created by whoever makes the annotation. */
+	id: string,
+	bookId: BookId,
+	kind: AnnotationKind,
+	color: HighlightColor | null,
+	/**  Format-specific position as JSON, e.g. `{"type":"pdf","page":4,…}`. */
+	locator: string,
+	quote: TextQuote | null,
+	/**  The comment written on a highlight, or a bookmark's name. */
+	note: string | null,
+	/**  Where it is, for people: "p. 4" or a chapter title. */
+	label: string | null,
+	/**  0.0–1.0 through the book, for sorting. */
+	position: number | null,
+	createdAt: string,
+	modifiedAt: string,
+};
+
+export type AnnotationKind = "highlight" | "bookmark";
+
 export type AppError = {
 	kind: AppErrorKind,
 	message: string,
@@ -257,6 +296,9 @@ export type FolderDto = {
  */
 export type FolderKind = "missing" | "empty" | "library" | "otherFiles";
 
+/**  The four highlight colours. */
+export type HighlightColor = "yellow" | "green" | "blue" | "pink";
+
 /**  Summary of a finished import, for the report shown to the user. */
 export type ImportFinished = {
 	jobId: string,
@@ -296,6 +338,11 @@ export type LibrarySummary = {
 	bookCount: number,
 };
 
+export type NotebookDto = {
+	relPath: string,
+	content: string,
+};
+
 /**  Where a reader is with a book. Personal: stored per profile. */
 export type ReadingStatus = "none" | "wantToRead" | "reading" | "finished" | "abandoned";
 
@@ -313,6 +360,16 @@ export type SettingsDto = {
 };
 
 export type SortKey = "title" | "author" | "added" | "year" | "size" | "pages" | "lastOpened" | "rating";
+
+/**
+ *  The highlighted words with a little text before and after (W3C
+ *  TextQuoteSelector).
+ */
+export type TextQuote = {
+	exact?: string,
+	prefix?: string,
+	suffix?: string,
+};
 
 export type Theme = "system" | "light" | "dark" | "highContrast";
 

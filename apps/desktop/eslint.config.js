@@ -14,6 +14,7 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
       // Features talk to each other only through their index.ts
       // (see docs/code-structure.md, rule 5).
       "no-restricted-imports": [

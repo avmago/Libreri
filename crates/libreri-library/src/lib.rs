@@ -18,6 +18,7 @@ mod folders;
 mod import;
 mod lock;
 mod paths;
+mod reading;
 mod scan;
 mod sidecar;
 mod watcher;
@@ -33,6 +34,7 @@ pub use folders::FolderNode;
 pub use import::{Duplicate, ImportMode, ImportReport, ImportRequest};
 pub use libreri_db::Facets;
 pub use lock::{LibraryLock, LockOwner};
+pub use reading::Notebook;
 pub use scan::ScanReport;
 pub use watcher::LibraryWatcher;
 
