@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import {
   ArrowLeft,
+  ArrowLeftRight,
   BookOpen,
   Globe,
   HardDrive,
@@ -20,15 +21,25 @@ import { LibrarySettings } from "./sections/LibraryStorage";
 import { NotesSettings } from "./sections/Notes";
 import { ProfileSettings } from "./sections/ProfilesSecurity";
 import { ReaderSettings } from "./sections/Reader";
+import { ExportImportSettings } from "./sections/ExportImport";
 import { OnlineDetailsSettings } from "./sections/OnlineDetails";
 import { ShortcutSettings } from "./sections/Shortcuts";
 
 export type SettingsSection =
-  "general" | "library" | "profiles" | "appearance" | "reader" | "notes" | "online" | "shortcuts";
+  | "general"
+  | "library"
+  | "export"
+  | "profiles"
+  | "appearance"
+  | "reader"
+  | "notes"
+  | "online"
+  | "shortcuts";
 
 const SECTIONS: { id: SettingsSection; label: string; Icon: LucideIcon }[] = [
   { id: "general", label: "General", Icon: Settings2 },
   { id: "library", label: "Library & storage", Icon: HardDrive },
+  { id: "export", label: "Export & import", Icon: ArrowLeftRight },
   { id: "profiles", label: "Profiles & security", Icon: ShieldCheck },
   { id: "appearance", label: "Appearance", Icon: Palette },
   { id: "reader", label: "Reader", Icon: BookOpen },
@@ -95,6 +106,7 @@ export function SettingsPage({
           <h1 className="text-[20px] font-semibold tracking-tight">{current.label}</h1>
           {section === "general" && <GeneralSettings session={session} />}
           {section === "library" && <LibrarySettings library={library} session={session} />}
+          {section === "export" && <ExportImportSettings session={session} />}
           {section === "profiles" && <ProfileSettings session={session} />}
           {section === "appearance" && <AppearanceSettings />}
           {section === "reader" && <ReaderSettings />}

@@ -7,7 +7,8 @@
 //! file from the trash brings its details back too.
 
 use crate::paths::write_atomic;
-use libreri_core::{Book, BookId, BookMetadata, FileType, LibraryLayout};
+use crate::Library;
+use libreri_core::{Alias, Book, BookId, BookMetadata, FileType, LibraryLayout};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -24,6 +25,9 @@ pub struct Sidecar {
     pub added_at: String,
     pub modified_at: String,
     pub metadata: BookMetadata,
+    /// Earlier ids of the book, so old links keep working after a rebuild.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub aliases: Vec<Alias>,
 }
 
 pub fn path(layout: &LibraryLayout, id: &BookId) -> PathBuf {
@@ -33,7 +37,14 @@ pub fn path(layout: &LibraryLayout, id: &BookId) -> PathBuf {
         .join(format!("{id}.json"))
 }
 
-pub fn write(layout: &LibraryLayout, book: &Book) -> std::io::Result<()> {
+pub fn write(lib: &Library, book: &Book) -> crate::Result<()> {
+    let aliases = lib.with_db(|db| db.aliases_of(&book.id))?;
+    write_with(lib.layout(), book, aliases)?;
+    Ok(())
+}
+
+/// Writes a sidecar with the given aliases (no database needed).
+pub fn write_with(layout: &LibraryLayout, book: &Book, aliases: Vec<Alias>) -> std::io::Result<()> {
     let sidecar = Sidecar {
         format_version: SIDECAR_VERSION,
         id: book.id.clone(),
@@ -43,6 +54,7 @@ pub fn write(layout: &LibraryLayout, book: &Book) -> std::io::Result<()> {
         added_at: book.added_at.clone(),
         modified_at: book.modified_at.clone(),
         metadata: book.metadata.clone(),
+        aliases,
     };
     let json = serde_json::to_vec_pretty(&sidecar).map_err(std::io::Error::other)?;
     write_atomic(&path(layout, &book.id), &json)

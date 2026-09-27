@@ -77,19 +77,19 @@ fn notebook_book_id(content: &str) -> Option<BookId> {
 /// only the list of annotations.
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct PersonalBackup {
-    format_version: u32,
+pub(crate) struct PersonalBackup {
+    pub format_version: u32,
     #[serde(default)]
-    state: Option<BookUserState>,
+    pub state: Option<BookUserState>,
     #[serde(default)]
-    position: Option<String>,
+    pub position: Option<String>,
     #[serde(default)]
-    annotations: Vec<Annotation>,
+    pub annotations: Vec<Annotation>,
 }
 
-const PERSONAL_BACKUP_VERSION: u32 = 2;
+pub(crate) const PERSONAL_BACKUP_VERSION: u32 = 2;
 
-fn read_backup(text: &str) -> Option<PersonalBackup> {
+pub(crate) fn read_backup(text: &str) -> Option<PersonalBackup> {
     if let Ok(list) = serde_json::from_str::<Vec<Annotation>>(text) {
         return Some(PersonalBackup {
             format_version: 1,
@@ -185,7 +185,17 @@ impl Library {
         if !session.kind.keeps_data() {
             return Ok(());
         }
-        let profile = session.id;
+        self.backup_personal_of(&session.id, book)
+    }
+
+    /// The personal data of `profile` for one book, as stored in its backup.
+    /// `None` when there is nothing to keep.
+    pub(crate) fn personal_backup(
+        &self,
+        profile: &ProfileId,
+        book: &BookId,
+    ) -> Result<Option<PersonalBackup>> {
+        let profile = *profile;
         let (state, position, annotations) = self.with_db(|db| {
             let state = db.book(book, &profile)?.map(|b| b.user);
             Ok((
@@ -194,21 +204,29 @@ impl Library {
                 db.annotations(book, &profile)?,
             ))
         })?;
-        let path = annotations_file(self, &profile, book);
         let state = state.filter(|s| s != &BookUserState::default());
         if state.is_none() && position.is_none() && annotations.is_empty() {
-            let _ = fs::remove_file(&path);
-            return Ok(());
+            return Ok(None);
         }
-        if let Some(dir) = path.parent() {
-            fs::create_dir_all(dir)?;
-        }
-        let backup = PersonalBackup {
+        Ok(Some(PersonalBackup {
             format_version: PERSONAL_BACKUP_VERSION,
             state,
             position,
             annotations,
+        }))
+    }
+
+    /// Writes (or removes) the backup file of `profile` for one book,
+    /// whoever is signed in. Callers check that the profile keeps data.
+    pub(crate) fn backup_personal_of(&self, profile: &ProfileId, book: &BookId) -> Result<()> {
+        let path = annotations_file(self, profile, book);
+        let Some(backup) = self.personal_backup(profile, book)? else {
+            let _ = fs::remove_file(&path);
+            return Ok(());
         };
+        if let Some(dir) = path.parent() {
+            fs::create_dir_all(dir)?;
+        }
         let json = serde_json::to_vec_pretty(&backup).map_err(std::io::Error::other)?;
         write_atomic(&path, &json)?;
         Ok(())

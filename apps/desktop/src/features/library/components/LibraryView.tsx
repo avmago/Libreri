@@ -6,6 +6,7 @@ import {
   LibraryBig,
   ChevronDown,
   ChevronRight,
+  Download,
   FileUp,
   FolderUp,
   LayoutGrid,
@@ -14,6 +15,7 @@ import {
   PanelRight,
   RefreshCw,
   Search,
+  Upload,
   SearchX,
   X,
 } from "lucide-react";
@@ -35,6 +37,7 @@ import { cn } from "@/lib/utils";
 import { usePermissions } from "@/features/profiles";
 import { useBooks, useFacets, useFolders, useMoveFolder } from "../api";
 import { useDetailsDialog, useFillDetails } from "@/features/details";
+import { pickArchiveToImport, usePortability } from "@/features/portability";
 import { useLibraryDialogs } from "../dialogs";
 import type { DragItem } from "../drag";
 import { DragLayer } from "./DragLayer";
@@ -208,6 +211,8 @@ function SortMenu() {
 }
 
 function ImportMenu() {
+  const { kind } = usePermissions();
+  const openExport = usePortability((s) => s.openExport);
   return (
     <div className="flex">
       <Button size="sm" className="rounded-r-none" onClick={() => void pickFilesToImport()}>
@@ -237,6 +242,21 @@ function ImportMenu() {
               <RefreshCw /> Check folder for changes{" "}
               <MenuShortcut>{keys("library.refresh")}</MenuShortcut>
             </DropdownMenu.Item>
+            <DropdownMenu.Separator className={menuSeparator} />
+            <DropdownMenu.Item
+              className={menuItem}
+              onSelect={() => {
+                const sel = useLibraryView.getState().selection;
+                openExport(sel.length ? sel : null);
+              }}
+            >
+              <Download /> Export… <MenuShortcut>{keys("library.export")}</MenuShortcut>
+            </DropdownMenu.Item>
+            {kind === "owner" && (
+              <DropdownMenu.Item className={menuItem} onSelect={() => void pickArchiveToImport()}>
+                <Upload /> Import a Libreri archive…
+              </DropdownMenu.Item>
+            )}
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
@@ -400,6 +420,8 @@ export function LibraryView() {
   const dialogs = useLibraryDialogs();
   const openFinder = useDetailsDialog((s) => s.open);
   const fillDetails = useFillDetails();
+  const openExport = usePortability((s) => s.openExport);
+  const openCitation = usePortability((s) => s.openCitation);
   usePdfCovers(books);
 
   const selected = books.filter((b) => view.selection.includes(b.id));
@@ -449,6 +471,11 @@ export function LibraryView() {
     if (editLibrary && selected.length === 1) openFinder(selected[0]!.id);
   });
   useShortcut("details.fill", () => editLibrary && fillDetails(selected.map((b) => b.id)));
+  useShortcut(
+    "library.export",
+    () => editLibrary && openExport(selected.length ? selected.map((b) => b.id) : null),
+  );
+  useShortcut("books.cite", () => selected.length && openCitation(selected.map((b) => b.id)));
   useShortcut("books.selectAll", () => view.setSelection(books.map((b) => b.id)));
   useShortcut("books.clearSelection", () => view.setSelection([]));
   const only = selected.length === 1 ? selected[0] : undefined;

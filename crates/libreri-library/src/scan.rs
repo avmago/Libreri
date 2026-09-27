@@ -113,7 +113,7 @@ impl Library {
                 covers::rename(self.layout(), &rec.id, &id);
                 self.rename_annotation_backups(&rec.id, &id);
                 if let Ok(book) = self.record(&id) {
-                    sidecar::write(self.layout(), &book)?;
+                    sidecar::write(self, &book)?;
                 }
                 report.changed += 1;
                 seen_ids.insert(id);
@@ -150,7 +150,7 @@ impl Library {
                         db.set_file_stamp(&existing, f.size, f.mtime)
                     })?;
                     if let Ok(book) = self.record(&existing) {
-                        sidecar::write(self.layout(), &book)?;
+                        sidecar::write(self, &book)?;
                     }
                     if was_missing {
                         report.restored += 1;

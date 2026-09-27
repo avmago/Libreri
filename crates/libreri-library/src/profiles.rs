@@ -28,11 +28,11 @@ pub struct Collection {
 /// A collection as backed up in `.library-data/profiles/<id>.collections.json`.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct CollectionBackup {
-    id: String,
-    name: String,
-    query: String,
-    position: i64,
+pub(crate) struct CollectionBackup {
+    pub id: String,
+    pub name: String,
+    pub query: String,
+    pub position: i64,
 }
 
 /// What `set_pin` did.
@@ -63,11 +63,11 @@ fn check_colour(colour: &str) -> Result<()> {
 }
 
 impl Library {
-    fn profiles_dir(&self) -> PathBuf {
+    pub(crate) fn profiles_dir(&self) -> PathBuf {
         self.layout().data_dir().join("profiles")
     }
 
-    fn profile_backup(&self, p: &Profile) -> Result<()> {
+    pub(crate) fn profile_backup(&self, p: &Profile) -> Result<()> {
         let dir = self.profiles_dir();
         fs::create_dir_all(&dir)?;
         let json = serde_json::to_vec_pretty(p).map_err(std::io::Error::other)?;
@@ -127,7 +127,7 @@ impl Library {
         Ok(n)
     }
 
-    fn backup_collections(&self, profile: &ProfileId) -> Result<()> {
+    pub(crate) fn backup_collections(&self, profile: &ProfileId) -> Result<()> {
         if !self.session_info().is_some_and(|s| s.kind.keeps_data()) {
             return Ok(());
         }
@@ -196,7 +196,12 @@ impl Library {
         Ok(())
     }
 
-    fn require_owner(&self) -> Result<Session> {
+    /// Refuses unless the owner is signed in.
+    pub fn require_owner_profile(&self) -> Result<()> {
+        self.require_owner().map(|_| ())
+    }
+
+    pub(crate) fn require_owner(&self) -> Result<Session> {
         match self.session_info() {
             None => Err(Error::SignedOut),
             Some(s) if s.kind.can_manage_profiles() => Ok(s),
@@ -206,7 +211,7 @@ impl Library {
         }
     }
 
-    fn load_profile(&self, id: &ProfileId) -> Result<Profile> {
+    pub(crate) fn load_profile(&self, id: &ProfileId) -> Result<Profile> {
         self.with_db(|db| db.profile(id))?
             .ok_or_else(|| Error::InvalidInput("that profile no longer exists".into()))
     }
@@ -382,7 +387,7 @@ impl Library {
 
     /// `Notes/<old name>` becomes `Notes/<new name>`, and notebook paths
     /// follow.
-    fn rename_notes_folder(&self, p: &Profile, new_name: &str) -> Result<()> {
+    pub(crate) fn rename_notes_folder(&self, p: &Profile, new_name: &str) -> Result<()> {
         let old_dir = crate::reading::notes_folder_name(&p.name);
         let new_dir = crate::reading::notes_folder_name(new_name);
         if old_dir == new_dir {

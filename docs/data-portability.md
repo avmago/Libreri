@@ -36,7 +36,14 @@ Requirement (user, 2026-09-27): when the database, metadata and every kind of no
 - Notebooks stay Markdown in `Notes/<profile name>/`; renaming a profile renames the folder and notebook links follow. Guests leave nothing on disk.
 - See `docs/adr/0010-profiles-and-pins.md`.
 
+## How it is built (Phase 4b)
+- Archives, import, re-linking, backups and the health check: `docs/adr/0014-export-import-backups.md`. Round-trip tests live in `crates/libreri-library/src/archive_tests.rs`.
+- Old ids of a book (edited file, or notes from another copy) are *aliases* kept in the database and in the book's sidecar, so links survive a rebuild and an import.
+- Exports carry only the signed-in profile's personal data (the owner may include everyone's) and never PINs or keys. Backups carry everyone's data and PIN hashes, so a restore is complete.
+- Differences from the plan above: the archive's catalogue copy is for reference and other tools; import works from the sidecars and backups, which are the source of truth. Versions history arrives with Phase 6 and will be added to the archive then.
+
 ## Per-computer settings (Phase 4)
+- Backup settings and the file kept up to date are in `backups.json` (per library id), because they name folders on this computer.
 - Online sources in use and API keys (ComicVine, ISBNdb) are kept in `online-sources.json` in the computer's app-config folder, not in the library, so exports, backups and copies of the library folder never carry them. See `docs/adr/0013-online-details.md`.
 - Details and covers found online are saved like any edit: in the database and the book's sidecar, so they travel with the library.
 

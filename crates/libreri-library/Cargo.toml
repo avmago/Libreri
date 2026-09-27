@@ -14,6 +14,7 @@ libreri-formats.workspace = true
 libreri-thumbs.workspace = true
 libreri-profiles.workspace = true
 libreri-metadata.workspace = true
+libreri-export.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

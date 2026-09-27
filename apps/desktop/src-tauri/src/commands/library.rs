@@ -89,7 +89,7 @@ pub fn cancel_job(state: State<'_, AppState>, id: String) -> bool {
 }
 
 /// Makes `library` the open one and remembers it on the Welcome screen.
-fn adopt(state: &AppState, library: Library) -> Result<LibrarySummary, AppError> {
+pub(crate) fn adopt(state: &AppState, library: Library) -> Result<LibrarySummary, AppError> {
     let summary = LibrarySummary::of(&library);
     let root: PathBuf = library.layout().root().to_path_buf();
     let name = library.info().name.clone();

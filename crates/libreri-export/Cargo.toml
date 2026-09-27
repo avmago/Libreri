@@ -1,0 +1,29 @@
+[package]
+name = "libreri-export"
+description = "Writes Libreri data in other formats (CSV, Excel, JSON, BibTeX, RIS, CSL-JSON, Obsidian, Calibre OPF), formats citations, and reads and writes Libreri archives."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+libreri-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+csv = "1.4"
+rust_xlsxwriter = { version = "0.99", default-features = false }
+zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
+# Only the desktop shell turns this on, to generate TypeScript types.
+specta = { version = "=2.0.0-rc.25", features = ["derive"], optional = true }
+
+[features]
+specta = ["dep:specta"]
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

@@ -2550,7 +2550,9 @@ name = "libreri-desktop"
 version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
+ "chrono",
  "libreri-core",
+ "libreri-export",
  "libreri-jobs",
  "libreri-library",
  "libreri-metadata",
@@ -2566,6 +2568,22 @@ dependencies = [
  "tauri-specta",
  "tempfile",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "libreri-export"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "csv",
+ "libreri-core",
+ "rust_xlsxwriter",
+ "serde",
+ "serde_json",
+ "specta",
+ "tempfile",
+ "thiserror 2.0.21",
+ "zip",
 ]
 
 [[package]]
@@ -2599,6 +2617,7 @@ dependencies = [
  "image",
  "libreri-core",
  "libreri-db",
+ "libreri-export",
  "libreri-formats",
  "libreri-metadata",
  "libreri-profiles",
@@ -3828,6 +3847,15 @@ dependencies = [
  "hashlink",
  "libsqlite3-sys",
  "smallvec",
+]
+
+[[package]]
+name = "rust_xlsxwriter"
+version = "0.99.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "34f2d2cda7223168a14fb86bc7411dbc3379bd7d49749ecc53b91ed98585b6b0"
+dependencies = [
+ "zip",
 ]
 
 [[package]]

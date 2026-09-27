@@ -5,6 +5,7 @@
 //! Anything that is a rule about books or libraries belongs in a
 //! `libreri-*` crate (see docs/code-structure.md).
 
+mod backup_store;
 mod commands;
 mod dto;
 mod error;
@@ -102,6 +103,18 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::notes::create_note,
             commands::notes::reveal_notes_folder,
             commands::notes::library_storage,
+            commands::portability::export_books,
+            commands::portability::copy_citation,
+            commands::portability::inspect_archive,
+            commands::portability::import_archive,
+            commands::portability::restore_library,
+            commands::portability::health_check,
+            commands::portability::repair_health,
+            commands::portability::locate_file,
+            commands::portability::get_backup_settings,
+            commands::portability::set_backup_settings,
+            commands::portability::back_up_now,
+            commands::portability::reveal_path,
         ])
         .events(tauri_specta::collect_events![
             events::JobEventPayload,
@@ -110,6 +123,9 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::SessionChanged,
             events::DetailsFilled,
             events::PhoneScan,
+            events::ExportFinished,
+            events::ArchiveImported,
+            events::BackupFinished,
         ])
 }
 
@@ -127,6 +143,7 @@ pub fn run() {
             let state = AppState::initialise(app.handle())?;
             app.manage(state);
             app.state::<AppState>().reopen_last_library();
+            state::start_scheduler(app.handle().clone());
             Ok(())
         })
         .on_window_event(|window, event| {

@@ -458,6 +458,15 @@ impl Database {
         )?)
     }
 
+    /// The book's file is now of another kind (another edition was located).
+    pub fn set_file_type(&self, id: &BookId, file_type: FileType) -> Result<()> {
+        self.conn.execute(
+            "UPDATE books SET file_type=?2 WHERE id=?1",
+            params![id.as_str(), file_type.as_str()],
+        )?;
+        Ok(())
+    }
+
     pub fn set_missing(&self, id: &BookId, missing: bool) -> Result<()> {
         self.conn.execute(
             "UPDATE books SET missing=?2 WHERE id=?1",

@@ -1,4 +1,4 @@
-import { FileText, Folder, FolderOpen, FolderPlus, Library, X } from "lucide-react";
+import { ArchiveRestore, FileText, Folder, FolderOpen, FolderPlus, Library, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useForgetRecentLibrary, useSettings } from "@/features/settings";
 import { useLibraryActions } from "../hooks/useLibraryActions";
@@ -15,7 +15,7 @@ const TREE: { name: string; hint?: string; depth: number; file?: boolean }[] = [
 ];
 
 export function WelcomeScreen() {
-  const { createNew, openExisting, openPath, busy } = useLibraryActions();
+  const { createNew, openExisting, openPath, restoreFromBackup, busy } = useLibraryActions();
   const { data: settings } = useSettings();
   const forget = useForgetRecentLibrary();
   const recent = settings?.recentLibraries ?? [];
@@ -45,6 +45,15 @@ export function WelcomeScreen() {
             className="justify-start"
           >
             <FolderOpen /> Open an existing library…
+          </Button>
+          <Button
+            size="lg"
+            variant="ghost"
+            onClick={() => void restoreFromBackup()}
+            disabled={busy}
+            className="justify-start"
+          >
+            <ArchiveRestore /> Restore from a backup…
           </Button>
         </div>
 

@@ -3,6 +3,7 @@ import {
   BookOpen,
   Check,
   Columns2,
+  Download,
   ExternalLink,
   FolderInput,
   FolderSearch,
@@ -11,10 +12,12 @@ import {
   Info,
   ListChecks,
   Pencil,
+  Quote,
   Star,
   Trash2,
 } from "lucide-react";
 import { useDetailsDialog, useFillDetails } from "@/features/details";
+import { usePortability } from "@/features/portability";
 import { usePermissions } from "@/features/profiles";
 import {
   ContextMenu,
@@ -45,6 +48,8 @@ function MenuItems({ book, targets }: { book: BookView; targets: BookView[] }) {
   const openBulk = useLibraryDialogs((s) => s.openBulkEdit);
   const openFinder = useDetailsDialog((s) => s.open);
   const fillDetails = useFillDetails();
+  const openCitation = usePortability((s) => s.openCitation);
+  const openExport = usePortability((s) => s.openExport);
   const hasOpenBook = useTabs((s) => s.tabs.length > 0);
   const setDetailsOpen = useLibraryView((s) => s.setDetailsOpen);
   const { data: folders = [] } = useFolders();
@@ -124,6 +129,22 @@ function MenuItems({ book, targets }: { book: BookView; targets: BookView[] }) {
         {allFavourite ? "Remove from Favourites" : "Add to Favourites"}
         <MenuShortcut>{keys("books.favorite")}</MenuShortcut>
       </ContextMenu.Item>
+      <ContextMenu.Item
+        className={menuItem}
+        onSelect={() => openCitation(targets.map((b) => b.id))}
+      >
+        <Quote /> {single ? "Cite…" : `Cite ${targets.length} books…`}
+        <MenuShortcut>{keys("books.cite")}</MenuShortcut>
+      </ContextMenu.Item>
+      {editLibrary && (
+        <ContextMenu.Item
+          className={menuItem}
+          onSelect={() => openExport(targets.map((b) => b.id))}
+        >
+          <Download /> {single ? "Export…" : `Export ${targets.length} books…`}
+          <MenuShortcut>{keys("library.export")}</MenuShortcut>
+        </ContextMenu.Item>
+      )}
       {editLibrary && (
         <>
           <ContextMenu.Item className={menuItem} onSelect={() => openBulk(targets)}>

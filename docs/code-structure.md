@@ -15,7 +15,7 @@ libreri/
 │  ├─ src-tauri/  src/{main.rs, state.rs, commands/, events.rs, protocol.rs}  capabilities/  tauri.conf.json
 │  └─ src/
 │     ├─ app/            providers, router, shell layout, error boundary
-│     ├─ features/       library reader notes profiles metadata search import-export organize
+│     ├─ features/       library reader notes profiles details portability search organize
 │     │                  markup page-editor compare audio voice canvas capture links stats settings
 │     │                  (each: components/ hooks/ store.ts api.ts types.ts index.ts)
 │     ├─ readers/        types.ts (Renderer interface) + pdf/ ebook/ markdown/ comic/ djvu/
@@ -34,7 +34,7 @@ libreri/
 │  ├─ libreri-annotations highlights, comments, ink, voice notes, links, anchors
 │  ├─ libreri-profiles    6-digit PIN rules, Argon2 hashing, lockout, recovery codes
 │  ├─ libreri-search      full-text index
-│  ├─ libreri-export      exporters + importers
+│  ├─ libreri-export      formats: CSV/XLSX/JSON, BibTeX/RIS/CSL-JSON, citation styles, Obsidian notes, Calibre OPF, Libreri archives (zip + manifest); importers from other apps (4c)
 │  ├─ libreri-pdf-edit    page ops, redaction, compare, versions
 │  ├─ libreri-speech      TTS, dictation, transcription
 │  ├─ libreri-recognition OCR, handwriting, maths (optional cargo features)

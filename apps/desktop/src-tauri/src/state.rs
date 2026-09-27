@@ -1,13 +1,19 @@
 //! Shared app state held by Tauri.
 
+use crate::backup_store::{BackupSettings, BackupStore};
 use crate::error::{AppError, AppResult};
-use crate::events::{DetailsFilled, ImportFinished, JobEventPayload, LibraryChanged};
+use crate::events::{
+    ArchiveImported, BackupFinished, DetailsFilled, ExportFinished, ImportFinished,
+    JobEventPayload, LibraryChanged,
+};
 use crate::online_store::OnlineStore;
 use crate::settings_store::SettingsStore;
 use libreri_core::AppSettings;
 use libreri_core::BookId;
 use libreri_jobs::{JobContext, JobError, JobId, JobQueue};
-use libreri_library::{ImportRequest, Library, LibraryWatcher, Progress};
+use libreri_library::{
+    ArchiveImport, ExportRequest, ImportRequest, Library, LibraryWatcher, Progress,
+};
 use libreri_metadata::Http;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -20,6 +26,10 @@ pub struct AppState {
     /// Online sources and API keys (per computer, never exported).
     pub online: Mutex<libreri_metadata::Settings>,
     pub online_store: OnlineStore,
+    /// Backups and files kept up to date, per library (per computer).
+    pub backups: BackupStore,
+    /// A backup is running; the schedule does not start another.
+    backup_running: Arc<AtomicBool>,
     /// Shared by all lookups, so connections are reused.
     pub http: Arc<dyn Http + Send>,
     /// The phone scanning page, while it is open.
@@ -30,6 +40,24 @@ pub struct AppState {
     /// A scan is queued and has not started yet; further requests are merged.
     scan_queued: Arc<AtomicBool>,
     app: AppHandle,
+}
+
+/// Checks every five minutes (and a minute after starting) whether a
+/// backup or an auto-export is due.
+pub fn start_scheduler(app: AppHandle) {
+    std::thread::Builder::new()
+        .name("libreri-scheduler".into())
+        .spawn(move || {
+            std::thread::sleep(std::time::Duration::from_secs(60));
+            loop {
+                match app.try_state::<AppState>() {
+                    Some(state) => state.run_due_tasks(),
+                    None => return,
+                }
+                std::thread::sleep(std::time::Duration::from_secs(300));
+            }
+        })
+        .expect("the scheduler thread starts");
 }
 
 /// Adapts a job's context to the library's progress interface.
@@ -79,6 +107,7 @@ impl AppState {
         let settings = settings_store.load();
         let online_store = OnlineStore::new(&config_dir);
         let online = online_store.load();
+        let backups = BackupStore::new(&config_dir);
 
         let handle = app.clone();
         let threads = std::thread::available_parallelism()
@@ -94,6 +123,8 @@ impl AppState {
             settings_store,
             online: Mutex::new(online),
             online_store,
+            backups,
+            backup_running: Arc::default(),
             http: make_http(),
             phone: Mutex::new(None),
             library: Mutex::new(None),
@@ -250,6 +281,131 @@ impl AppState {
             let _ = DetailsFilled::new(ctx.id(), &report).emit(&handle);
             Ok(())
         }))
+    }
+
+    /// Writes an export; the result arrives as an `ExportFinished` event.
+    pub fn start_export(&self, request: ExportRequest) -> AppResult<JobId> {
+        let library = self.library()?;
+        let handle = self.app.clone();
+        Ok(self.jobs.submit("Exporting", move |ctx| {
+            let report = library
+                .export(&request, &JobProgress(ctx))
+                .map_err(job_error)?;
+            let _ = ExportFinished::new(ctx.id(), &report).emit(&handle);
+            Ok(())
+        }))
+    }
+
+    /// Imports a Libreri archive; the result arrives as `ArchiveImported`.
+    pub fn start_archive_import(
+        &self,
+        path: std::path::PathBuf,
+        choice: ArchiveImport,
+    ) -> AppResult<JobId> {
+        let library = self.library()?;
+        let handle = self.app.clone();
+        Ok(self.jobs.submit("Importing a Libreri archive", move |ctx| {
+            let result = library.import_archive(&path, &choice, &JobProgress(ctx));
+            let _ = LibraryChanged::default().emit(&handle);
+            let report = result.map_err(job_error)?;
+            let _ = ArchiveImported::new(ctx.id(), &report).emit(&handle);
+            Ok(())
+        }))
+    }
+
+    /// Backup settings of the open library.
+    pub fn backup_settings(&self) -> AppResult<(String, BackupSettings)> {
+        let id = self.library()?.info().id.to_string();
+        let settings = self.backups.get(&id);
+        Ok((id, settings))
+    }
+
+    /// Backs up the open library into its backup folder; the result arrives
+    /// as `BackupFinished`. `None` if a backup is already running.
+    pub fn start_backup(&self, scheduled: bool) -> AppResult<Option<JobId>> {
+        let library = self.library()?;
+        let (id, settings) = self.backup_settings()?;
+        let folder = settings
+            .folder
+            .clone()
+            .filter(|f| !f.is_empty())
+            .ok_or_else(|| AppError::invalid("choose a folder for backups first"))?;
+        if self.backup_running.swap(true, Ordering::SeqCst) {
+            return Ok(None);
+        }
+        let running = Arc::clone(&self.backup_running);
+        let handle = self.app.clone();
+        let started = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+        let _ = self.backups.update(&id, |s| s.last_attempt = Some(started));
+        let label = if scheduled {
+            "Backing up the library (scheduled)"
+        } else {
+            "Backing up the library"
+        };
+        Ok(Some(self.jobs.submit(label, move |ctx| {
+            let result = library.back_up_into(
+                std::path::Path::new(&folder),
+                settings.keep as usize,
+                settings.book_files,
+                env!("CARGO_PKG_VERSION"),
+                &JobProgress(ctx),
+            );
+            running.store(false, Ordering::SeqCst);
+            let stamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+            let (path, error) = match &result {
+                Ok(r) => (Some(r.path.to_string_lossy().into_owned()), None),
+                Err(libreri_library::Error::Cancelled) => (None, None),
+                Err(e) => (None, Some(e.to_string())),
+            };
+            if let Some(state) = handle.try_state::<AppState>() {
+                let _ = state.backups.update(&id, |s| {
+                    if path.is_some() {
+                        s.last_backup = Some(stamp.clone());
+                        s.last_error = None;
+                    } else if error.is_some() {
+                        s.last_error = error.clone();
+                    }
+                });
+            }
+            let _ = BackupFinished {
+                job_id: ctx.id().to_string(),
+                path,
+                error,
+                scheduled,
+            }
+            .emit(&handle);
+            result.map(|_| ()).map_err(job_error)
+        })))
+    }
+
+    /// Runs what is due: a scheduled backup, and rewriting the file kept up
+    /// to date. Called every few minutes by [`start_scheduler`].
+    fn run_due_tasks(&self) {
+        let Ok((id, settings)) = self.backup_settings() else {
+            return;
+        };
+        let now = chrono::Utc::now();
+        if settings.due(now) && !settings.failed_recently(now) {
+            if let Err(e) = self.start_backup(true) {
+                let stamp = now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+                let _ = self.backups.update(&id, |s| {
+                    s.last_error = Some(e.message);
+                    s.last_attempt = Some(stamp);
+                });
+            }
+        }
+        if let (Some(auto), Some(library)) = (settings.auto_export, self.library_if_open()) {
+            let result = library.write_catalogue(auto.format, std::path::Path::new(&auto.path));
+            let stamp = now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+            let _ = self.backups.update(&id, |s| match result {
+                Ok(true) => {
+                    s.last_auto_export = Some(stamp);
+                    s.auto_export_error = None;
+                }
+                Ok(false) => s.auto_export_error = None,
+                Err(e) => s.auto_export_error = Some(e.to_string()),
+            });
+        }
     }
 
     /// Rebuilds the database from files and sidecars.

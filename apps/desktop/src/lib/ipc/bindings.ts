@@ -215,11 +215,47 @@ export const commands = {
 	revealNotesFolder: () => typedError<string, AppError>(__TAURI_INVOKE("reveal_notes_folder")),
 	/**  How much space the library's folders use, in bytes. */
 	libraryStorage: () => typedError<StorageDto, AppError>(__TAURI_INVOKE("library_storage")),
+	/**
+	 *  Starts an export. Returns the job id; the result arrives as an
+	 *  `ExportFinished` event.
+	 */
+	exportBooks: (request: ExportRequestDto) => typedError<string, AppError>(__TAURI_INVOKE("export_books", { request })),
+	/**  References for books, ready to paste. */
+	copyCitation: (ids: string[], style: CitationStyle) => typedError<Citation, AppError>(__TAURI_INVOKE("copy_citation", { ids, style })),
+	/**  What a Libreri archive holds and what importing it would do. */
+	inspectArchive: (path: string) => typedError<ArchiveSummaryDto, AppError>(__TAURI_INVOKE("inspect_archive", { path })),
+	/**
+	 *  Imports a Libreri archive into the open library (owner only). Returns
+	 *  the job id; the report arrives as an `ArchiveImported` event.
+	 */
+	importArchive: (path: string, profiles: ProfileMappingDto[]) => typedError<string, AppError>(__TAURI_INVOKE("import_archive", { path, profiles })),
+	/**
+	 *  Makes a new library in `folder` (new or empty) and restores a backup or
+	 *  export into it, owner included.
+	 */
+	restoreLibrary: (archive: string, folder: string) => typedError<RestoredLibrary, AppError>(__TAURI_INVOKE("restore_library", { archive, folder })),
+	/**  Checks the library for missing files, broken links and other problems. */
+	healthCheck: () => typedError<HealthReportDto, AppError>(__TAURI_INVOKE("health_check")),
+	/**  Fixes what the health check can fix by itself. Returns how many things. */
+	repairHealth: () => typedError<number, AppError>(__TAURI_INVOKE("repair_health")),
+	/**  Puts a missing book's file back ("Locate file…"). */
+	locateFile: (id: string, path: string, copy: boolean, acceptOther: boolean) => typedError<LocateResult, AppError>(__TAURI_INVOKE("locate_file", { id, path, copy, acceptOther })),
+	/**  Backups and the file kept up to date, for Settings › Export & import. */
+	getBackupSettings: () => typedError<BackupSettingsDto, AppError>(__TAURI_INVOKE("get_backup_settings")),
+	/**  Changes the backup settings (owner only). */
+	setBackupSettings: (change: BackupSettingsChange) => typedError<BackupSettingsDto, AppError>(__TAURI_INVOKE("set_backup_settings", { change })),
+	/**  Starts a backup now. Returns the job id, or `None` if one is running. */
+	backUpNow: () => typedError<string | null, AppError>(__TAURI_INVOKE("back_up_now")),
+	/**  Shows a file (an export or a backup) in the system file manager. */
+	revealPath: (path: string) => typedError<null, AppError>(__TAURI_INVOKE("reveal_path", { path })),
 };
 
 /** Events */
 export const events = {
+	archiveImported: makeEvent<ArchiveImported>("archive-imported"),
+	backupFinished: makeEvent<BackupFinished>("backup-finished"),
 	detailsFilled: makeEvent<DetailsFilled>("details-filled"),
+	exportFinished: makeEvent<ExportFinished>("export-finished"),
 	importFinished: makeEvent<ImportFinished>("import-finished"),
 	jobEventPayload: makeEvent<JobEventPayload>("job-event-payload"),
 	libraryChanged: makeEvent<LibraryChanged>("library-changed"),
@@ -277,6 +313,106 @@ export type AppliedDetails = {
 	book: BookDto,
 	/**  Why the picked cover could not be used, if it could not. */
 	coverError: string | null,
+};
+
+/**  A Libreri archive was imported: the summary shown to the user. */
+export type ArchiveImported = {
+	jobId: string,
+	linked: number,
+	added: number,
+	otherFile: number,
+	missing: number,
+	filesRestored: number,
+	detailsUpdated: number,
+	notesAdded: number,
+	notesUpdated: number,
+	notesKept: number,
+	noteFilesAdded: number,
+	noteConflicts: string[],
+	profilesCreated: string[],
+	missingBooks: string[],
+	warnings: string[],
+};
+
+export type ArchiveKind = 
+/**  Made with Export; never carries PINs. */
+"export" | 
+/**  Made by a backup; carries PINs so a restore brings them back. */
+"backup";
+
+export type ArchiveProfileDto = {
+	archiveId: string,
+	name: string,
+	kind: ProfileKind,
+	suggestion: ProfileTargetDto,
+};
+
+export type ArchiveSummaryDto = {
+	kind: ArchiveKind,
+	createdAt: string,
+	createdBy: string,
+	libraryName: string,
+	includesBookFiles: boolean,
+	includesPins: boolean,
+	books: number,
+	notes: number,
+	notebooks: number,
+	linked: number,
+	withFile: number,
+	otherFile: number,
+	missing: number,
+	profiles: ArchiveProfileDto[],
+};
+
+/**  A file (BibTeX, CSL-JSON…) Libreri rewrites whenever the library changes. */
+export type AutoExport = {
+	format: ExportFormat,
+	path: string,
+};
+
+export type BackupFileDto = {
+	path: string,
+	createdAt: string,
+	size: number,
+	includesBookFiles: boolean,
+	books: number,
+};
+
+/**  A backup finished (by hand or on schedule). */
+export type BackupFinished = {
+	jobId: string,
+	/**  Set when the backup was written. */
+	path: string | null,
+	error: string | null,
+	/**  Started by the schedule rather than "Back up now". */
+	scheduled: boolean,
+};
+
+export type BackupSettingsChange = {
+	enabled: boolean,
+	folder: string | null,
+	everyHours: number,
+	keep: number,
+	bookFiles: boolean,
+	autoExport: AutoExport | null,
+};
+
+export type BackupSettingsDto = {
+	enabled: boolean,
+	folder: string | null,
+	everyHours: number,
+	keep: number,
+	bookFiles: boolean,
+	lastBackup: string | null,
+	lastError: string | null,
+	lastAttempt: string | null,
+	autoExport: AutoExport | null,
+	lastAutoExport: string | null,
+	autoExportError: string | null,
+	/**  This library's backups in the folder, newest first. */
+	backups: BackupFileDto[],
+	/**  The signed-in profile may change these settings (the owner). */
+	canEdit: boolean,
 };
 
 /**  Everything about one book in the library. */
@@ -366,6 +502,12 @@ export type BookQuery = {
 	descending?: boolean,
 };
 
+export type BookRef = {
+	id: string,
+	title: string,
+	relPath: string,
+};
+
 /**  Personal state of one profile for one book. */
 export type BookUserState = {
 	status?: ReadingStatus,
@@ -375,6 +517,12 @@ export type BookUserState = {
 	/**  0.0–1.0. */
 	progress?: number | null,
 	lastOpened?: string | null,
+};
+
+export type BrokenLinkDto = {
+	note: string,
+	line: number,
+	link: string,
 };
 
 /**
@@ -411,6 +559,17 @@ export type Candidate = {
 	score: number | null,
 };
 
+/**  A formatted reference as plain text and as HTML (with italics). */
+export type Citation = {
+	text: string,
+	html: string,
+};
+
+/**  Reference styles offered by "Copy citation". */
+export type CitationStyle = "apa" | "mla" | "chicago" | "harvard" | "ieee" | 
+/**  A BibTeX entry, for pasting into a `.bib` file. */
+"bibtex";
+
 export type CollectionDto = {
 	id: string,
 	name: string,
@@ -423,6 +582,11 @@ export type ContentType = "book" | "textbook" | "researchPaper" | "conferencePap
 export type CountDto<T> = {
 	value: T,
 	count: number,
+};
+
+export type CountedBook = {
+	book: BookRef,
+	notes: number,
 };
 
 /**  "Fill in missing details" finished (by hand, or after an import). */
@@ -439,6 +603,45 @@ export type DuplicateDto = {
 	file: string,
 	existingTitle: string,
 	existingId: string,
+};
+
+export type DuplicateGroup = {
+	key: string,
+	books: BookRef[],
+};
+
+/**  An export finished. */
+export type ExportFinished = {
+	jobId: string,
+	path: string,
+	books: number,
+	notes: number,
+	files: number,
+	bytes: number,
+	warnings: string[],
+};
+
+/**  Every format Libreri exports to. */
+export type ExportFormat = 
+/**  `.libreri` archive: everything, to import into Libreri again. */
+"archive" | "csv" | "xlsx" | "json" | "bibtex" | "ris" | "cslJson" | 
+/**  A folder of Markdown notes for Obsidian (or any Markdown app). */
+"obsidian" | 
+/**  Book folders with `metadata.opf` and `cover.jpg`, for Calibre. */
+"calibre" | 
+/**  A copy of the catalogue database. */
+"sqlite";
+
+/**  What the export dialog asks for (board 24). */
+export type ExportRequestDto = {
+	format: ExportFormat,
+	/**  `None` = every book. */
+	bookIds: string[] | null,
+	dest: string,
+	personal: boolean,
+	notes: boolean,
+	bookFiles: boolean,
+	everyone: boolean,
 };
 
 /**  Counts for the sidebar and the filter menus. */
@@ -478,6 +681,22 @@ export type FolderDto = {
  *  the right action.
  */
 export type FolderKind = "missing" | "empty" | "library" | "otherFiles";
+
+export type HealthReportDto = {
+	checkedAt: string,
+	books: number,
+	missingFiles: BookRef[],
+	otherFileNotes: CountedBook[],
+	duplicates: DuplicateGroup[],
+	brokenLinks: BrokenLinkDto[],
+	missingSidecars: number,
+	staleNotebooks: number,
+	unusedCovers: number,
+	unusedCoverBytes: number,
+	unreadableBackups: string[],
+	database: string[],
+	fixable: boolean,
+};
 
 /**  The four highlight colours. */
 export type HighlightColor = "yellow" | "green" | "blue" | "pink";
@@ -520,6 +739,10 @@ export type LibrarySummary = {
 	/**  `u32` is plenty for a book count and maps to a plain TypeScript number. */
 	bookCount: number,
 };
+
+export type LocateResult = "linked" | 
+/**  Another copy or edition: ask before using it. */
+"differentFile";
 
 export type Lookup = {
 	/**  Best first. */
@@ -606,6 +829,14 @@ export type ProfileKind =
 /**  Reads without an account. Nothing is kept after the guest leaves. */
 "guest";
 
+export type ProfileMappingDto = {
+	archiveId: string,
+	target: ProfileTargetDto,
+};
+
+/**  Where one archive profile's notes go. */
+export type ProfileTargetDto = { kind: "existing"; profileId: string } | { kind: "new" } | { kind: "skip" };
+
 /**
  *  What to look up. Identifiers are tried first; the title and author are
  *  used when there are none (or they find nothing).
@@ -631,6 +862,11 @@ export type RecentLibraryDto = {
 	path: string,
 	/**  False when the folder no longer exists or is no longer a library. */
 	available: boolean,
+};
+
+export type RestoredLibrary = {
+	library: LibrarySummary,
+	jobId: string,
 };
 
 export type ScannedDto = {

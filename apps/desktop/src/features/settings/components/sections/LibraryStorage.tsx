@@ -1,9 +1,10 @@
-import { FolderOpen, RefreshCw, Wrench } from "lucide-react";
+import { FolderOpen, HeartPulse, RefreshCw, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useFacets } from "@/features/library";
+import { usePortability } from "@/features/portability";
 import { commands, unwrap, type LibrarySummary, type SessionDto } from "@/lib/ipc";
 import { Group, Row } from "../parts";
 
@@ -27,6 +28,7 @@ export function LibrarySettings({
   session: SessionDto;
 }) {
   const { data: facets } = useFacets();
+  const setHealth = usePortability((s) => s.setHealth);
   const { data: storage } = useQuery({
     queryKey: ["lib", "storage"],
     queryFn: () => unwrap(commands.libraryStorage()),
@@ -96,6 +98,16 @@ export function LibrarySettings({
             <RefreshCw /> Check now
           </Button>
         </Row>
+        {session.canEditLibrary && (
+          <Row
+            label="Check library health"
+            help="Missing files, broken links in your notes, missing backups of details."
+          >
+            <Button variant="outline" size="sm" onClick={() => setHealth(true)}>
+              <HeartPulse /> Check…
+            </Button>
+          </Row>
+        )}
         {session.canEditLibrary && (
           <Row
             label="Rebuild the library index"

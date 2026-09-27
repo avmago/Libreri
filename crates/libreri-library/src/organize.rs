@@ -30,7 +30,7 @@ impl Library {
             return Ok(());
         }
         self.with_db(|db| db.update_metadata(&book.id, &metadata, &now()))?;
-        sidecar::write(self.layout(), &self.record(&book.id)?)?;
+        sidecar::write(self, &self.record(&book.id)?)?;
         Ok(())
     }
 

@@ -10,6 +10,7 @@ pub mod folders;
 pub mod library;
 pub mod notes;
 pub mod organize;
+pub mod portability;
 pub mod profiles;
 pub mod reader;
 pub mod scan;

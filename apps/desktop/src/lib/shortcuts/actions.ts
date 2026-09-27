@@ -73,6 +73,13 @@ export const ACTIONS = {
     keys: "Mod+Shift+2",
     whileTyping: true,
   },
+  "library.health": { label: "Check library health", group: "General", keys: null },
+  "library.backup": { label: "Back up the library now", group: "General", keys: null },
+  "library.importArchive": {
+    label: "Import a Libreri archive",
+    group: "General",
+    keys: null,
+  },
   "go.organize": {
     label: "Go to Organize",
     group: "General",
@@ -157,6 +164,11 @@ export const ACTIONS = {
   "details.find": { label: "Find details online", group: "Library", keys: "Mod+Shift+D" },
   "details.fill": { label: "Fill in missing details online", group: "Library", keys: null },
   "filters.clear": { label: "Clear search and filters", group: "Library", keys: "Mod+Shift+X" },
+  "library.export": {
+    label: "Export the selected books (or the library)",
+    group: "Library",
+    keys: "Mod+Alt+E",
+  },
   "collection.save": {
     label: "Save this search as a smart collection",
     group: "Library",
@@ -186,6 +198,7 @@ export const ACTIONS = {
   "books.trash": { label: "Move to the trash", group: "Books", keys: "Delete" },
   "books.trashMac": { label: "Move to the trash (Mac)", group: "Books", keys: "Mod+Backspace" },
   "books.favorite": { label: "Favourite", group: "Books", keys: "Mod+D" },
+  "books.cite": { label: "Cite the selected books", group: "Books", keys: "Mod+Alt+C" },
   "books.rate0": { label: rateLabel(0), group: "Books", keys: "Alt+0" },
   "books.rate1": { label: rateLabel(1), group: "Books", keys: "Alt+1" },
   "books.rate2": { label: rateLabel(2), group: "Books", keys: "Alt+2" },

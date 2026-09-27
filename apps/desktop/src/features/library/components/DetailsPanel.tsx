@@ -2,10 +2,13 @@ import { useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   BookOpen,
+  Download,
+  FileSearch,
   FolderSearch,
   Globe,
   Heart,
   Pencil,
+  Quote,
   Star,
   Trash2,
   X,
@@ -16,6 +19,7 @@ import type { ReadingStatus } from "@/lib/ipc";
 import { useShortcut } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import { useDetailsDialog, useFillDetails } from "@/features/details";
+import { useLocateFile, usePortability } from "@/features/portability";
 import { usePermissions } from "@/features/profiles";
 import { useUpdateBook } from "../api";
 import { useLibraryDialogs } from "../dialogs";
@@ -91,6 +95,7 @@ function SingleBook({ book }: { book: BookView }) {
   const actions = useBookActions();
   const { editLibrary } = usePermissions();
   const openFinder = useDetailsDialog((s) => s.open);
+  const openCitation = usePortability((s) => s.openCitation);
   const m = book.metadata;
   useShortcut("details.edit", () => editLibrary && setEditing(true));
 
@@ -134,13 +139,7 @@ function SingleBook({ book }: { book: BookView }) {
         {m.subtitle && <p className="text-muted-foreground">{m.subtitle}</p>}
         <p className="text-muted-foreground">{m.authors.join(", ") || "Unknown author"}</p>
       </div>
-      {book.missing && (
-        <p className="flex gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-2.5 py-2 text-destructive">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-          The file is missing from the library folder. Put it back (or import it again) and
-          everything reconnects.
-        </p>
-      )}
+      {book.missing && <MissingFile book={book} />}
       <div className="flex items-center justify-center gap-1.5">
         <Button size="sm" onClick={() => void actions.open(book)} disabled={book.missing}>
           <BookOpen /> Open
@@ -173,6 +172,15 @@ function SingleBook({ book }: { book: BookView }) {
             <Pencil />
           </Button>
         )}
+        <Button
+          size="icon"
+          variant="outline"
+          aria-label="Cite"
+          title="Cite"
+          onClick={() => openCitation([book.id])}
+        >
+          <Quote />
+        </Button>
         {editLibrary && (
           <Button
             size="icon"
@@ -258,6 +266,8 @@ function ManyBooks({ books }: { books: BookView[] }) {
   const { editLibrary } = usePermissions();
   const openBulk = useLibraryDialogs((s) => s.openBulkEdit);
   const fillDetails = useFillDetails();
+  const openCitation = usePortability((s) => s.openCitation);
+  const openExport = usePortability((s) => s.openExport);
   const size = books.reduce((n, b) => n + b.fileSize, 0);
   return (
     <div className="flex flex-col gap-4 px-4 py-6">
@@ -299,8 +309,14 @@ function ManyBooks({ books }: { books: BookView[] }) {
         <Heart />{" "}
         {books.every((b) => b.user.favorite) ? "Remove from Favourites" : "Add to Favourites"}
       </Button>
+      <Button variant="outline" onClick={() => openCitation(books.map((b) => b.id))}>
+        <Quote /> Cite {books.length} books…
+      </Button>
       {editLibrary && (
         <>
+          <Button variant="outline" onClick={() => openExport(books.map((b) => b.id))}>
+            <Download /> Export {books.length} books…
+          </Button>
           <Button onClick={() => openBulk(books)}>
             <Pencil /> Edit {books.length} books together…
           </Button>
@@ -318,6 +334,36 @@ function ManyBooks({ books }: { books: BookView[] }) {
             Drag the selection onto a folder to move it.
           </p>
         </>
+      )}
+    </div>
+  );
+}
+
+/** A book whose file is gone: its notes are kept; find the file again. */
+function MissingFile({ book }: { book: BookView }) {
+  const { editLibrary } = usePermissions();
+  const locate = useLocateFile();
+  const actions = useBookActions();
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-2.5 py-2">
+      <p className="flex gap-2 text-destructive">
+        <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+        The file is missing. Notes and details are kept; put the file back (or import it again) and
+        everything reconnects.
+      </p>
+      {editLibrary && (
+        <div className="flex flex-wrap gap-1.5">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void locate({ id: book.id, title: book.metadata.title })}
+          >
+            <FileSearch /> Locate file…
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => void actions.moveToTrash([book])}>
+            Remove from library
+          </Button>
+        </div>
       )}
     </div>
   );

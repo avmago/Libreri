@@ -172,7 +172,7 @@ impl Library {
             let dest = self.place(item, books_dir)?;
             let rel = paths::rel_of(self.layout(), &dest).ok_or(Error::BookNotFound)?;
             self.with_db(|db| db.set_book_path(&book.id, &rel))?;
-            sidecar::write(self.layout(), &self.record(&book.id)?)?;
+            sidecar::write(self, &self.record(&book.id)?)?;
             report.relinked += 1;
             return Ok(());
         }

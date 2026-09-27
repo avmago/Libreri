@@ -171,6 +171,15 @@ pub const MIGRATIONS: &[&str] = &[
     ) STRICT;
     CREATE INDEX collections_profile ON collections(profile_id, position);
     "#,
+    // 5 — export and import (Phase 4b): why an old id points to a book.
+    // 'changed' = the file was edited; 'otherFile' = notes imported from
+    // another copy or edition of the book (they re-anchor by quoted text).
+    r#"
+    ALTER TABLE book_aliases ADD COLUMN kind TEXT NOT NULL DEFAULT 'changed';
+    CREATE INDEX book_aliases_book ON book_aliases(book_id);
+    CREATE INDEX books_isbn10 ON books(isbn10);
+    CREATE INDEX books_doi ON books(doi);
+    "#,
 ];
 
 /// Schema version this build of Libreri writes.

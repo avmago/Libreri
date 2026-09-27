@@ -167,3 +167,86 @@ pub struct PhoneScan {
     pub kind: String,
     pub scanned: Option<crate::commands::scan::ScannedDto>,
 }
+
+/// An export finished.
+#[derive(Debug, Clone, Serialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportFinished {
+    pub job_id: String,
+    pub path: String,
+    pub books: u32,
+    pub notes: u32,
+    pub files: u32,
+    #[specta(type = u32)]
+    pub bytes: u64,
+    pub warnings: Vec<String>,
+}
+
+impl ExportFinished {
+    pub fn new(job: libreri_jobs::JobId, r: &libreri_library::ExportReport) -> Self {
+        Self {
+            job_id: job.to_string(),
+            path: r.path.to_string_lossy().into_owned(),
+            books: r.books,
+            notes: r.notes,
+            files: r.files,
+            bytes: r.bytes,
+            warnings: r.warnings.clone(),
+        }
+    }
+}
+
+/// A Libreri archive was imported: the summary shown to the user.
+#[derive(Debug, Clone, Serialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchiveImported {
+    pub job_id: String,
+    pub linked: u32,
+    pub added: u32,
+    pub other_file: u32,
+    pub missing: u32,
+    pub files_restored: u32,
+    pub details_updated: u32,
+    pub notes_added: u32,
+    pub notes_updated: u32,
+    pub notes_kept: u32,
+    pub note_files_added: u32,
+    pub note_conflicts: Vec<String>,
+    pub profiles_created: Vec<String>,
+    pub missing_books: Vec<String>,
+    pub warnings: Vec<String>,
+}
+
+impl ArchiveImported {
+    pub fn new(job: libreri_jobs::JobId, r: &libreri_library::ArchiveImportReport) -> Self {
+        Self {
+            job_id: job.to_string(),
+            linked: r.linked,
+            added: r.added,
+            other_file: r.other_file,
+            missing: r.missing,
+            files_restored: r.files_restored,
+            details_updated: r.details_updated,
+            notes_added: r.notes_added,
+            notes_updated: r.notes_updated,
+            notes_kept: r.notes_kept,
+            note_files_added: r.note_files_added,
+            note_conflicts: r.note_conflicts.clone(),
+            profiles_created: r.profiles_created.clone(),
+            missing_books: r.missing_books.iter().map(ToString::to_string).collect(),
+            warnings: r.warnings.clone(),
+        }
+    }
+}
+
+/// A backup finished (by hand or on schedule).
+#[derive(Debug, Clone, Serialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct BackupFinished {
+    pub job_id: String,
+    /// Set when the backup was written.
+    pub path: Option<String>,
+    pub error: Option<String>,
+    /// Started by the schedule rather than "Back up now".
+    pub scheduled: bool,
+}

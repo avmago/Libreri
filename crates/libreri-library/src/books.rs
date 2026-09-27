@@ -56,7 +56,7 @@ impl Library {
             return Err(Error::BookNotFound);
         }
         let book = self.book(id)?;
-        sidecar::write(self.layout(), &book)?;
+        sidecar::write(self, &book)?;
         Ok(book)
     }
 
@@ -97,7 +97,7 @@ impl Library {
             let rel = paths::rel_of(self.layout(), &to).ok_or(Error::BookNotFound)?;
             self.with_db(|db| db.set_book_path(&book.id, &rel))?;
             let book = self.book(&book.id)?;
-            sidecar::write(self.layout(), &book)?;
+            sidecar::write(self, &book)?;
             moved.push(book);
         }
         Ok(moved)
@@ -137,8 +137,12 @@ impl Library {
             .ok_or_else(|| Error::InvalidInput("the file is outside the library".into()))?;
         let now = now();
 
+        let mut aliases = Vec::new();
         let (metadata, added_at, cover) = match sidecar::read(self.layout(), &id) {
-            Some(s) => (s.metadata, s.added_at, None),
+            Some(s) => {
+                aliases = s.aliases;
+                (s.metadata, s.added_at, None)
+            }
             None => {
                 let e = libreri_formats::extract(abs, file_type);
                 warnings.extend(e.warnings);
@@ -182,8 +186,14 @@ impl Library {
             metadata,
             user: BookUserState::default(),
         };
-        self.with_db(|db| db.insert_book(&book, mtime_secs(&meta)))?;
-        sidecar::write(self.layout(), &book)?;
+        self.with_db(|db| {
+            db.insert_book(&book, mtime_secs(&meta))?;
+            for a in &aliases {
+                db.add_alias(&a.id, &book.id, a.kind)?;
+            }
+            Ok(())
+        })?;
+        sidecar::write(self, &book)?;
         self.restore_annotations(&book.id)?;
         Ok(book)
     }

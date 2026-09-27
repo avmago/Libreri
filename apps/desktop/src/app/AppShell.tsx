@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Archive,
   BookOpen,
   Columns2,
+  Download,
+  HeartPulse,
+  Quote,
+  Upload,
   FileUp,
   FolderOpen,
   FolderPlus,
@@ -48,6 +53,15 @@ import {
 } from "@/features/library";
 import { FindDetailsDialog, useDetailsEvents } from "@/features/details";
 import { NotesHub } from "@/features/notes";
+import {
+  CitationDialog,
+  ExportDialog,
+  HealthDialog,
+  ImportArchiveDialog,
+  pickArchiveToImport,
+  usePortability,
+  usePortabilityEvents,
+} from "@/features/portability";
 import { OrganizeView } from "@/features/organize";
 import {
   ProfileMenu,
@@ -105,6 +119,19 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
   const { setView, toggleDetails, nav, setNav } = libraryView;
   useLibraryEvents();
   useDetailsEvents();
+  usePortabilityEvents();
+  const setHealth = usePortability((s) => s.setHealth);
+  const showMissingRequest = usePortability((s) => s.showMissingRequest);
+  const openExport = usePortability((s) => s.openExport);
+  const isOwner = session.profile.kind === "owner";
+  const backUpNow = useCallback(async () => {
+    const r = await commands.backUpNow();
+    if (r.status === "error") {
+      toast.error(r.error.message, {
+        action: { label: "Settings", onClick: () => useUi.getState().openSettings("export") },
+      });
+    } else toast(r.data ? "Backing up…" : "A backup is already running");
+  }, []);
   useDesktopDrop(session.canEditLibrary);
   useSession(`${library.id}:${session.profile.id}`);
   const tabs = useTabs();
@@ -169,6 +196,14 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
     [tabs, ui, nav.kind, setNav],
   );
 
+  // "Show missing files" from the health check or an import report.
+  useEffect(() => {
+    if (!showMissingRequest) return;
+    tabs.activate(null);
+    ui.closeSettings();
+    setNav({ kind: "missing" });
+  }, [showMissingRequest]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useShortcut("palette.open", () => ui.setPaletteOpen(true));
   useShortcut("settings.open", () => ui.openSettings());
   useShortcut("shortcuts.show", () => ui.setShortcutsOpen(true));
@@ -179,6 +214,9 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
   useShortcut("go.library", () => goHome("all"));
   useShortcut("go.notes", () => goHome("notes"));
   useShortcut("go.organize", () => session.canEditLibrary && goHome("organize"));
+  useShortcut("library.health", () => session.canEditLibrary && setHealth(true));
+  useShortcut("library.backup", () => isOwner && void backUpNow());
+  useShortcut("library.importArchive", () => isOwner && void pickArchiveToImport());
   useShortcut("app.fullscreen", () => {
     const w = getCurrentWindow();
     void w.isFullscreen().then((f) => w.setFullscreen(!f));
@@ -207,7 +245,7 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
 
   const k = (id: ActionId) => shortcutFor(id) ?? undefined;
   const actions: PaletteAction[] = useMemo(() => {
-    const list: (PaletteAction & { edit?: boolean })[] = [
+    const list: (PaletteAction & { edit?: boolean; owner?: boolean })[] = [
       {
         id: "go.library",
         group: "Go to",
@@ -292,6 +330,25 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
         icon: Globe,
         shortcut: k("details.fill"),
         run: () => void runAction("details.fill"),
+        edit: true,
+      },
+      {
+        id: "books.cite",
+        group: "Books",
+        label: "Cite the selected books…",
+        icon: Quote,
+        shortcut: k("books.cite"),
+        run: () => void runAction("books.cite"),
+      },
+      {
+        id: "library.export",
+        group: "Library",
+        label: "Export…",
+        icon: Download,
+        shortcut: k("library.export"),
+        run: () => {
+          if (!runAction("library.export")) openExport(null);
+        },
         edit: true,
       },
       {
@@ -383,6 +440,33 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
         run: () => void lock(),
       },
       {
+        id: "library.importArchive",
+        group: "Library",
+        label: "Import a Libreri archive…",
+        icon: Upload,
+        shortcut: k("library.importArchive"),
+        run: () => void pickArchiveToImport(),
+        owner: true,
+      },
+      {
+        id: "library.backup",
+        group: "Library",
+        label: "Back up the library now",
+        icon: Archive,
+        shortcut: k("library.backup"),
+        run: () => void backUpNow(),
+        owner: true,
+      },
+      {
+        id: "library.health",
+        group: "Library",
+        label: "Check library health…",
+        icon: HeartPulse,
+        shortcut: k("library.health"),
+        run: () => setHealth(true),
+        edit: true,
+      },
+      {
         id: "lib.new",
         group: "Library",
         label: "Create a new library…",
@@ -405,8 +489,12 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
         run: () => void close(),
       },
     ];
-    return list.filter((a) => !a.edit || session.canEditLibrary);
+    return list.filter((a) => (!a.edit || session.canEditLibrary) && (!a.owner || isOwner));
   }, [
+    isOwner,
+    backUpNow,
+    setHealth,
+    openExport,
     createNew,
     openExisting,
     close,
@@ -538,6 +626,10 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
       <ShortcutsSheet open={ui.shortcutsOpen} onOpenChange={ui.setShortcutsOpen} />
       <BulkEditDialog />
       <FindDetailsDialog />
+      <ExportDialog />
+      <CitationDialog />
+      <ImportArchiveDialog />
+      <HealthDialog />
       <SaveCollectionDialog />
       <ImportDialog />
       <DropOverlay />

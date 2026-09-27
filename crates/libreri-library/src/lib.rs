@@ -12,10 +12,15 @@
 //! A `Library` is shared between threads (`Arc<Library>`): the database sits
 //! behind a mutex, and long operations (import, scan) run one at a time.
 
+mod archive;
+#[cfg(test)]
+mod archive_tests;
 mod books;
 mod covers;
 mod details;
+mod export;
 mod folders;
+mod health;
 mod import;
 mod lock;
 mod notes;
@@ -42,9 +47,15 @@ pub(crate) struct Session {
     pub within: Vec<String>,
 }
 
+pub use archive::{
+    ArchiveImport, ArchiveImportReport, ArchiveOptions, ArchiveSummary, ProfileChoice,
+    ProfileTarget,
+};
 pub use covers::{cover_rel, thumbnail_rel};
 pub use details::FillReport;
+pub use export::{ExportReport, ExportRequest};
 pub use folders::FolderNode;
+pub use health::{list_backups, BackupFile, BrokenLink, HealthReport, LocateOutcome};
 pub use import::{Duplicate, ImportMode, ImportReport, ImportRequest};
 pub use libreri_db::Facets;
 pub use lock::{LibraryLock, LockOwner};

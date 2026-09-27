@@ -170,7 +170,7 @@ impl Library {
             include_subfolders: true,
             ..Default::default()
         })? {
-            sidecar::write(self.layout(), &book)?;
+            sidecar::write(self, &book)?;
         }
         Ok(to.to_owned())
     }
