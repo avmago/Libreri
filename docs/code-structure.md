@@ -29,7 +29,8 @@ libreri/
 │  ├─ libreri-library     library folder, lock, scan, watcher, import/move, hashing, sidecars, versions
 │  ├─ libreri-formats     extractors: pdf, epub, mobi, fb2, txt, md, comic, djvu, audio
 │  ├─ libreri-thumbs      thumbnails, covers
-│  ├─ libreri-metadata    providers (openlibrary, googlebooks, crossref, openalex, semanticscholar, arxiv, comicvine, isbndb-optional) + merge
+│  ├─ libreri-metadata    online details: sources (Open Library, Google Books, Crossref, OpenAlex, Semantic Scholar, arXiv, ComicVine, ISBNdb), scoring, tag/category tidying, cover download
+│  ├─ libreri-scan        barcode reading (rxing) and the one-time phone page for scanning
 │  ├─ libreri-annotations highlights, comments, ink, voice notes, links, anchors
 │  ├─ libreri-profiles    6-digit PIN rules, Argon2 hashing, lockout, recovery codes
 │  ├─ libreri-search      full-text index

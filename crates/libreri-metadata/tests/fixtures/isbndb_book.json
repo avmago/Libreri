@@ -1,0 +1,19 @@
+{
+  "book": {
+    "publisher": "Springer",
+    "language": "en_US",
+    "image": "https://images.isbndb.com/covers/61/57/9780306406157.jpg",
+    "title_long": "Linear Algebra Done Right (Undergraduate Texts in Mathematics)",
+    "edition": "3rd",
+    "pages": 340,
+    "date_published": "2015-01-01",
+    "subjects": ["Mathematics", "Algebra"],
+    "authors": ["Smith, John"],
+    "title": "Linear Algebra Done Right",
+    "isbn13": "9780306406157",
+    "binding": "Hardcover",
+    "isbn": "0306406152",
+    "isbn10": "0306406152",
+    "synopsis": "This best-selling textbook for a second course in linear algebra."
+  }
+}

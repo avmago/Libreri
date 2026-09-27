@@ -14,6 +14,7 @@
 
 mod books;
 mod covers;
+mod details;
 mod folders;
 mod import;
 mod lock;
@@ -42,6 +43,7 @@ pub(crate) struct Session {
 }
 
 pub use covers::{cover_rel, thumbnail_rel};
+pub use details::FillReport;
 pub use folders::FolderNode;
 pub use import::{Duplicate, ImportMode, ImportReport, ImportRequest};
 pub use libreri_db::Facets;
@@ -275,7 +277,7 @@ impl Library {
     }
 
     /// Refuses unless the signed-in profile may change the shared library.
-    pub(crate) fn require_edit(&self) -> Result<()> {
+    pub fn require_edit(&self) -> Result<()> {
         match self.session_info() {
             None => Err(Error::SignedOut),
             Some(s) if s.kind.can_edit_library() => Ok(()),

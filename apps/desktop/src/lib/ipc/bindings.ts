@@ -19,6 +19,66 @@ export const commands = {
 	setTheme: (theme: Theme) => typedError<SettingsDto, AppError>(__TAURI_INVOKE("set_theme", { theme })),
 	setAccent: (accent: string | null) => typedError<SettingsDto, AppError>(__TAURI_INVOKE("set_accent", { accent })),
 	forgetRecentLibrary: (path: string) => typedError<SettingsDto, AppError>(__TAURI_INVOKE("forget_recent_library", { path })),
+	/**
+	 *  What a book would be looked up by (its identifiers, or ones found in
+	 *  its pages), to fill the search form.
+	 */
+	detailsQuery: (id: string) => typedError<Query, AppError>(__TAURI_INVOKE("details_query", { id })),
+	/**
+	 *  Asks the online sources about a book. `query` is the reader's own
+	 *  search; without it the book's details are used.
+	 */
+	findDetails: (id: string, query: {
+	isbn?: string | null,
+	doi?: string | null,
+	arxivId?: string | null,
+	title?: string | null,
+	author?: string | null,
+	/**
+	 *  What kind of item it is, if known, so a comic goes to ComicVine and
+	 *  a paper to Crossref.
+	 */
+	contentType?: ContentType | null,
+} | null) => typedError<Lookup, AppError>(__TAURI_INVOKE("find_details", { id, query })),
+	/**  Saves the details picked in the merge screen, and the picked cover. */
+	applyDetails: (id: string, metadata: BookMetadata, coverUrl: string | null) => typedError<AppliedDetails, AppError>(__TAURI_INVOKE("apply_details", { id, metadata, coverUrl })),
+	/**
+	 *  A cover from a source as a data: URL, so the interface can show it
+	 *  without loading images from the internet itself.
+	 */
+	coverPreview: (url: string) => typedError<string, AppError>(__TAURI_INVOKE("cover_preview", { url })),
+	/**
+	 *  Fills in missing details of many books in the background. Returns the
+	 *  job id; the result arrives as a `DetailsFilled` event.
+	 */
+	fillMissingDetails: (ids: string[]) => typedError<string, AppError>(__TAURI_INVOKE("fill_missing_details", { ids })),
+	getOnlineSettings: () => __TAURI_INVOKE<OnlineSettingsDto>("get_online_settings"),
+	setOnlineSettings: (change: OnlineChange) => typedError<OnlineSettingsDto, AppError>(__TAURI_INVOKE("set_online_settings", { change })),
+	/**
+	 *  Saves (or, with `None`, removes) the reader's key for a source. Saving
+	 *  a key also turns the source on.
+	 */
+	setSourceKey: (source: Source, key: string | null) => typedError<OnlineSettingsDto, AppError>(__TAURI_INVOKE("set_source_key", { source, key })),
+	/**
+	 *  Reads a barcode from a picture (a camera frame), sent as a data: URL or
+	 *  base64. Returns nothing if there is no readable barcode.
+	 */
+	scanPicture: (data: string) => typedError<{
+	code: string,
+	isbn13: string | null,
+} | null, AppError>(__TAURI_INVOKE("scan_picture", { data })),
+	/**  Reads a barcode from a picture file the reader chose. */
+	scanPictureFile: (path: string) => typedError<{
+	code: string,
+	isbn13: string | null,
+} | null, AppError>(__TAURI_INVOKE("scan_picture_file", { path })),
+	/**
+	 *  Starts the phone page (replacing any earlier one). Scans arrive as
+	 *  `PhoneScan` events.
+	 */
+	startPhoneScan: () => typedError<PhonePairingDto, AppError>(__TAURI_INVOKE("start_phone_scan")),
+	/**  Stops the phone page. */
+	stopPhoneScan: () => __TAURI_INVOKE<void>("stop_phone_scan"),
 	/**  Creates a new library in `path` and opens it. */
 	createLibrary: (path: string, name: string | null) => typedError<LibrarySummary, AppError>(__TAURI_INVOKE("create_library", { path, name })),
 	/**
@@ -159,9 +219,11 @@ export const commands = {
 
 /** Events */
 export const events = {
+	detailsFilled: makeEvent<DetailsFilled>("details-filled"),
 	importFinished: makeEvent<ImportFinished>("import-finished"),
 	jobEventPayload: makeEvent<JobEventPayload>("job-event-payload"),
 	libraryChanged: makeEvent<LibraryChanged>("library-changed"),
+	phoneScan: makeEvent<PhoneScan>("phone-scan"),
 	sessionChanged: makeEvent<SessionChanged>("session-changed"),
 };
 
@@ -209,6 +271,12 @@ export type AppErrorKind = "notALibrary" | "alreadyALibrary" | "folderNotEmpty" 
 export type AppInfo = {
 	version: string,
 	platform: string,
+};
+
+export type AppliedDetails = {
+	book: BookDto,
+	/**  Why the picked cover could not be used, if it could not. */
+	coverError: string | null,
 };
 
 /**  Everything about one book in the library. */
@@ -330,6 +398,19 @@ export type BulkEdit = {
 	removeCategories?: string[],
 };
 
+/**  One source's idea of what the book is. */
+export type Candidate = {
+	source: Source,
+	/**  The source's own id ("OL7353617M", "10.1038/nature14539"). */
+	sourceId: string,
+	/**  The page about it on the source's website. */
+	link: string | null,
+	metadata: BookMetadata,
+	coverUrl: string | null,
+	/**  How well it matches the query, 0–1. An identifier match is 1. */
+	score: number | null,
+};
+
 export type CollectionDto = {
 	id: string,
 	name: string,
@@ -342,6 +423,16 @@ export type ContentType = "book" | "textbook" | "researchPaper" | "conferencePap
 export type CountDto<T> = {
 	value: T,
 	count: number,
+};
+
+/**  "Fill in missing details" finished (by hand, or after an import). */
+export type DetailsFilled = {
+	jobId: string,
+	filled: string[],
+	/**  Books with no sure match, to look up one by one. */
+	unsure: string[],
+	unchanged: number,
+	failed: FailedFileDto[],
 };
 
 export type DuplicateDto = {
@@ -430,6 +521,12 @@ export type LibrarySummary = {
 	bookCount: number,
 };
 
+export type Lookup = {
+	/**  Best first. */
+	candidates: Candidate[],
+	errors: SourceError[],
+};
+
 export type NewProfile = {
 	name: string,
 	colour: string,
@@ -456,6 +553,29 @@ export type NotebookEntryDto = {
 	modified: number | null,
 	excerpt: string,
 	words: number,
+};
+
+export type OnlineChange = {
+	enabled: Source[] | null,
+	fillOnImport: boolean | null,
+};
+
+export type OnlineSettingsDto = {
+	sources: SourceInfo[],
+	fillOnImport: boolean,
+};
+
+export type PhonePairingDto = {
+	url: string,
+	qrSvg: string,
+	expiresIn: number,
+};
+
+/**  The phone page was opened, or it read a barcode. */
+export type PhoneScan = {
+	/**  "opened" | "scanned" */
+	kind: string,
+	scanned: ScannedDto | null,
 };
 
 /**  A profile as the picker and Settings show it. Never includes hashes. */
@@ -486,6 +606,23 @@ export type ProfileKind =
 /**  Reads without an account. Nothing is kept after the guest leaves. */
 "guest";
 
+/**
+ *  What to look up. Identifiers are tried first; the title and author are
+ *  used when there are none (or they find nothing).
+ */
+export type Query = {
+	isbn?: string | null,
+	doi?: string | null,
+	arxivId?: string | null,
+	title?: string | null,
+	author?: string | null,
+	/**
+	 *  What kind of item it is, if known, so a comic goes to ComicVine and
+	 *  a paper to Crossref.
+	 */
+	contentType?: ContentType | null,
+};
+
 /**  Where a reader is with a book. Personal: stored per profile. */
 export type ReadingStatus = "none" | "wantToRead" | "reading" | "finished" | "abandoned";
 
@@ -494,6 +631,11 @@ export type RecentLibraryDto = {
 	path: string,
 	/**  False when the folder no longer exists or is no longer a library. */
 	available: boolean,
+};
+
+export type ScannedDto = {
+	code: string,
+	isbn13: string | null,
 };
 
 /**
@@ -523,6 +665,25 @@ export type SettingsDto = {
 };
 
 export type SortKey = "title" | "author" | "added" | "year" | "size" | "pages" | "lastOpened" | "rating";
+
+/**  A place book details come from. */
+export type Source = "openLibrary" | "googleBooks" | "crossref" | "openAlex" | "semanticScholar" | "arxiv" | "comicVine" | "isbndb";
+
+/**  A source that could not be reached or answered with an error. */
+export type SourceError = {
+	source: Source,
+	message: string,
+};
+
+/**  One source in Settings › Online details. */
+export type SourceInfo = {
+	source: Source,
+	name: string,
+	enabled: boolean,
+	needsKey: boolean,
+	/**  The end of the saved key ("…a1b2"); the key itself never leaves Rust. */
+	keyHint: string | null,
+};
 
 export type StorageDto = {
 	books: number | null,

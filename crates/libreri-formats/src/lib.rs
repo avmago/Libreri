@@ -9,7 +9,7 @@ mod epub;
 mod fb2;
 mod markdown;
 mod pdf;
-mod xml;
+pub mod xml;
 
 use libreri_core::{BookMetadata, FileType};
 use std::io::Read;
@@ -143,7 +143,7 @@ pub(crate) fn find_year(s: &str) -> Option<i32> {
 }
 
 /// A DOI such as "10.1000/xyz123" inside free text.
-pub(crate) fn find_doi(s: &str) -> Option<String> {
+pub fn find_doi(s: &str) -> Option<String> {
     let start = s.find("10.")?;
     let rest = &s[start..];
     let end = rest
@@ -155,6 +155,53 @@ pub(crate) fn find_doi(s: &str) -> Option<String> {
         && prefix[3..].chars().all(|c| c.is_ascii_digit() || c == '.')
         && !suffix.is_empty())
     .then(|| doi.to_owned())
+}
+
+/// A new-style arXiv identifier such as "arXiv:1706.03762v5" inside free
+/// text. Returns it without the "arXiv:" prefix or version.
+pub fn find_arxiv(s: &str) -> Option<String> {
+    let lower = s.to_ascii_lowercase();
+    let mut from = 0;
+    while let Some(i) = lower[from..].find("arxiv") {
+        let at = from + i + 5;
+        let rest = s[at..].trim_start_matches([':', ' ', '.', '/']);
+        let rest = rest.strip_prefix("org/").unwrap_or(rest);
+        let rest = ["abs/", "pdf/"]
+            .iter()
+            .find_map(|p| rest.strip_prefix(p))
+            .unwrap_or(rest);
+        let id: String = rest
+            .chars()
+            .take_while(|c| c.is_ascii_digit() || *c == '.')
+            .collect();
+        let ok = id.len() >= 9
+            && id.as_bytes().get(4) == Some(&b'.')
+            && id[..4].chars().all(|c| c.is_ascii_digit())
+            && id[5..].chars().all(|c| c.is_ascii_digit());
+        if ok {
+            return Some(id);
+        }
+        from = at;
+    }
+    None
+}
+
+/// Identifiers found inside a book's pages, for looking its details up.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Identifiers {
+    pub isbn13: Option<String>,
+    pub doi: Option<String>,
+    pub arxiv_id: Option<String>,
+}
+
+/// Looks for an ISBN, DOI or arXiv id in the first and last pages of a PDF
+/// (copyright pages, title pages, headers of papers). Other formats carry
+/// identifiers in their metadata, which `extract` already reads.
+pub fn find_identifiers(path: &Path, file_type: FileType) -> Identifiers {
+    if file_type != FileType::Pdf {
+        return Identifiers::default();
+    }
+    pdf::identifiers(path).unwrap_or_default()
 }
 
 /// Reads one ZIP entry, refusing entries larger than [`MAX_ENTRY`].
@@ -267,5 +314,27 @@ mod tests {
             split_people("John Smith and Jane Smith; Smith, J."),
             vec!["John Smith", "Jane Smith", "Smith, J."]
         );
+    }
+}
+
+#[cfg(test)]
+mod arxiv_tests {
+    use super::find_arxiv;
+
+    #[test]
+    fn finds_arxiv_ids() {
+        assert_eq!(
+            find_arxiv("arXiv:2301.00001v2 [cs.LG]").as_deref(),
+            Some("2301.00001")
+        );
+        assert_eq!(
+            find_arxiv("https://arxiv.org/abs/1706.03762").as_deref(),
+            Some("1706.03762")
+        );
+        assert_eq!(
+            find_arxiv("arXiv preprint arXiv:1412.6980").as_deref(),
+            Some("1412.6980")
+        );
+        assert_eq!(find_arxiv("the arxiv 12.3"), None);
     }
 }

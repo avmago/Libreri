@@ -1,0 +1,8 @@
+{
+  "kind": "books#volumes",
+  "totalItems": 2,
+  "items": [
+    {"id": "g1", "volumeInfo": {"title": "Linear Algebra Done Right", "subtitle": "Third Edition", "authors": ["Sheldon Axler"], "publishedDate": "2014-11-13", "language": "en", "pageCount": 340}},
+    {"id": "g2", "volumeInfo": {"title": "Introduction to Linear Algebra", "authors": ["Gilbert Strang"], "publishedDate": "2016"}}
+  ]
+}

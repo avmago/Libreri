@@ -127,3 +127,43 @@ pub struct SessionChanged {
     /// The profile now signed in, if any.
     pub profile_id: Option<String>,
 }
+
+/// "Fill in missing details" finished (by hand, or after an import).
+#[derive(Debug, Clone, Serialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct DetailsFilled {
+    pub job_id: String,
+    pub filled: Vec<String>,
+    /// Books with no sure match, to look up one by one.
+    pub unsure: Vec<String>,
+    pub unchanged: u32,
+    pub failed: Vec<FailedFileDto>,
+}
+
+impl DetailsFilled {
+    pub fn new(job: libreri_jobs::JobId, r: &libreri_library::FillReport) -> Self {
+        Self {
+            job_id: job.to_string(),
+            filled: r.filled.iter().map(ToString::to_string).collect(),
+            unsure: r.unsure.iter().map(ToString::to_string).collect(),
+            unchanged: r.unchanged,
+            failed: r
+                .failed
+                .iter()
+                .map(|(file, reason)| FailedFileDto {
+                    file: file.clone(),
+                    reason: reason.clone(),
+                })
+                .collect(),
+        }
+    }
+}
+
+/// The phone page was opened, or it read a barcode.
+#[derive(Debug, Clone, Serialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct PhoneScan {
+    /// "opened" | "scanned"
+    pub kind: String,
+    pub scanned: Option<crate::commands::scan::ScannedDto>,
+}

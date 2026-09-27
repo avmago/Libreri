@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import {
   ArrowLeft,
   BookOpen,
+  Globe,
   HardDrive,
   Keyboard,
   NotebookPen,
@@ -19,10 +20,11 @@ import { LibrarySettings } from "./sections/LibraryStorage";
 import { NotesSettings } from "./sections/Notes";
 import { ProfileSettings } from "./sections/ProfilesSecurity";
 import { ReaderSettings } from "./sections/Reader";
+import { OnlineDetailsSettings } from "./sections/OnlineDetails";
 import { ShortcutSettings } from "./sections/Shortcuts";
 
 export type SettingsSection =
-  "general" | "library" | "profiles" | "appearance" | "reader" | "notes" | "shortcuts";
+  "general" | "library" | "profiles" | "appearance" | "reader" | "notes" | "online" | "shortcuts";
 
 const SECTIONS: { id: SettingsSection; label: string; Icon: LucideIcon }[] = [
   { id: "general", label: "General", Icon: Settings2 },
@@ -31,6 +33,7 @@ const SECTIONS: { id: SettingsSection; label: string; Icon: LucideIcon }[] = [
   { id: "appearance", label: "Appearance", Icon: Palette },
   { id: "reader", label: "Reader", Icon: BookOpen },
   { id: "notes", label: "Notes", Icon: NotebookPen },
+  { id: "online", label: "Online details", Icon: Globe },
   { id: "shortcuts", label: "Shortcuts", Icon: Keyboard },
 ];
 
@@ -96,6 +99,7 @@ export function SettingsPage({
           {section === "appearance" && <AppearanceSettings />}
           {section === "reader" && <ReaderSettings />}
           {section === "notes" && <NotesSettings session={session} library={library} />}
+          {section === "online" && <OnlineDetailsSettings />}
           {section === "shortcuts" && <ShortcutSettings />}
         </div>
       </main>

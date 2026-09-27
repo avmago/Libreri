@@ -1,0 +1,14 @@
+{
+  "paperId": "204e3073870fae3d05bcbc2f6a8e263d9b72e776",
+  "externalIds": {"ArXiv": "1706.03762", "DBLP": "journals/corr/VaswaniSPUJGKP17", "CorpusId": 13756489},
+  "url": "https://www.semanticscholar.org/paper/204e3073870fae3d05bcbc2f6a8e263d9b72e776",
+  "title": "Attention is All you Need",
+  "abstract": "The dominant sequence transduction models are based on complex recurrent networks.",
+  "venue": "Neural Information Processing Systems",
+  "year": 2017,
+  "fieldsOfStudy": ["Computer Science"],
+  "s2FieldsOfStudy": [{"category": "Computer Science", "source": "external"}, {"category": "Computer Science", "source": "s2-fos-model"}],
+  "publicationTypes": ["JournalArticle", "Conference"],
+  "journal": {"name": "", "volume": ""},
+  "authors": [{"authorId": "40348417", "name": "Ashish Vaswani"}, {"authorId": "1846258", "name": "Noam Shazeer"}]
+}

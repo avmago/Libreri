@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSCameraUsageDescription</key>
+  <string>Libreri uses the camera only while you scan a book's barcode, to look up its details.</string>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Libreri lets a phone on the same network send photos of barcodes while you scan.</string>
+</dict>
+</plist>

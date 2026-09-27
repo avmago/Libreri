@@ -1,0 +1,25 @@
+{
+  "status": "ok",
+  "message-type": "work",
+  "message-version": "1.0.0",
+  "message": {
+    "DOI": "10.1038/nature14539",
+    "type": "journal-article",
+    "title": ["Deep learning"],
+    "author": [
+      {"given": "Yann", "family": "LeCun", "sequence": "first", "affiliation": []},
+      {"given": "Yoshua", "family": "Bengio", "sequence": "additional", "affiliation": []},
+      {"given": "Geoffrey", "family": "Hinton", "sequence": "additional", "affiliation": []}
+    ],
+    "container-title": ["Nature"],
+    "publisher": "Springer Science and Business Media LLC",
+    "volume": "521",
+    "issue": "7553",
+    "page": "436-444",
+    "issued": {"date-parts": [[2015, 5, 27]]},
+    "abstract": "<jats:p>Deep learning allows computational models to learn.</jats:p>",
+    "subject": ["Multidisciplinary"],
+    "language": "en",
+    "URL": "https://doi.org/10.1038/nature14539"
+  }
+}

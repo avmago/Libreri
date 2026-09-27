@@ -1,0 +1,23 @@
+{
+  "ISBN:9780306406157": {
+    "url": "https://openlibrary.org/books/OL7353617M/Linear_Algebra_Done_Right",
+    "key": "/books/OL7353617M",
+    "title": "Linear Algebra Done Right",
+    "authors": [{"url": "https://openlibrary.org/authors/OL1A/John_Smith", "name": "John Smith"}],
+    "number_of_pages": 340,
+    "identifiers": {"isbn_13": ["9780306406157"], "isbn_10": ["0306406152"], "openlibrary": ["OL7353617M"]},
+    "publishers": [{"name": "Springer"}],
+    "publish_date": "2015",
+    "subjects": [
+      {"name": "Accessible book", "url": "https://openlibrary.org/subjects/accessible_book"},
+      {"name": "Linear algebra", "url": "https://openlibrary.org/subjects/linear_algebra"},
+      {"name": "Vector spaces -- Textbooks", "url": "https://openlibrary.org/subjects/vector_spaces"},
+      {"name": "Protected DAISY", "url": "https://openlibrary.org/subjects/protected_daisy"}
+    ],
+    "cover": {
+      "small": "https://covers.openlibrary.org/b/id/8739161-S.jpg",
+      "medium": "https://covers.openlibrary.org/b/id/8739161-M.jpg",
+      "large": "https://covers.openlibrary.org/b/id/8739161-L.jpg"
+    }
+  }
+}

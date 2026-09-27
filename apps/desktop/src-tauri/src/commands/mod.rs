@@ -5,10 +5,12 @@
 
 pub mod app;
 pub mod books;
+pub mod details;
 pub mod folders;
 pub mod library;
 pub mod notes;
 pub mod organize;
 pub mod profiles;
 pub mod reader;
+pub mod scan;
 pub mod settings;

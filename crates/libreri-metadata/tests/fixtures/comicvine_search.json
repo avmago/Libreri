@@ -1,0 +1,22 @@
+{
+  "error": "OK", "limit": 8, "offset": 0, "number_of_page_results": 3, "number_of_total_results": 3, "status_code": 1,
+  "results": [
+    {
+      "resource_type": "issue", "id": 6686, "name": null, "issue_number": "1",
+      "cover_date": "1963-03-01",
+      "deck": null,
+      "description": "<p>The first adventure of the Star Rangers, far beyond the rim.</p>",
+      "volume": {"id": 42, "name": "Star Rangers", "api_detail_url": "https://comicvine.gamespot.com/api/volume/4050-42/"},
+      "image": {"original_url": "https://comicvine.gamespot.com/a/uploads/original/0/1/6686.jpg", "medium_url": "https://comicvine.gamespot.com/a/uploads/scale_medium/0/1/6686.jpg"},
+      "site_detail_url": "https://comicvine.gamespot.com/star-rangers-1/4000-6686/"
+    },
+    {
+      "resource_type": "volume", "id": 42, "name": "Star Rangers", "start_year": "1963",
+      "count_of_issues": 60,
+      "publisher": {"id": 1, "name": "Acme Comics"},
+      "image": {"original_url": "https://comicvine.gamespot.com/a/uploads/original/0/1/42.jpg"},
+      "site_detail_url": "https://comicvine.gamespot.com/star-rangers/4050-42/"
+    },
+    {"resource_type": "character", "id": 7, "name": "Ignored"}
+  ]
+}

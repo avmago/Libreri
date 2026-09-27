@@ -9,6 +9,7 @@ mod commands;
 mod dto;
 mod error;
 mod events;
+mod online_store;
 mod protocol;
 mod settings_store;
 mod state;
@@ -27,6 +28,18 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::settings::set_theme,
             commands::settings::set_accent,
             commands::settings::forget_recent_library,
+            commands::details::details_query,
+            commands::details::find_details,
+            commands::details::apply_details,
+            commands::details::cover_preview,
+            commands::details::fill_missing_details,
+            commands::details::get_online_settings,
+            commands::details::set_online_settings,
+            commands::details::set_source_key,
+            commands::scan::scan_picture,
+            commands::scan::scan_picture_file,
+            commands::scan::start_phone_scan,
+            commands::scan::stop_phone_scan,
             commands::library::create_library,
             commands::library::open_library,
             commands::library::close_library,
@@ -95,6 +108,8 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::LibraryChanged,
             events::ImportFinished,
             events::SessionChanged,
+            events::DetailsFilled,
+            events::PhoneScan,
         ])
 }
 

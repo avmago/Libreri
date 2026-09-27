@@ -36,6 +36,10 @@ Requirement (user, 2026-09-27): when the database, metadata and every kind of no
 - Notebooks stay Markdown in `Notes/<profile name>/`; renaming a profile renames the folder and notebook links follow. Guests leave nothing on disk.
 - See `docs/adr/0010-profiles-and-pins.md`.
 
+## Per-computer settings (Phase 4)
+- Online sources in use and API keys (ComicVine, ISBNdb) are kept in `online-sources.json` in the computer's app-config folder, not in the library, so exports, backups and copies of the library folder never carry them. See `docs/adr/0013-online-details.md`.
+- Details and covers found online are saved like any edit: in the database and the book's sidecar, so they travel with the library.
+
 ## Edited PDFs (versions)
 - Page edits create a new version with a **page map** (old page → new page). Anchors are migrated through the map; text-quote fallback catches the rest. Exports include the version history so links to older versions still resolve.
 

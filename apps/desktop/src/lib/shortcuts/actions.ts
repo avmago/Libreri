@@ -154,6 +154,8 @@ export const ACTIONS = {
   "details.toggle": { label: "Show or hide details", group: "Library", keys: "Mod+I" },
   "details.edit": { label: "Edit details", group: "Library", keys: "Mod+E" },
   "details.save": { label: "Save details", group: "Library", keys: "Mod+S", whileTyping: true },
+  "details.find": { label: "Find details online", group: "Library", keys: "Mod+Shift+D" },
+  "details.fill": { label: "Fill in missing details online", group: "Library", keys: null },
   "filters.clear": { label: "Clear search and filters", group: "Library", keys: "Mod+Shift+X" },
   "collection.save": {
     label: "Save this search as a smart collection",

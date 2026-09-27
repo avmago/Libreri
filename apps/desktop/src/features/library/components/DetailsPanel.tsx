@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   BookOpen,
   FolderSearch,
+  Globe,
   Heart,
   Pencil,
   Star,
@@ -14,6 +15,7 @@ import { NativeSelect } from "@/components/ui/input";
 import type { ReadingStatus } from "@/lib/ipc";
 import { useShortcut } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
+import { useDetailsDialog, useFillDetails } from "@/features/details";
 import { usePermissions } from "@/features/profiles";
 import { useUpdateBook } from "../api";
 import { useLibraryDialogs } from "../dialogs";
@@ -88,6 +90,7 @@ function SingleBook({ book }: { book: BookView }) {
   const update = useUpdateBook();
   const actions = useBookActions();
   const { editLibrary } = usePermissions();
+  const openFinder = useDetailsDialog((s) => s.open);
   const m = book.metadata;
   useShortcut("details.edit", () => editLibrary && setEditing(true));
 
@@ -170,6 +173,17 @@ function SingleBook({ book }: { book: BookView }) {
             <Pencil />
           </Button>
         )}
+        {editLibrary && (
+          <Button
+            size="icon"
+            variant="outline"
+            aria-label="Find details online"
+            title="Find details online"
+            onClick={() => openFinder(book.id)}
+          >
+            <Globe />
+          </Button>
+        )}
       </div>
       <div className="flex items-center gap-2">
         <NativeSelect
@@ -243,6 +257,7 @@ function ManyBooks({ books }: { books: BookView[] }) {
   const actions = useBookActions();
   const { editLibrary } = usePermissions();
   const openBulk = useLibraryDialogs((s) => s.openBulkEdit);
+  const fillDetails = useFillDetails();
   const size = books.reduce((n, b) => n + b.fileSize, 0);
   return (
     <div className="flex flex-col gap-4 px-4 py-6">
@@ -288,6 +303,9 @@ function ManyBooks({ books }: { books: BookView[] }) {
         <>
           <Button onClick={() => openBulk(books)}>
             <Pencil /> Edit {books.length} books together…
+          </Button>
+          <Button variant="outline" onClick={() => fillDetails(books.map((b) => b.id))}>
+            <Globe /> Fill in missing details online
           </Button>
           <Button
             variant="outline"

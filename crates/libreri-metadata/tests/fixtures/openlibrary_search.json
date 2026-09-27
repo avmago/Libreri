@@ -1,0 +1,24 @@
+{
+  "numFound": 2, "start": 0, "numFoundExact": true,
+  "docs": [
+    {
+      "key": "/works/OL1943966W",
+      "title": "Linear Algebra Done Right",
+      "author_name": ["Sheldon Axler"],
+      "first_publish_year": 1995,
+      "publisher": ["Springer"],
+      "number_of_pages_median": 251,
+      "isbn": ["3319110802", "9783319110806"],
+      "language": ["eng"],
+      "subject": ["Linear algebra", "Algebras, Linear", "Accessible book"],
+      "cover_i": 8739161,
+      "cover_edition_key": "OL7353617M"
+    },
+    {
+      "key": "/works/OL99W",
+      "title": "Linear Algebra",
+      "author_name": ["Jane Smith"],
+      "first_publish_year": 2001
+    }
+  ]
+}

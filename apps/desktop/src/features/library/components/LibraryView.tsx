@@ -34,6 +34,7 @@ import { keysLabel, platform, shortcutFor, useShortcut, type ActionId } from "@/
 import { cn } from "@/lib/utils";
 import { usePermissions } from "@/features/profiles";
 import { useBooks, useFacets, useFolders, useMoveFolder } from "../api";
+import { useDetailsDialog, useFillDetails } from "@/features/details";
 import { useLibraryDialogs } from "../dialogs";
 import type { DragItem } from "../drag";
 import { DragLayer } from "./DragLayer";
@@ -397,6 +398,8 @@ export function LibraryView() {
   const searchRef = useRef<HTMLInputElement>(null);
   const { editLibrary } = usePermissions();
   const dialogs = useLibraryDialogs();
+  const openFinder = useDetailsDialog((s) => s.open);
+  const fillDetails = useFillDetails();
   usePdfCovers(books);
 
   const selected = books.filter((b) => view.selection.includes(b.id));
@@ -442,6 +445,10 @@ export function LibraryView() {
   useShortcut("books.rate4", () => actions.setRating(selected, 4));
   useShortcut("books.rate5", () => actions.setRating(selected, 5));
   useShortcut("details.toggle", view.toggleDetails);
+  useShortcut("details.find", () => {
+    if (editLibrary && selected.length === 1) openFinder(selected[0]!.id);
+  });
+  useShortcut("details.fill", () => editLibrary && fillDetails(selected.map((b) => b.id)));
   useShortcut("books.selectAll", () => view.setSelection(books.map((b) => b.id)));
   useShortcut("books.clearSelection", () => view.setSelection([]));
   const only = selected.length === 1 ? selected[0] : undefined;

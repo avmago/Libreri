@@ -18,6 +18,8 @@ tauri-build = { version = "2", features = [] }
 libreri-core = { workspace = true, features = ["specta"] }
 libreri-library.workspace = true
 libreri-jobs.workspace = true
+libreri-metadata = { workspace = true, features = ["specta"] }
+libreri-scan.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
@@ -28,6 +30,9 @@ specta-typescript = "0.0.12"
 tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
 tauri-plugin-opener = "2.5.5"
 base64 = "0.23.1"
+
+[dev-dependencies]
+tempfile.workspace = true
 
 [lints]
 workspace = true

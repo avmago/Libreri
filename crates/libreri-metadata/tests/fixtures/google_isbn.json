@@ -1,0 +1,32 @@
+{
+  "kind": "books#volumes",
+  "totalItems": 1,
+  "items": [
+    {
+      "kind": "books#volume",
+      "id": "abc123",
+      "selfLink": "https://www.googleapis.com/books/v1/volumes/abc123",
+      "volumeInfo": {
+        "title": "Linear Algebra Done Right",
+        "authors": ["John Smith"],
+        "publisher": "Springer",
+        "publishedDate": "2015-01-01",
+        "description": "This <b>best-selling</b> textbook for a second course in linear algebra.",
+        "industryIdentifiers": [
+          {"type": "ISBN_10", "identifier": "0306406152"},
+          {"type": "ISBN_13", "identifier": "9780306406157"}
+        ],
+        "pageCount": 340,
+        "printType": "BOOK",
+        "categories": ["Mathematics / Algebra / Linear"],
+        "imageLinks": {
+          "smallThumbnail": "http://books.google.com/books/content?id=abc123&printsec=frontcover&img=1&zoom=5&edge=curl&source=gbs_api",
+          "thumbnail": "http://books.google.com/books/content?id=abc123&printsec=frontcover&img=1&zoom=1&edge=curl&source=gbs_api"
+        },
+        "language": "en",
+        "infoLink": "http://books.google.com/books?id=abc123&dq=isbn:9780306406157",
+        "canonicalVolumeLink": "https://books.google.com/books/about/Linear_Algebra_Done_Right.html?id=abc123"
+      }
+    }
+  ]
+}

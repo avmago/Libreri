@@ -6,6 +6,7 @@ import {
   ExternalLink,
   FolderInput,
   FolderSearch,
+  Globe,
   Heart,
   Info,
   ListChecks,
@@ -13,6 +14,7 @@ import {
   Star,
   Trash2,
 } from "lucide-react";
+import { useDetailsDialog, useFillDetails } from "@/features/details";
 import { usePermissions } from "@/features/profiles";
 import {
   ContextMenu,
@@ -41,6 +43,8 @@ function MenuItems({ book, targets }: { book: BookView; targets: BookView[] }) {
   const actions = useBookActions();
   const { editLibrary } = usePermissions();
   const openBulk = useLibraryDialogs((s) => s.openBulkEdit);
+  const openFinder = useDetailsDialog((s) => s.open);
+  const fillDetails = useFillDetails();
   const hasOpenBook = useTabs((s) => s.tabs.length > 0);
   const setDetailsOpen = useLibraryView((s) => s.setDetailsOpen);
   const { data: folders = [] } = useFolders();
@@ -127,6 +131,20 @@ function MenuItems({ book, targets }: { book: BookView; targets: BookView[] }) {
             {single ? "Edit details together…" : `Edit ${targets.length} books together…`}
             <MenuShortcut>{keys("books.bulkEdit")}</MenuShortcut>
           </ContextMenu.Item>
+          {single ? (
+            <ContextMenu.Item className={menuItem} onSelect={() => openFinder(book.id)}>
+              <Globe /> Find details online…
+              <MenuShortcut>{keys("details.find")}</MenuShortcut>
+            </ContextMenu.Item>
+          ) : (
+            <ContextMenu.Item
+              className={menuItem}
+              onSelect={() => fillDetails(targets.map((b) => b.id))}
+            >
+              <Globe /> Fill in missing details online
+              <MenuShortcut>{keys("details.fill")}</MenuShortcut>
+            </ContextMenu.Item>
+          )}
           <ContextMenu.Sub>
             <ContextMenu.SubTrigger className={menuItem}>
               <FolderInput /> Move to

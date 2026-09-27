@@ -6,6 +6,7 @@ import {
   FolderOpen,
   FolderPlus,
   FolderUp,
+  Globe,
   Info,
   Keyboard,
   LayoutGrid,
@@ -45,6 +46,7 @@ import {
   useLibraryEvents,
   useLibraryView,
 } from "@/features/library";
+import { FindDetailsDialog, useDetailsEvents } from "@/features/details";
 import { NotesHub } from "@/features/notes";
 import { OrganizeView } from "@/features/organize";
 import {
@@ -102,6 +104,7 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
   const libraryView = useLibraryView();
   const { setView, toggleDetails, nav, setNav } = libraryView;
   useLibraryEvents();
+  useDetailsEvents();
   useDesktopDrop(session.canEditLibrary);
   useSession(`${library.id}:${session.profile.id}`);
   const tabs = useTabs();
@@ -271,6 +274,24 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
         icon: LibrarySquare,
         shortcut: k("books.bulkEdit"),
         run: () => void runAction("books.bulkEdit"),
+        edit: true,
+      },
+      {
+        id: "details.find",
+        group: "Books",
+        label: "Find details of the selected book online…",
+        icon: Globe,
+        shortcut: k("details.find"),
+        run: () => void runAction("details.find"),
+        edit: true,
+      },
+      {
+        id: "details.fill",
+        group: "Books",
+        label: "Fill in missing details of the selected books online",
+        icon: Globe,
+        shortcut: k("details.fill"),
+        run: () => void runAction("details.fill"),
         edit: true,
       },
       {
@@ -516,6 +537,7 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
       <CommandPalette open={ui.paletteOpen} onOpenChange={ui.setPaletteOpen} actions={actions} />
       <ShortcutsSheet open={ui.shortcutsOpen} onOpenChange={ui.setShortcutsOpen} />
       <BulkEditDialog />
+      <FindDetailsDialog />
       <SaveCollectionDialog />
       <ImportDialog />
       <DropOverlay />

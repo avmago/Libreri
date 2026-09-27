@@ -1,0 +1,27 @@
+{
+  "id": "https://openalex.org/W1901616594",
+  "doi": "https://doi.org/10.1038/nature14539",
+  "title": "Deep learning",
+  "display_name": "Deep learning",
+  "publication_year": 2015,
+  "language": "en",
+  "type": "article",
+  "authorships": [
+    {"author_position": "first", "author": {"id": "https://openalex.org/A1", "display_name": "Yann LeCun"}},
+    {"author_position": "last", "author": {"id": "https://openalex.org/A2", "display_name": "Yoshua Bengio"}}
+  ],
+  "primary_location": {"source": {"id": "https://openalex.org/S137773608", "display_name": "Nature", "type": "journal"}},
+  "biblio": {"volume": "521", "issue": "7553", "first_page": "436", "last_page": "444"},
+  "primary_topic": {
+    "display_name": "Neural Networks",
+    "subfield": {"display_name": "Artificial Intelligence"},
+    "field": {"display_name": "Computer Science"},
+    "domain": {"display_name": "Physical Sciences"}
+  },
+  "keywords": [
+    {"id": "https://openalex.org/keywords/deep-learning", "display_name": "Deep learning", "score": 0.8},
+    {"id": "https://openalex.org/keywords/representation", "display_name": "Representation learning", "score": 0.5}
+  ],
+  "ids": {"openalex": "https://openalex.org/W1901616594", "doi": "https://doi.org/10.1038/nature14539"},
+  "abstract_inverted_index": {"Deep": [0], "learning": [1], "allows": [2], "computational": [3], "models": [4], "to": [5], "learn": [6]}
+}
