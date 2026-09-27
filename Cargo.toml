@@ -13,7 +13,7 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.89"
+rust-version = "1.95"
 authors = ["Libreri contributors"]
 # Licence to be decided (see docs/adr/0006-licence-deferred.md)
 publish = false

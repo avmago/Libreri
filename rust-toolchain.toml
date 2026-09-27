@@ -1,3 +1,5 @@
+# Pinned so every machine (and CI) builds with the same Rust. rustup
+# installs it automatically the first time you build.
 [toolchain]
-channel = "stable"
+channel = "1.95"
 components = ["rustfmt", "clippy"]

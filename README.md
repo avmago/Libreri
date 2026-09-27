@@ -10,7 +10,7 @@ Your library is an ordinary folder: books stay as plain files, notes are Markdow
 
 Requirements:
 
-- [Rust](https://rustup.rs) (stable, 1.89 or newer)
+- [Rust](https://rustup.rs) via rustup (the right version, 1.95, is installed automatically from `rust-toolchain.toml`)
 - [Node.js](https://nodejs.org) 20+ and [pnpm](https://pnpm.io) 10 (`corepack enable`)
 - Platform prerequisites for Tauri: <https://v2.tauri.app/start/prerequisites/>
   - macOS: Xcode Command Line Tools (`xcode-select --install`)
