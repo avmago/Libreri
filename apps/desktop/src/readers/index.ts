@@ -27,3 +27,4 @@ export async function createRenderer(type: FileType, events: RendererEvents): Pr
     }
   }
 }
+export { PDF_ASSETS } from "./pdf/assets";

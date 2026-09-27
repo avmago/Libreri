@@ -231,6 +231,8 @@ impl Library {
             busy: Mutex::new(()),
         };
         lib.backup_all_profiles()?;
+        // Best effort: a damaged thumbnail must not stop the library opening.
+        let _ = lib.forget_blank_pdf_covers();
         lib.sign_in_if_alone()?;
         Ok(lib)
     }

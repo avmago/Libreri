@@ -26,6 +26,7 @@ notify-debouncer-full = "0.7.0"
 
 [dev-dependencies]
 tempfile.workspace = true
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp"] }
 
 [lints]
 workspace = true

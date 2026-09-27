@@ -22,6 +22,7 @@ import {
   type TocItem,
   type ZoomValue,
 } from "../types";
+import { PDF_ASSETS } from "./assets";
 
 type ViewerModule = typeof import("pdfjs-dist/web/pdf_viewer.mjs");
 type PdfViewer = InstanceType<ViewerModule["PDFViewer"]>;
@@ -102,9 +103,7 @@ export class PdfRenderer implements Renderer {
       disableAutoFetch: true,
       disableStream: true,
       rangeChunkSize: 1 << 20,
-      standardFontDataUrl: "/pdfjs/standard_fonts/",
-      cMapUrl: "/pdfjs/cmaps/",
-      cMapPacked: true,
+      ...PDF_ASSETS,
     });
     this.cleanup.push(() => void task.destroy());
     this.doc = await task.promise;

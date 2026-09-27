@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { bookUrl, commands, unwrap } from "@/lib/ipc";
+import { PDF_ASSETS } from "@/readers";
 import { libKey } from "../api";
 import type { BookView } from "../model";
 
@@ -24,9 +25,7 @@ async function renderFirstPage(book: BookView): Promise<string> {
   const data = new Uint8Array(await response.arrayBuffer());
   const task = pdfjs.getDocument({
     data,
-    standardFontDataUrl: "/pdfjs/standard_fonts/",
-    cMapUrl: "/pdfjs/cmaps/",
-    cMapPacked: true,
+    ...PDF_ASSETS,
   });
   const doc = await task.promise;
   try {
@@ -41,10 +40,31 @@ async function renderFirstPage(book: BookView): Promise<string> {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     await page.render({ canvas, canvasContext: ctx, viewport }).promise;
+    // A plain page means nothing could be drawn (or truly a blank page):
+    // keep no cover, so the generated cover with the title shows instead.
+    if (isPlain(ctx.getImageData(0, 0, canvas.width, canvas.height).data)) {
+      throw new Error("blank first page");
+    }
     return canvas.toDataURL("image/jpeg", 0.88);
   } finally {
     void task.destroy();
   }
+}
+
+/** True if every sampled pixel is almost the same colour. */
+export function isPlain(rgba: Uint8ClampedArray): boolean {
+  const step = Math.max(4, Math.floor(rgba.length / 4 / 4000) * 4);
+  const [r, g, b] = [rgba[0]!, rgba[1]!, rgba[2]!];
+  for (let i = 0; i < rgba.length; i += step) {
+    if (
+      Math.abs(rgba[i]! - r) > 12 ||
+      Math.abs(rgba[i + 1]! - g) > 12 ||
+      Math.abs(rgba[i + 2]! - b) > 12
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /**

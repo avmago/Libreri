@@ -33,6 +33,19 @@ pub struct Covers {
     pub height: u32,
 }
 
+/// True if the image is one plain colour (a cover drawn from a page that
+/// could not be rendered).
+pub fn is_blank(bytes: &[u8]) -> bool {
+    let Ok(img) = image::load_from_memory(bytes) else {
+        return false;
+    };
+    let small = img.thumbnail(64, 64).to_rgb8();
+    let first = *small.get_pixel(0, 0);
+    small
+        .pixels()
+        .all(|p| (0..3).all(|c| p[c].abs_diff(first[c]) <= 12))
+}
+
 fn flatten(img: &DynamicImage) -> RgbImage {
     // Transparent PNG covers go on white, like paper.
     let rgba = img.to_rgba8();
@@ -84,7 +97,33 @@ pub fn make_covers(bytes: &[u8]) -> Result<Covers, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn blank_covers_are_recognised() {
+        let white = make_covers(&png_of(RgbImage::from_pixel(
+            300,
+            450,
+            Rgb([250, 248, 243]),
+        )))
+        .unwrap();
+        assert!(is_blank(&white.thumbnail));
+        let mut page = RgbImage::from_pixel(300, 450, Rgb([255, 255, 255]));
+        for x in 20..280 {
+            page.put_pixel(x, 100, Rgb([0, 0, 0]));
+            page.put_pixel(x, 101, Rgb([0, 0, 0]));
+        }
+        let text = make_covers(&png_of(page)).unwrap();
+        assert!(!is_blank(&text.thumbnail));
+        assert!(!is_blank(b"not an image"));
+    }
     use image::{ImageFormat, Rgba, RgbaImage};
+
+    fn png_of(img: RgbImage) -> Vec<u8> {
+        let mut buf = Vec::new();
+        img.write_to(&mut Cursor::new(&mut buf), ImageFormat::Png)
+            .unwrap();
+        buf
+    }
 
     fn png(w: u32, h: u32) -> Vec<u8> {
         let img = RgbaImage::from_pixel(w, h, Rgba([200, 30, 30, 128]));
