@@ -5,6 +5,7 @@ import {
   unwrap,
   type BackupSettingsChange,
   type CitationStyle,
+  type ForeignImportDto,
   type ProfileMappingDto,
 } from "@/lib/ipc";
 import { usePortability } from "./store";
@@ -82,4 +83,22 @@ export async function pickArchiveToImport() {
     filters: [{ name: "Libreri archive", extensions: ["libreri"] }],
   });
   if (typeof path === "string") usePortability.getState().openImport(path);
+}
+
+export function useForeignSummary(path: string | null) {
+  return useQuery({
+    queryKey: [...libKey, "foreign", path],
+    queryFn: () => unwrap(commands.inspectForeign(path!)),
+    enabled: path !== null,
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
+  });
+}
+
+export function useImportForeign() {
+  return useMutation({
+    mutationFn: ({ path, options }: { path: string; options: ForeignImportDto }) =>
+      unwrap(commands.importForeign(path, options)),
+  });
 }

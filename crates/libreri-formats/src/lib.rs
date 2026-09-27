@@ -9,6 +9,9 @@ mod epub;
 mod fb2;
 mod markdown;
 mod pdf;
+#[doc(hidden)]
+pub use pdf::test_pdf;
+pub use pdf::{page_boxes, PageBox};
 pub mod xml;
 
 use libreri_core::{BookMetadata, FileType};

@@ -250,3 +250,51 @@ pub struct BackupFinished {
     /// Started by the schedule rather than "Back up now".
     pub scheduled: bool,
 }
+
+/// An import from another app finished.
+#[derive(Debug, Clone, Serialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct ForeignImported {
+    pub job_id: String,
+    pub source: String,
+    pub added: u32,
+    pub already_here: u32,
+    pub details_added: u32,
+    pub without_file: Vec<String>,
+    pub without_file_count: u32,
+    pub highlights_added: u32,
+    pub notes_added: u32,
+    pub personal_updated: u32,
+    pub unmatched: Vec<String>,
+    pub unmatched_count: u32,
+    pub failed: Vec<FailedFileDto>,
+    pub warnings: Vec<String>,
+}
+
+impl ForeignImported {
+    pub fn new(job: libreri_jobs::JobId, source: &str, r: &libreri_library::ForeignReport) -> Self {
+        Self {
+            job_id: job.to_string(),
+            source: source.to_owned(),
+            added: r.added,
+            already_here: r.already_here,
+            details_added: r.details_added,
+            without_file: r.without_file.clone(),
+            without_file_count: r.without_file_count,
+            highlights_added: r.highlights_added,
+            notes_added: r.notes_added,
+            personal_updated: r.personal_updated,
+            unmatched: r.unmatched.clone(),
+            unmatched_count: r.unmatched_count,
+            failed: r
+                .failed
+                .iter()
+                .map(|(file, reason)| FailedFileDto {
+                    file: file.clone(),
+                    reason: reason.clone(),
+                })
+                .collect(),
+            warnings: r.warnings.iter().take(20).cloned().collect(),
+        }
+    }
+}

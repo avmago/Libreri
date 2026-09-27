@@ -248,6 +248,16 @@ export const commands = {
 	backUpNow: () => typedError<string | null, AppError>(__TAURI_INVOKE("back_up_now")),
 	/**  Shows a file (an export or a backup) in the system file manager. */
 	revealPath: (path: string) => typedError<null, AppError>(__TAURI_INVOKE("reveal_path", { path })),
+	/**
+	 *  Reads a Calibre library, Zotero folder, BibTeX/RIS file or reading log
+	 *  and says what importing it would bring in.
+	 */
+	inspectForeign: (path: string) => typedError<ForeignSummaryDto, AppError>(__TAURI_INVOKE("inspect_foreign", { path })),
+	/**
+	 *  Imports from another app (files are copied). Returns the job id; the
+	 *  report arrives as a `ForeignImported` event.
+	 */
+	importForeign: (path: string, options: ForeignImportDto) => typedError<string, AppError>(__TAURI_INVOKE("import_foreign", { path, options })),
 };
 
 /** Events */
@@ -256,6 +266,7 @@ export const events = {
 	backupFinished: makeEvent<BackupFinished>("backup-finished"),
 	detailsFilled: makeEvent<DetailsFilled>("details-filled"),
 	exportFinished: makeEvent<ExportFinished>("export-finished"),
+	foreignImported: makeEvent<ForeignImported>("foreign-imported"),
 	importFinished: makeEvent<ImportFinished>("import-finished"),
 	jobEventPayload: makeEvent<JobEventPayload>("job-event-payload"),
 	libraryChanged: makeEvent<LibraryChanged>("library-changed"),
@@ -681,6 +692,68 @@ export type FolderDto = {
  *  the right action.
  */
 export type FolderKind = "missing" | "empty" | "library" | "otherFiles";
+
+export type ForeignImportDto = {
+	/**  Preferred formats, best first; empty = Libreri's order. */
+	formats: FileType[],
+	/**  Folder under Books/ ("" = top level). */
+	folder: string,
+	replacePersonal: boolean,
+};
+
+/**  An import from another app finished. */
+export type ForeignImported = {
+	jobId: string,
+	source: string,
+	added: number,
+	alreadyHere: number,
+	detailsAdded: number,
+	withoutFile: string[],
+	withoutFileCount: number,
+	highlightsAdded: number,
+	notesAdded: number,
+	personalUpdated: number,
+	unmatched: string[],
+	unmatchedCount: number,
+	failed: FailedFileDto[],
+	warnings: string[],
+};
+
+/**  Where a library comes from. */
+export type ForeignSource = 
+/**  A Calibre library folder (with `metadata.db`). */
+"calibre" | 
+/**  Zotero's data folder (with `zotero.sqlite` and `storage/`). */
+"zotero" | 
+/**  A BibTeX file, such as a Mendeley or JabRef export. */
+"bibtex" | 
+/**  A RIS file (Mendeley, EndNote, Zotero). */
+"ris" | 
+/**  Goodreads "Export library" CSV. */
+"goodreads" | 
+/**  The StoryGraph export CSV. */
+"storyGraph";
+
+/**  What a library from another app holds. */
+export type ForeignSummaryDto = {
+	source: ForeignSource,
+	label: string,
+	books: number,
+	withFiles: number,
+	highlights: number,
+	notes: number,
+	rated: number,
+	formats: FormatCount[],
+	/**  Goodreads and StoryGraph: books found in this library. */
+	matched: number,
+	readingLog: boolean,
+	warnings: string[],
+};
+
+export type FormatCount = {
+	fileType: FileType,
+	count: number,
+};
 
 export type HealthReportDto = {
 	checkedAt: string,

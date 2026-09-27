@@ -67,6 +67,16 @@ export function ExportImportSettings({ session }: { session: SessionDto }) {
             </Button>
           </Row>
         )}
+        {session.canEditLibrary && (
+          <Row
+            label="Import from another app"
+            help="Calibre, Zotero, Mendeley and other BibTeX or RIS exports, Goodreads and The StoryGraph. Files are copied."
+          >
+            <Button variant="outline" size="sm" onClick={() => portability.openForeign()}>
+              <Upload /> Import…
+            </Button>
+          </Row>
+        )}
         {isOwner && (
           <Row
             label="Import a Libreri archive"

@@ -80,6 +80,11 @@ export const ACTIONS = {
     group: "General",
     keys: null,
   },
+  "library.importForeign": {
+    label: "Import from Calibre, Zotero, Goodreads…",
+    group: "General",
+    keys: null,
+  },
   "go.organize": {
     label: "Go to Organize",
     group: "General",

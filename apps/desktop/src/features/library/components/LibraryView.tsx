@@ -213,6 +213,7 @@ function SortMenu() {
 function ImportMenu() {
   const { kind } = usePermissions();
   const openExport = usePortability((s) => s.openExport);
+  const openForeign = usePortability((s) => s.openForeign);
   return (
     <div className="flex">
       <Button size="sm" className="rounded-r-none" onClick={() => void pickFilesToImport()}>
@@ -241,6 +242,9 @@ function ImportMenu() {
             <DropdownMenu.Item className={menuItem} onSelect={() => void commands.rescanLibrary()}>
               <RefreshCw /> Check folder for changes{" "}
               <MenuShortcut>{keys("library.refresh")}</MenuShortcut>
+            </DropdownMenu.Item>
+            <DropdownMenu.Item className={menuItem} onSelect={() => openForeign()}>
+              <Upload /> Import from Calibre, Zotero, Goodreads…
             </DropdownMenu.Item>
             <DropdownMenu.Separator className={menuSeparator} />
             <DropdownMenu.Item

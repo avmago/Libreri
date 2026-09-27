@@ -8,6 +8,7 @@
 
 pub mod archive;
 pub mod citation;
+pub mod foreign;
 mod names;
 pub mod notes;
 pub mod opf;

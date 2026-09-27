@@ -81,6 +81,125 @@ pub fn identifiers(path: &Path) -> Option<crate::Identifiers> {
     Some(found)
 }
 
+/// The visible area of a PDF page in PDF points (crop box within the
+/// media box), and its rotation in degrees clockwise.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PageBox {
+    pub x0: f64,
+    pub y0: f64,
+    pub x1: f64,
+    pub y1: f64,
+    pub rotate: i64,
+}
+
+fn number(doc: &lopdf::Document, o: &lopdf::Object) -> Option<f64> {
+    match o {
+        lopdf::Object::Integer(i) => Some(*i as f64),
+        lopdf::Object::Real(f) => Some(f64::from(*f)),
+        lopdf::Object::Reference(r) => number(doc, doc.get_object(*r).ok()?),
+        _ => None,
+    }
+}
+
+/// A page attribute, looking up the page tree for inherited ones.
+fn inherited<'a>(
+    doc: &'a lopdf::Document,
+    mut dict: &'a lopdf::Dictionary,
+    key: &[u8],
+) -> Option<&'a lopdf::Object> {
+    for _ in 0..32 {
+        if let Ok(v) = dict.get(key) {
+            return Some(match v {
+                lopdf::Object::Reference(r) => doc.get_object(*r).ok()?,
+                v => v,
+            });
+        }
+        let parent = dict.get(b"Parent").ok()?.as_reference().ok()?;
+        dict = doc.get_object(parent).ok()?.as_dict().ok()?;
+    }
+    None
+}
+
+fn rect(doc: &lopdf::Document, o: &lopdf::Object) -> Option<[f64; 4]> {
+    let a = o.as_array().ok()?;
+    if a.len() != 4 {
+        return None;
+    }
+    let v: Vec<f64> = a.iter().filter_map(|x| number(doc, x)).collect();
+    (v.len() == 4).then(|| {
+        [
+            v[0].min(v[2]),
+            v[1].min(v[3]),
+            v[0].max(v[2]),
+            v[1].max(v[3]),
+        ]
+    })
+}
+
+/// Every page's visible box, in page order. `None` if the file cannot be
+/// read.
+pub fn page_boxes(path: &Path) -> Option<Vec<PageBox>> {
+    let doc = lopdf::Document::load(path).ok()?;
+    let mut out = Vec::new();
+    for (_, id) in doc.get_pages() {
+        let dict = doc.get_object(id).ok()?.as_dict().ok()?;
+        let media = inherited(&doc, dict, b"MediaBox")
+            .and_then(|o| rect(&doc, o))
+            .unwrap_or([0.0, 0.0, 612.0, 792.0]);
+        let crop = inherited(&doc, dict, b"CropBox")
+            .and_then(|o| rect(&doc, o))
+            .unwrap_or(media);
+        // PDF.js shows the crop box clipped to the media box.
+        let b = [
+            crop[0].max(media[0]),
+            crop[1].max(media[1]),
+            crop[2].min(media[2]),
+            crop[3].min(media[3]),
+        ];
+        let rotate = inherited(&doc, dict, b"Rotate")
+            .and_then(|o| number(&doc, o))
+            .map_or(0, |r| (r as i64).rem_euclid(360));
+        out.push(PageBox {
+            x0: b[0],
+            y0: b[1],
+            x1: b[2],
+            y1: b[3],
+            rotate,
+        });
+    }
+    Some(out)
+}
+
+/// Writes a blank PDF of `pages` US Letter pages, for other crates' tests.
+#[doc(hidden)]
+pub fn test_pdf(path: &Path, pages: u32) {
+    use lopdf::{dictionary, Document, Object, Stream};
+    let mut doc = Document::with_version("1.5");
+    let pages_id = doc.new_object_id();
+    let mut kids = Vec::new();
+    for _ in 0..pages {
+        let content = doc.add_object(Stream::new(dictionary! {}, Vec::new()));
+        let page = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+            "Contents" => content,
+        });
+        kids.push(Object::Reference(page));
+    }
+    doc.objects.insert(
+        pages_id,
+        Object::Dictionary(dictionary! {
+            "Type" => "Pages",
+            "Kids" => kids,
+            "Count" => pages as i64,
+        }),
+    );
+    let catalog = doc.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages_id });
+    doc.trailer.set("Root", catalog);
+    doc.save(path).expect("the test PDF is written");
+}
+
 #[cfg(test)]
 mod tests {
     use crate::extract;
@@ -115,6 +234,19 @@ mod tests {
         doc.trailer.set("Root", catalog);
         doc.trailer.set("Info", info);
         doc.save(path).unwrap();
+    }
+
+    #[test]
+    fn page_boxes_are_read_with_inheritance() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("a.pdf");
+        make_pdf(&p, 2, dictionary! {});
+        let boxes = super::page_boxes(&p).unwrap();
+        assert_eq!(boxes.len(), 2);
+        assert_eq!(
+            (boxes[0].x1, boxes[0].y1, boxes[0].rotate),
+            (612.0, 792.0, 0)
+        );
     }
 
     /// A one-page PDF whose page shows `text` in Helvetica.

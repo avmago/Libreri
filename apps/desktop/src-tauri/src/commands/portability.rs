@@ -5,12 +5,14 @@ use crate::backup_store::AutoExport;
 use crate::dto::LibrarySummary;
 use crate::error::{AppError, AppErrorKind, AppResult};
 use crate::state::AppState;
+use libreri_core::FileType;
 use libreri_core::{BookId, ProfileId, ProfileKind};
 use libreri_export::archive::ArchiveKind;
 use libreri_export::citation::Citation;
+use libreri_export::foreign::ForeignSource;
 use libreri_export::{CitationStyle, ExportFormat};
 use libreri_library::{
-    ArchiveImport, ExportRequest, ImportMode, Library, LocateOutcome, ProfileTarget,
+    ArchiveImport, ExportRequest, ForeignImport, ImportMode, Library, LocateOutcome, ProfileTarget,
 };
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -601,4 +603,98 @@ pub fn reveal_path(app: AppHandle, path: String) -> AppResult<()> {
     app.opener()
         .reveal_item_in_dir(path)
         .map_err(|e| AppError::new(AppErrorKind::Io, e.to_string()))
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct FormatCount {
+    pub file_type: FileType,
+    pub count: u32,
+}
+
+/// What a library from another app holds.
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ForeignSummaryDto {
+    pub source: ForeignSource,
+    pub label: String,
+    pub books: u32,
+    pub with_files: u32,
+    pub highlights: u32,
+    pub notes: u32,
+    pub rated: u32,
+    pub formats: Vec<FormatCount>,
+    /// Goodreads and StoryGraph: books found in this library.
+    pub matched: u32,
+    pub reading_log: bool,
+    pub warnings: Vec<String>,
+}
+
+/// Reads a Calibre library, Zotero folder, BibTeX/RIS file or reading log
+/// and says what importing it would bring in.
+#[tauri::command]
+#[specta::specta]
+pub async fn inspect_foreign(
+    state: State<'_, AppState>,
+    path: String,
+) -> AppResult<ForeignSummaryDto> {
+    let library = state.library()?;
+    blocking(move || {
+        let s = library.inspect_foreign(Path::new(&path))?;
+        let source = s
+            .source
+            .ok_or_else(|| AppError::invalid("Libreri does not recognise this"))?;
+        Ok(ForeignSummaryDto {
+            source,
+            label: source.label().to_owned(),
+            books: s.books,
+            with_files: s.with_files,
+            highlights: s.highlights,
+            notes: s.notes,
+            rated: s.rated,
+            formats: s
+                .formats
+                .into_iter()
+                .map(|(file_type, count)| FormatCount { file_type, count })
+                .collect(),
+            matched: s.matched,
+            reading_log: source.is_reading_log(),
+            warnings: s.warnings,
+        })
+    })
+    .await
+}
+
+#[derive(Debug, Clone, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ForeignImportDto {
+    /// Preferred formats, best first; empty = Libreri's order.
+    pub formats: Vec<FileType>,
+    /// Folder under Books/ ("" = top level).
+    pub folder: String,
+    pub replace_personal: bool,
+}
+
+/// Imports from another app (files are copied). Returns the job id; the
+/// report arrives as a `ForeignImported` event.
+#[tauri::command]
+#[specta::specta]
+pub fn import_foreign(
+    state: State<'_, AppState>,
+    path: String,
+    options: ForeignImportDto,
+) -> AppResult<String> {
+    let library = state.library()?;
+    library.require_edit()?;
+    let path = PathBuf::from(path);
+    let source = libreri_export::foreign::detect(&path)
+        .ok_or_else(|| AppError::invalid("Libreri does not recognise this"))?;
+    let opts = ForeignImport {
+        formats: options.formats,
+        folder: options.folder,
+        replace_personal: options.replace_personal,
+    };
+    Ok(state
+        .start_foreign_import(path, opts, source.label())?
+        .to_string())
 }

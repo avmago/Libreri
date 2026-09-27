@@ -3,6 +3,7 @@ export { CitationDialog } from "./components/CitationDialog";
 export { copyCitation } from "./clipboard";
 export { ImportArchiveDialog } from "./components/ImportArchiveDialog";
 export { HealthDialog } from "./components/HealthDialog";
+export { ForeignImportDialog } from "./components/ForeignImportDialog";
 export { usePortabilityEvents } from "./hooks/usePortabilityEvents";
 export { useLocateFile } from "./hooks/useLocateFile";
 export { usePortability } from "./store";

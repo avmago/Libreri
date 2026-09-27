@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { commands, events } from "@/lib/ipc";
-import { summariseImport } from "../model";
+import { summariseForeign, summariseImport } from "../model";
 import { usePortability } from "../store";
 
 const reveal = (path: string) =>
@@ -34,6 +34,11 @@ export function usePortabilityEvents() {
           duration: 12_000,
           action: r.missing ? { label: "Show missing files", onClick: showMissing } : undefined,
         });
+      }),
+      events.foreignImported.listen(({ payload: r }) => {
+        const { title, description } = summariseForeign(r);
+        const show = r.failed.length ? toast.warning : toast.success;
+        show(title, { description: description || undefined, duration: 12_000 });
       }),
       events.backupFinished.listen(({ payload: r }) => {
         void qc.invalidateQueries({ queryKey: ["lib", "backups"] });

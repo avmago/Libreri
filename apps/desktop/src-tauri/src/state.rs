@@ -3,8 +3,8 @@
 use crate::backup_store::{BackupSettings, BackupStore};
 use crate::error::{AppError, AppResult};
 use crate::events::{
-    ArchiveImported, BackupFinished, DetailsFilled, ExportFinished, ImportFinished,
-    JobEventPayload, LibraryChanged,
+    ArchiveImported, BackupFinished, DetailsFilled, ExportFinished, ForeignImported,
+    ImportFinished, JobEventPayload, LibraryChanged,
 };
 use crate::online_store::OnlineStore;
 use crate::settings_store::SettingsStore;
@@ -311,6 +311,26 @@ impl AppState {
             let _ = ArchiveImported::new(ctx.id(), &report).emit(&handle);
             Ok(())
         }))
+    }
+
+    /// Imports from another app; the report arrives as `ForeignImported`.
+    pub fn start_foreign_import(
+        &self,
+        path: std::path::PathBuf,
+        options: libreri_library::ForeignImport,
+        source: &'static str,
+    ) -> AppResult<JobId> {
+        let library = self.library()?;
+        let handle = self.app.clone();
+        Ok(self
+            .jobs
+            .submit(format!("Importing from {source}"), move |ctx| {
+                let result = library.import_foreign(&path, &options, &JobProgress(ctx));
+                let _ = LibraryChanged::default().emit(&handle);
+                let report = result.map_err(job_error)?;
+                let _ = ForeignImported::new(ctx.id(), source, &report).emit(&handle);
+                Ok(())
+            }))
     }
 
     /// Backup settings of the open library.

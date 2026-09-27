@@ -56,6 +56,7 @@ import { NotesHub } from "@/features/notes";
 import {
   CitationDialog,
   ExportDialog,
+  ForeignImportDialog,
   HealthDialog,
   ImportArchiveDialog,
   pickArchiveToImport,
@@ -123,6 +124,7 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
   const setHealth = usePortability((s) => s.setHealth);
   const showMissingRequest = usePortability((s) => s.showMissingRequest);
   const openExport = usePortability((s) => s.openExport);
+  const openForeign = usePortability((s) => s.openForeign);
   const isOwner = session.profile.kind === "owner";
   const backUpNow = useCallback(async () => {
     const r = await commands.backUpNow();
@@ -216,6 +218,7 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
   useShortcut("go.organize", () => session.canEditLibrary && goHome("organize"));
   useShortcut("library.health", () => session.canEditLibrary && setHealth(true));
   useShortcut("library.backup", () => isOwner && void backUpNow());
+  useShortcut("library.importForeign", () => session.canEditLibrary && openForeign());
   useShortcut("library.importArchive", () => isOwner && void pickArchiveToImport());
   useShortcut("app.fullscreen", () => {
     const w = getCurrentWindow();
@@ -440,6 +443,15 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
         run: () => void lock(),
       },
       {
+        id: "library.importForeign",
+        group: "Library",
+        label: "Import from Calibre, Zotero, Mendeley, Goodreads…",
+        icon: Upload,
+        shortcut: k("library.importForeign"),
+        run: () => openForeign(),
+        edit: true,
+      },
+      {
         id: "library.importArchive",
         group: "Library",
         label: "Import a Libreri archive…",
@@ -495,6 +507,7 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
     backUpNow,
     setHealth,
     openExport,
+    openForeign,
     createNew,
     openExisting,
     close,
@@ -630,6 +643,7 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
       <CitationDialog />
       <ImportArchiveDialog />
       <HealthDialog />
+      <ForeignImportDialog />
       <SaveCollectionDialog />
       <ImportDialog />
       <DropOverlay />

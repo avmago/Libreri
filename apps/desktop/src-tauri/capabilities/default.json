@@ -10,6 +10,7 @@
     "core:default",
     "core:event:default",
     "dialog:allow-open",
+    "dialog:allow-save",
     "dialog:allow-message",
     "dialog:allow-ask",
     "core:window:allow-set-fullscreen",

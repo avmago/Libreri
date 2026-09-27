@@ -21,4 +21,10 @@ export { DropOverlay, ImportDialog } from "./components/ImportDialog";
 export { useLibraryDialogs } from "./dialogs";
 export { useLibraryView, type Nav } from "./store";
 export { flattenFolders } from "./components/folderUtils";
-export { CONTENT_TYPE_LABEL, EMPTY_METADATA, toView, type BookView } from "./model";
+export {
+  CONTENT_TYPE_LABEL,
+  EMPTY_METADATA,
+  FILE_TYPE_LABEL,
+  toView,
+  type BookView,
+} from "./model";

@@ -115,6 +115,8 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::portability::set_backup_settings,
             commands::portability::back_up_now,
             commands::portability::reveal_path,
+            commands::portability::inspect_foreign,
+            commands::portability::import_foreign,
         ])
         .events(tauri_specta::collect_events![
             events::JobEventPayload,
@@ -126,6 +128,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::ExportFinished,
             events::ArchiveImported,
             events::BackupFinished,
+            events::ForeignImported,
         ])
 }
 

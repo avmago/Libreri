@@ -1,4 +1,4 @@
-import type { ArchiveImported, CitationStyle, ExportFormat } from "@/lib/ipc";
+import type { ArchiveImported, CitationStyle, ExportFormat, ForeignImported } from "@/lib/ipc";
 
 export type ExportOption = "personal" | "notes" | "bookFiles" | "everyone";
 
@@ -204,4 +204,32 @@ export function formatWhen(iso: string | null | undefined): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+/** "Imported 298 books from Calibre · 14 were already here…". */
+export function summariseForeign(r: ForeignImported) {
+  const lines: string[] = [];
+  const parts: string[] = [];
+  if (r.alreadyHere) parts.push(`${plural(r.alreadyHere, "book")} already here`);
+  if (r.detailsAdded) parts.push(`details added to ${plural(r.detailsAdded, "book")}`);
+  if (r.highlightsAdded) parts.push(`${plural(r.highlightsAdded, "highlight")} added`);
+  if (r.notesAdded) parts.push(`${plural(r.notesAdded, "note")} added to notebooks`);
+  if (r.personalUpdated)
+    parts.push(`reading status or rating of ${plural(r.personalUpdated, "book")} updated`);
+  lines.push(parts.join(" · "));
+  if (r.withoutFileCount)
+    lines.push(
+      `${plural(r.withoutFileCount, "book")} had no file and no match here: ${r.withoutFile.slice(0, 3).join(", ")}${r.withoutFileCount > 3 ? "…" : ""}`,
+    );
+  if (r.unmatchedCount)
+    lines.push(
+      `${plural(r.unmatchedCount, "book")} not in this library: ${r.unmatched.slice(0, 3).join(", ")}${r.unmatchedCount > 3 ? "…" : ""}`,
+    );
+  if (r.failed.length) lines.push(...r.failed.slice(0, 2).map((f) => `${f.file}: ${f.reason}`));
+  const title = r.added
+    ? `Imported ${plural(r.added, "book")} from ${r.source}`
+    : r.personalUpdated || r.detailsAdded || r.highlightsAdded
+      ? `Updated from ${r.source}`
+      : `Nothing new from ${r.source}`;
+  return { title, description: lines.filter(Boolean).join("\n") };
 }

@@ -42,6 +42,9 @@ Requirement (user, 2026-09-27): when the database, metadata and every kind of no
 - Exports carry only the signed-in profile's personal data (the owner may include everyone's) and never PINs or keys. Backups carry everyone's data and PIN hashes, so a restore is complete.
 - Differences from the plan above: the archive's catalogue copy is for reference and other tools; import works from the sidecars and backups, which are the source of truth. Versions history arrives with Phase 6 and will be added to the archive then.
 
+## Coming from other apps (Phase 4c)
+- Calibre, Zotero, BibTeX/RIS and Goodreads/StoryGraph imports copy files and never change the other app's library. Zotero highlights are converted to Libreri anchors (page + rectangles, with the quoted text as fallback) and get stable ids, so importing again never duplicates them. See `docs/adr/0015-import-from-other-apps.md`.
+
 ## Per-computer settings (Phase 4)
 - Backup settings and the file kept up to date are in `backups.json` (per library id), because they name folders on this computer.
 - Online sources in use and API keys (ComicVine, ISBNdb) are kept in `online-sources.json` in the computer's app-config folder, not in the library, so exports, backups and copies of the library folder never carry them. See `docs/adr/0013-online-details.md`.

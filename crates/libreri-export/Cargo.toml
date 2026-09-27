@@ -9,6 +9,10 @@ publish.workspace = true
 
 [dependencies]
 libreri-core.workspace = true
+libreri-metadata.workspace = true
+libreri-formats.workspace = true
+rusqlite.workspace = true
+uuid = { workspace = true, features = ["v5"] }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
@@ -20,7 +24,7 @@ zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 specta = { version = "=2.0.0-rc.25", features = ["derive"], optional = true }
 
 [features]
-specta = ["dep:specta"]
+specta = ["dep:specta", "libreri-core/specta"]
 
 [dev-dependencies]
 tempfile.workspace = true

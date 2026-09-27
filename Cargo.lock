@@ -2577,12 +2577,16 @@ dependencies = [
  "chrono",
  "csv",
  "libreri-core",
+ "libreri-formats",
+ "libreri-metadata",
+ "rusqlite",
  "rust_xlsxwriter",
  "serde",
  "serde_json",
  "specta",
  "tempfile",
  "thiserror 2.0.21",
+ "uuid",
  "zip",
 ]
 
@@ -4215,6 +4219,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha1_smol"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbfa15b3dddfee50a0fff136974b3e1bde555604ba463834a7eb7deb6417705d"
+
+[[package]]
 name = "sha2"
 version = "0.10.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5416,6 +5426,7 @@ dependencies = [
  "getrandom 0.4.3",
  "js-sys",
  "serde_core",
+ "sha1_smol",
  "wasm-bindgen",
 ]
 
