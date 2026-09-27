@@ -148,6 +148,29 @@ pub const MIGRATIONS: &[&str] = &[
         PRIMARY KEY (book_id, profile_id)
     ) STRICT;
     "#,
+    // 4 — profiles and organising (Phase 3): profile kinds, PIN lockout,
+    // Kids folders, interface preferences, and smart collections.
+    r#"
+    ALTER TABLE profiles ADD COLUMN kind TEXT NOT NULL DEFAULT 'standard';
+    UPDATE profiles SET kind = 'owner' WHERE is_owner = 1;
+    ALTER TABLE profiles ADD COLUMN recovery_hash TEXT;
+    ALTER TABLE profiles ADD COLUMN allowed_folders TEXT NOT NULL DEFAULT '[]';
+    ALTER TABLE profiles ADD COLUMN prefs TEXT NOT NULL DEFAULT '{}';
+    ALTER TABLE profiles ADD COLUMN last_used TEXT;
+    ALTER TABLE profiles ADD COLUMN failed_pins INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE profiles ADD COLUMN locked_until INTEGER NOT NULL DEFAULT 0; -- unix seconds
+
+    -- Saved searches shown in the sidebar, one list per profile.
+    CREATE TABLE collections (
+        id          TEXT PRIMARY KEY,                -- UUID
+        profile_id  TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+        name        TEXT NOT NULL,
+        query       TEXT NOT NULL,                   -- JSON BookQuery
+        position    INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT NOT NULL
+    ) STRICT;
+    CREATE INDEX collections_profile ON collections(profile_id, position);
+    "#,
 ];
 
 /// Schema version this build of Libreri writes.

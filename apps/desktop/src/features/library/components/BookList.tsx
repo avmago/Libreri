@@ -137,7 +137,7 @@ export function BookList({
       {folders.map((f) => (
         <FolderRow key={f.path} folder={f} onOpen={() => onOpenFolder(f.path)} />
       ))}
-      <div role="listbox" aria-multiselectable aria-label="Books">
+      <div role="listbox" data-shortcuts aria-multiselectable aria-label="Books">
         {books.map((b) => (
           <BookRow key={b.id} book={b} selected={selection.includes(b.id)} handlers={handlers} />
         ))}

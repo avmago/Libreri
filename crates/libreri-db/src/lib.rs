@@ -5,6 +5,7 @@
 
 mod books;
 mod migrations;
+mod profiles;
 mod reading;
 
 use rusqlite::{Connection, OpenFlags};
@@ -12,6 +13,7 @@ use std::path::Path;
 
 pub use books::{Facets, FileRecord};
 pub use migrations::{latest_version, MIGRATIONS};
+pub use profiles::CollectionRecord;
 
 /// Errors from the storage layer.
 #[derive(Debug, thiserror::Error)]

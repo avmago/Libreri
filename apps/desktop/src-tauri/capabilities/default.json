@@ -1,15 +1,21 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissions for the main window. Keep this list as small as possible.",
+  "description": "Permissions for Libreri's windows (the main one and book windows). Keep this list as small as possible.",
   "windows": [
-    "main"
+    "main",
+    "libreri-*"
   ],
   "permissions": [
     "core:default",
     "core:event:default",
     "dialog:allow-open",
     "dialog:allow-message",
-    "dialog:allow-ask"
+    "dialog:allow-ask",
+    "core:window:allow-set-fullscreen",
+    "core:window:allow-is-fullscreen",
+    "core:window:allow-set-title",
+    "core:window:allow-close",
+    "core:webview:allow-create-webview-window"
   ]
 }

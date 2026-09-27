@@ -20,7 +20,7 @@
   font-family:
     "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Noto Serif", ui-serif, serif;
   font-size: var(--page-font-size);
-  line-height: 1.65;
+  line-height: var(--page-line-height, 1.65);
   overflow-wrap: break-word;
 }
 .lb-doc-txt {

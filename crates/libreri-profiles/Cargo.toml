@@ -1,0 +1,16 @@
+[package]
+name = "libreri-profiles"
+description = "Profile secrets for Libreri: 6-digit PINs (Argon2), lockout and recovery codes."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+argon2 = { version = "0.5", features = ["std"] }
+rand_core = { version = "0.6", features = ["getrandom"] }
+thiserror.workspace = true
+
+[lints]
+workspace = true

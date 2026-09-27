@@ -8,7 +8,8 @@
 use crate::paths::{self, unique_path, write_atomic};
 use crate::{now, Error, Library, Result};
 use libreri_core::annotation::book_link;
-use libreri_core::{Annotation, BookId, ProfileId, ReadingStatus};
+use libreri_core::{Annotation, BookId, BookUserState, ProfileId, ReadingStatus};
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
@@ -57,6 +58,10 @@ fn safe_file_name(s: &str) -> String {
 
 /// The book a notebook belongs to, from its front matter line
 /// `book: libreri://book/<id>`.
+pub(crate) fn linked_book(content: &str) -> Option<BookId> {
+    notebook_book_id(content)
+}
+
 fn notebook_book_id(content: &str) -> Option<BookId> {
     let front = content.strip_prefix("---")?;
     let end = front.find("\n---")?;
@@ -67,11 +72,46 @@ fn notebook_book_id(content: &str) -> Option<BookId> {
     })
 }
 
+/// One profile's data about one book, as backed up in
+/// `.library-data/annotations/<profile>/<book>.json`. Version 1 files hold
+/// only the list of annotations.
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PersonalBackup {
+    format_version: u32,
+    #[serde(default)]
+    state: Option<BookUserState>,
+    #[serde(default)]
+    position: Option<String>,
+    #[serde(default)]
+    annotations: Vec<Annotation>,
+}
+
+const PERSONAL_BACKUP_VERSION: u32 = 2;
+
+fn read_backup(text: &str) -> Option<PersonalBackup> {
+    if let Ok(list) = serde_json::from_str::<Vec<Annotation>>(text) {
+        return Some(PersonalBackup {
+            format_version: 1,
+            annotations: list,
+            ..Default::default()
+        });
+    }
+    let b: PersonalBackup = serde_json::from_str(text).ok()?;
+    (b.format_version <= PERSONAL_BACKUP_VERSION).then_some(b)
+}
+
+/// The folder name under `Notes/` for a profile called `name`.
+pub(crate) fn notes_folder_name(name: &str) -> String {
+    safe_file_name(name)
+}
+
 impl Library {
     /// The last saved place in a book for the current profile (JSON).
     pub fn position(&self, book: &BookId) -> Result<Option<String>> {
-        let profile = self.profile();
-        self.with_db(|db| db.position(book, &profile))
+        let profile = self.profile()?;
+        let book = self.book(book)?;
+        self.with_db(|db| db.position(&book.id, &profile))
     }
 
     /// Saves the reading position. Opening a book without a status marks it
@@ -79,7 +119,7 @@ impl Library {
     pub fn save_position(&self, book: &BookId, locator: &str, progress: f32) -> Result<()> {
         serde_json::from_str::<serde_json::Value>(locator)
             .map_err(|_| Error::InvalidInput("the reading position is not valid".into()))?;
-        let profile = self.profile();
+        let profile = self.profile()?;
         let current = self.book(book)?;
         self.with_db(|db| db.set_position(&current.id, &profile, locator, progress, &now()))?;
         if current.user.status == ReadingStatus::None {
@@ -87,11 +127,11 @@ impl Library {
             state.status = ReadingStatus::Reading;
             self.with_db(|db| db.set_user_state(&current.id, &profile, &state))?;
         }
-        Ok(())
+        self.backup_personal(&current.id)
     }
 
     pub fn annotations(&self, book: &BookId) -> Result<Vec<Annotation>> {
-        let profile = self.profile();
+        let profile = self.profile()?;
         let book = self.book(book)?;
         self.with_db(|db| db.annotations(&book.id, &profile))
     }
@@ -103,7 +143,7 @@ impl Library {
             .map_err(|e| Error::InvalidInput(e.to_string()))?;
         let book = self.book(&a.book_id)?;
         a.book_id = book.id.clone();
-        let profile = self.profile();
+        let profile = self.profile()?;
         let now = now();
         let existing = self.with_db(|db| db.annotation(&a.id))?;
         if let Some((old, owner)) = &existing {
@@ -118,36 +158,64 @@ impl Library {
         }
         a.modified_at = now;
         self.with_db(|db| db.save_annotation(&a, &profile))?;
-        self.backup_annotations(&book.id)?;
+        self.backup_personal(&book.id)?;
         Ok(a)
     }
 
     pub fn delete_annotation(&self, id: &str) -> Result<()> {
-        let Some((a, _)) = self.with_db(|db| db.annotation(id))? else {
+        let profile = self.profile()?;
+        let Some((a, owner)) = self.with_db(|db| db.annotation(id))? else {
             return Ok(());
         };
+        if owner != profile {
+            return Err(Error::InvalidInput(
+                "that note belongs to someone else".into(),
+            ));
+        }
         self.with_db(|db| db.delete_annotation(id))?;
-        self.backup_annotations(&a.book_id)
+        self.backup_personal(&a.book_id)
     }
 
-    fn backup_annotations(&self, book: &BookId) -> Result<()> {
-        let profile = self.profile();
-        let list = self.with_db(|db| db.annotations(book, &profile))?;
+    /// Writes the signed-in profile's backup for one book: status, rating,
+    /// position and annotations. Guests leave no backups.
+    pub(crate) fn backup_personal(&self, book: &BookId) -> Result<()> {
+        let Some(session) = self.session_info() else {
+            return Ok(());
+        };
+        if !session.kind.keeps_data() {
+            return Ok(());
+        }
+        let profile = session.id;
+        let (state, position, annotations) = self.with_db(|db| {
+            let state = db.book(book, &profile)?.map(|b| b.user);
+            Ok((
+                state,
+                db.position(book, &profile)?,
+                db.annotations(book, &profile)?,
+            ))
+        })?;
         let path = annotations_file(self, &profile, book);
-        if list.is_empty() {
+        let state = state.filter(|s| s != &BookUserState::default());
+        if state.is_none() && position.is_none() && annotations.is_empty() {
             let _ = fs::remove_file(&path);
             return Ok(());
         }
         if let Some(dir) = path.parent() {
             fs::create_dir_all(dir)?;
         }
-        let json = serde_json::to_vec_pretty(&list).map_err(std::io::Error::other)?;
+        let backup = PersonalBackup {
+            format_version: PERSONAL_BACKUP_VERSION,
+            state,
+            position,
+            annotations,
+        };
+        let json = serde_json::to_vec_pretty(&backup).map_err(std::io::Error::other)?;
         write_atomic(&path, &json)?;
         Ok(())
     }
 
-    /// Loads annotation backups for a book that was just added (a rebuilt
-    /// database, or a file restored from the trash).
+    /// Loads every profile's backup for a book that was just added (a
+    /// rebuilt database, or a file restored from the trash).
     pub(crate) fn restore_annotations(&self, book: &BookId) -> Result<usize> {
         let dir = self.layout().data_dir().join("annotations");
         let Ok(profiles) = fs::read_dir(&dir) else {
@@ -162,14 +230,26 @@ impl Library {
             let Ok(text) = fs::read_to_string(&file) else {
                 continue;
             };
-            let Ok(list) = serde_json::from_str::<Vec<Annotation>>(&text) else {
+            let Some(backup) = read_backup(&text) else {
                 continue;
             };
             let known = self.with_db(|db| db.profile_name(&profile))?.is_some();
             if !known {
                 self.with_db(|db| db.insert_profile(&profile, "Restored profile", &now()))?;
             }
-            for mut a in list {
+            if let Some(state) = &backup.state {
+                self.with_db(|db| db.set_user_state(book, &profile, state))?;
+            }
+            if let Some(position) = &backup.position {
+                let progress = backup.state.as_ref().map_or(0.0, |s| s.progress);
+                let opened = backup
+                    .state
+                    .as_ref()
+                    .and_then(|s| s.last_opened.clone())
+                    .unwrap_or_else(now);
+                self.with_db(|db| db.set_position(book, &profile, position, progress, &opened))?;
+            }
+            for mut a in backup.annotations {
                 a.book_id = book.clone();
                 self.with_db(|db| db.save_annotation(&a, &profile))?;
                 restored += 1;
@@ -192,6 +272,11 @@ impl Library {
     }
 
     fn notes_dir_for(&self, profile: &ProfileId) -> Result<PathBuf> {
+        if !self.session_info().is_some_and(|s| s.kind.keeps_data()) {
+            return Err(Error::NotAllowed(
+                "guests cannot keep a notebook; sign in to your own profile".into(),
+            ));
+        }
         let name = self
             .with_db(|db| db.profile_name(profile))?
             .unwrap_or_else(|| "Me".to_owned());
@@ -202,7 +287,7 @@ impl Library {
 
     /// The current profile's notebook for a book, created on first use.
     pub fn notebook(&self, book: &BookId) -> Result<Notebook> {
-        let profile = self.profile();
+        let profile = self.profile()?;
         let book = self.book(book)?;
         if let Some(rel) = self.with_db(|db| db.notebook_path(&book.id, &profile))? {
             if let Some(path) = self.layout().resolve_relative(&rel) {
@@ -274,14 +359,14 @@ impl Library {
 
     /// The tabs that were open, as saved by the interface (JSON).
     pub fn session(&self) -> Result<Option<String>> {
-        let key = format!("session:{}", self.profile());
+        let key = format!("session:{}", self.profile()?);
         self.with_db(|db| db.meta_get(&key))
     }
 
     pub fn save_session(&self, json: &str) -> Result<()> {
         serde_json::from_str::<serde_json::Value>(json)
             .map_err(|_| Error::InvalidInput("the session is not valid JSON".into()))?;
-        let key = format!("session:{}", self.profile());
+        let key = format!("session:{}", self.profile()?);
         self.with_db(|db| db.meta_set(&key, json))
     }
 }

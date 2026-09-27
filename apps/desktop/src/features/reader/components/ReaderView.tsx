@@ -10,14 +10,19 @@ import {
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { useBook } from "@/features/library";
+import { useBook, useLibraryView } from "@/features/library";
+import { useProfilePrefs } from "@/features/profiles";
 import { bookUrl, commands, type Annotation, type HighlightColor } from "@/lib/ipc";
-import { DEFAULT_SHORTCUTS, displayKeys, platform, useShortcut } from "@/lib/shortcuts";
+import { keysLabel, platform, shortcutFor, useShortcut, type ActionId } from "@/lib/shortcuts";
 import { useTabs, type BookTab } from "@/lib/tabs";
+import { cn } from "@/lib/utils";
 import {
   createRenderer,
+  PAGE_THEMES,
   pageTheme,
   parseLocator,
+  type Locator,
+  type PdfDarkMode,
   type ReaderLocation,
   type Renderer,
   type SelectionInfo,
@@ -42,8 +47,7 @@ import { AnnotationMenu, SelectionMenu } from "./Popovers";
 import "@/readers/reader.css";
 import "katex/dist/katex.min.css";
 
-const keys = (id: keyof typeof DEFAULT_SHORTCUTS) =>
-  displayKeys(DEFAULT_SHORTCUTS[id], platform).join(platform === "mac" ? "" : "+");
+const keys = (id: ActionId) => keysLabel(shortcutFor(id), platform);
 
 const PDF_STEPS = [0.5, 0.67, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4];
 const TEXT_STEPS = [0.8, 0.9, 1, 1.1, 1.2, 1.35, 1.5, 1.7, 2];
@@ -83,6 +87,7 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
   const saveAnnotation = useSaveAnnotation(bookId);
   const deleteAnnotation = useDeleteAnnotation(bookId);
   const prefs = useReaderPrefs();
+  const profilePrefs = useProfilePrefs((s) => s.prefs);
   const appDark = useAppDark();
   const openTab = useTabs((s) => s.open);
   const clearJump = useTabs((s) => s.clearJump);
@@ -100,6 +105,14 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
   const [notebookOpen, setNotebookOpen] = useState(false);
   const [notebookInsert, setNotebookInsert] = useState<string | null>(null);
   const [findOpen, setFindOpen] = useState(false);
+  const [findStep, setFindStep] = useState<{ backwards: boolean; seq: number }>({
+    backwards: false,
+    seq: 0,
+  });
+  const [lastQuery, setLastQuery] = useState("");
+  const [focusMode, setFocusMode] = useState(false);
+  // Jumps made from the app (contents, marks, links) can be undone with Back.
+  const history = useRef<{ back: Locator[]; forward: Locator[] }>({ back: [], forward: [] });
   const [zoom, setZoom] = useState<ZoomValue>(1);
   const [pageInput, setPageInput] = useState("");
   const pageInputRef = useRef<HTMLInputElement>(null);
@@ -188,13 +201,17 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
           externalLink: (href) => linkRef.current(href),
         });
         if (cancelled) return;
-        await renderer.open(host, bookUrl(relPath), parseLocator(position.data));
+        const resume = useProfilePrefs.getState().prefs.reader.resume;
+        await renderer.open(host, bookUrl(relPath), resume ? parseLocator(position.data) : null);
         if (cancelled) {
           renderer.destroy();
           return;
         }
         rendererRef.current = renderer;
         openedRef.current = true;
+        const { reader } = useProfilePrefs.getState().prefs;
+        renderer.setLineHeight(reader.lineHeight);
+        if (!renderer.paged && reader.fontScale !== 100) renderer.setZoom(reader.fontScale / 100);
         setToc(renderer.toc());
         setZoom(renderer.zoom());
         setStatus("ready");
@@ -234,8 +251,15 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
   // Keep the tab title in step with the book's details.
   const rename = useTabs((s) => s.rename);
   useEffect(() => {
-    if (book && book.metadata.title !== tab.title) rename(bookId, book.metadata.title);
-  }, [book, bookId, rename, tab.title]);
+    if (book && (book.metadata.title !== tab.title || book.fileType !== tab.fileType)) {
+      rename(bookId, book.metadata.title, book.fileType);
+    }
+  }, [book, bookId, rename, tab.title, tab.fileType]);
+
+  // Line spacing follows Settings › Reader.
+  useEffect(() => {
+    if (status === "ready") rendererRef.current?.setLineHeight(profilePrefs.reader.lineHeight);
+  }, [profilePrefs.reader.lineHeight, status]);
 
   const r = () => rendererRef.current;
   const isPdf = fileType === "pdf";
@@ -316,7 +340,71 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
 
   const addToNotebook = (a: Annotation) => {
     setNotebookOpen(true);
-    setNotebookInsert(quoteBlock(a, bookId, location?.shortLabel ?? ""));
+    const block = quoteBlock(a, bookId, location?.shortLabel ?? "");
+    setNotebookInsert(
+      profilePrefs.notes.linkQuotes
+        ? block
+        : block
+            .split("\n")
+            .filter((l) => !l.startsWith("> —"))
+            .join("\n")
+            .replace(/>\n\n/, "\n"),
+    );
+  };
+
+  /** Goes somewhere from the app, remembering where we were for Back. */
+  const jump = (go: () => Promise<void> | void) => {
+    if (location) {
+      history.current.back.push(location.locator);
+      history.current.forward = [];
+    }
+    void go();
+  };
+  const travel = (from: "back" | "forward") => {
+    const h = history.current;
+    const target = h[from].pop();
+    if (!target) return;
+    if (location) h[from === "back" ? "forward" : "back"].push(location.locator);
+    void r()?.goTo(target);
+  };
+
+  const flatToc = useMemo(() => {
+    const out: TocItem[] = [];
+    const walk = (items: TocItem[]) =>
+      items.forEach((i) => {
+        out.push(i);
+        walk(i.children);
+      });
+    walk(toc);
+    return out;
+  }, [toc]);
+  const chapter = (dir: 1 | -1) => {
+    if (!flatToc.length) return dir > 0 ? r()?.next() : r()?.prev();
+    const i = flatToc.findIndex((t) => t.label === location?.section);
+    const next = flatToc[i < 0 ? (dir > 0 ? 0 : flatToc.length - 1) : i + dir];
+    if (next) jump(() => r()?.goTo(next.target));
+  };
+  const nextHighlight = (dir: 1 | -1) => {
+    const here = location?.progress ?? 0;
+    const list = annotations
+      .filter((a) => a.kind === "highlight")
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    const target =
+      dir > 0
+        ? list.find((a) => (a.position ?? 0) > here + 0.0005)
+        : [...list].reverse().find((a) => (a.position ?? 0) < here - 0.0005);
+    if (target) jump(() => r()?.showAnnotation(target));
+    else toast(dir > 0 ? "No more highlights after this page" : "No highlights before this page");
+  };
+  const cycleTheme = () => {
+    const ids = PAGE_THEMES.map((t) => t.id);
+    const next = ids[(ids.indexOf(prefs.theme) + 1) % ids.length]!;
+    prefs.set({ theme: next, followApp: false });
+    toast(`Page theme: ${pageTheme(next).name}`);
+  };
+  const cyclePdfMode = () => {
+    const modes: PdfDarkMode[] = ["recolour", "invert", "dim", "off"];
+    prefs.set({ pdfMode: modes[(modes.indexOf(prefs.pdfMode) + 1) % modes.length]! });
   };
 
   const goToPage = () => {
@@ -332,14 +420,61 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
   useShortcut("reader.pageDown", () => r()?.next());
   useShortcut("reader.pageUp", () => r()?.prev());
   useShortcut("reader.space", () => r()?.next());
+  useShortcut("reader.spaceBack", () => r()?.prev());
+  useShortcut("reader.scrollDown", () => r()?.scrollBy(1));
+  useShortcut("reader.scrollUp", () => r()?.scrollBy(-1));
+  useShortcut("reader.start", () => jump(() => r()?.start()));
+  useShortcut("reader.end", () => jump(() => r()?.end()));
+  useShortcut("reader.nextChapter", () => chapter(1));
+  useShortcut("reader.previousChapter", () => chapter(-1));
+  useShortcut("reader.back", () => travel("back"));
+  useShortcut("reader.forward", () => travel("forward"));
   useShortcut("reader.find", () => setFindOpen(true));
+  const findAgain = (backwards: boolean) => {
+    setFindOpen(true);
+    setFindStep((s) => ({ backwards, seq: s.seq + 1 }));
+  };
+  useShortcut("reader.findNext", () => findAgain(false));
+  useShortcut("reader.findPrevious", () => findAgain(true));
   useShortcut("reader.zoomIn", () => changeZoom(1));
   useShortcut("reader.zoomOut", () => changeZoom(-1));
   useShortcut("reader.zoomReset", () => changeZoom(0));
+  useShortcut("reader.fitWidth", () => {
+    if (!isPdf) return;
+    r()?.setZoom("page-width");
+    setZoom(r()?.zoom() ?? 1);
+  });
+  useShortcut("reader.fitPage", () => {
+    if (!isPdf) return;
+    r()?.setZoom("page-fit");
+    setZoom(r()?.zoom() ?? 1);
+  });
   useShortcut("reader.goToPage", () => pageInputRef.current?.focus());
   useShortcut("reader.bookmark", toggleBookmark);
   useShortcut("reader.contents", () => setLeft((p) => (p ? null : lastLeft)));
   useShortcut("reader.notebook", () => setNotebookOpen((o) => !o));
+  useShortcut("reader.themeNext", cycleTheme);
+  useShortcut("reader.pdfModeNext", cyclePdfMode);
+  useShortcut("reader.focusMode", () => setFocusMode((f) => !f));
+  useShortcut("reader.details", () => {
+    useTabs.getState().activate(null);
+    useLibraryView.getState().setSelection([bookId]);
+    useLibraryView.getState().setDetailsOpen(true);
+  });
+  useShortcut("reader.highlight", () => highlightFromSelection(profilePrefs.notes.defaultColor));
+  useShortcut("reader.comment", () => {
+    const sel = selection;
+    if (sel) {
+      highlightFromSelection(profilePrefs.notes.defaultColor, (saved) =>
+        setMenu({ id: saved.id, rect: sel.rect, edit: true }),
+      );
+    }
+  });
+  useShortcut("reader.addToNotebook", () =>
+    highlightFromSelection(profilePrefs.notes.defaultColor, addToNotebook),
+  );
+  useShortcut("reader.nextHighlight", () => nextHighlight(1));
+  useShortcut("reader.previousHighlight", () => nextHighlight(-1));
 
   // Save the place as soon as the user switches to another tab.
   useEffect(() => {
@@ -364,7 +499,9 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* Toolbar */}
-      <div className="flex h-11 shrink-0 items-center gap-1 border-b px-2">
+      <div
+        className={cn("flex h-11 shrink-0 items-center gap-1 border-b px-2", focusMode && "hidden")}
+      >
         <Button
           variant="ghost"
           size="icon"
@@ -436,7 +573,7 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
       </div>
 
       <div className="flex min-h-0 flex-1">
-        {left && (
+        {left && !focusMode && (
           <ContentsPanel
             panel={left}
             setPanel={(p) => {
@@ -446,14 +583,34 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
             toc={toc}
             section={location?.section}
             annotations={annotations}
-            onGo={(target) => void r()?.goTo(target)}
-            onShow={(a) => void r()?.showAnnotation(a)}
+            onGo={(target) => jump(() => r()?.goTo(target))}
+            onShow={(a) => jump(() => r()?.showAnnotation(a))}
             onDelete={(a) => deleteAnnotation.mutate(a.id)}
           />
         )}
 
         <div className="relative min-w-0 flex-1" style={{ background: theme.surround }}>
-          <div ref={hostRef} className="absolute inset-0" />
+          <div
+            ref={hostRef}
+            className="absolute inset-0"
+            style={
+              profilePrefs.reader.brightness !== 100 || profilePrefs.reader.contrast !== 100
+                ? {
+                    filter: `brightness(${profilePrefs.reader.brightness / 100}) contrast(${profilePrefs.reader.contrast / 100})`,
+                  }
+                : undefined
+            }
+          />
+          {focusMode && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="absolute top-3 right-4 z-10 opacity-40 hover:opacity-100 focus-visible:opacity-100"
+              onClick={() => setFocusMode(false)}
+            >
+              Show toolbar
+            </Button>
+          )}
           {status === "loading" && (
             <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
               Opening…
@@ -471,6 +628,9 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
           )}
           {findOpen && (
             <FindBar
+              step={findStep}
+              initialQuery={lastQuery}
+              onQuery={setLastQuery}
               onFind={(q, back) => r()?.find(q, back) ?? Promise.resolve({ current: 0, total: 0 })}
               onClose={() => {
                 setFindOpen(false);
@@ -480,7 +640,7 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
           )}
         </div>
 
-        {notebookOpen && (
+        {notebookOpen && !focusMode && (
           <NotebookPanel
             bookId={bookId}
             insert={notebookInsert}
@@ -492,7 +652,12 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
       </div>
 
       {/* Status bar */}
-      <div className="flex h-7 shrink-0 items-center gap-3 border-t px-3 text-[11.5px] text-muted-foreground">
+      <div
+        className={cn(
+          "flex h-7 shrink-0 items-center gap-3 border-t px-3 text-[11.5px] text-muted-foreground",
+          focusMode && "hidden",
+        )}
+      >
         <span className="tabular-nums">{location?.label ?? ""}</span>
         <div className="h-1 max-w-64 flex-1 overflow-hidden rounded-full bg-muted" aria-hidden>
           <div
@@ -514,11 +679,11 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
           rect={selection.rect}
           onHighlight={(c) => highlightFromSelection(c)}
           onComment={() =>
-            highlightFromSelection("yellow", (saved) =>
+            highlightFromSelection(profilePrefs.notes.defaultColor, (saved) =>
               setMenu({ id: saved.id, rect: selection.rect, edit: true }),
             )
           }
-          onNotebook={() => highlightFromSelection("yellow", addToNotebook)}
+          onNotebook={() => highlightFromSelection(profilePrefs.notes.defaultColor, addToNotebook)}
           onCopy={() => {
             void navigator.clipboard.writeText(selection.quote.exact ?? "");
             r()?.clearSelection();

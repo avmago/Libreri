@@ -4,7 +4,7 @@ A local-first library for PDFs, ebooks, Markdown, comics, DjVu and audiobooks �
 
 Your library is an ordinary folder: books stay as plain files, notes are Markdown, and everything can be exported and moved to another computer with every link intact.
 
-> **Status:** Phase 2 (reader) — read PDF, EPUB, MOBI, AZW3, FB2, comics (CBZ), Markdown with maths and plain text in tabs, with highlights, comments, bookmarks and a Markdown notebook per book. Profiles and settings arrive in Phase 3. See [docs/development-phases.md](docs/development-phases.md).
+> **Status:** Phase 3 (profiles, organising and settings) — read PDF, EPUB, MOBI, AZW3, FB2, comics (CBZ), Markdown with maths and plain text in tabs, split view and separate windows, with highlights, comments, bookmarks and a Markdown notebook per book. Several people can share a library with their own profiles and 6-digit PINs; bulk edit, tag and category tidying, smart collections, a Notes hub, full Settings and over 100 rebindable shortcuts (Ctrl+/ lists them). Online book details and export arrive in Phase 4. See [docs/development-phases.md](docs/development-phases.md).
 
 ## Run it
 
@@ -40,7 +40,8 @@ apps/desktop/src        React UI, one folder per feature; readers/ holds the boo
 apps/desktop/src-tauri  Thin Tauri shell: commands, events, book:// protocol
 crates/libreri-core     Domain types, IDs, library layout (no dependencies on the app)
 crates/libreri-db       SQLite and migrations
-crates/libreri-library  Library folders: import, folders, scan, watcher, sidecars
+crates/libreri-library  Library folders: import, folders, scan, watcher, sidecars, profiles, notes
+crates/libreri-profiles 6-digit PINs (Argon2), lockout and recovery codes
 crates/libreri-formats  Reads details and covers from PDF, EPUB, Markdown, FB2, CBZ
 crates/libreri-thumbs   Covers and grid thumbnails
 crates/libreri-jobs     Background job queue with progress and cancel

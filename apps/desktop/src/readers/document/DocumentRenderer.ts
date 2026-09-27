@@ -254,6 +254,22 @@ export class DocumentRenderer implements Renderer {
     this.scroller.scrollBy({ top: -this.scroller.clientHeight * 0.9, behavior: "smooth" });
   }
 
+  scrollBy(direction: 1 | -1) {
+    this.scroller.scrollBy({ top: direction * 60, behavior: "smooth" });
+  }
+
+  async start() {
+    await this.goTo({ type: "scroll", fraction: 0 });
+  }
+
+  async end() {
+    await this.goTo({ type: "scroll", fraction: 1 });
+  }
+
+  setLineHeight(lineHeight: number) {
+    this.scroller.style.setProperty("--page-line-height", String(lineHeight));
+  }
+
   /** Where an annotation's text is now: its offsets, or its quote. */
   private resolve(a: Annotation): [number, number] | null {
     const all = this.article.textContent ?? "";

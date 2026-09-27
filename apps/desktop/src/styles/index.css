@@ -64,3 +64,55 @@
     }
   }
 }
+
+@keyframes lb-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-8px);
+  }
+  40%,
+  80% {
+    transform: translateX(8px);
+  }
+}
+
+/* Shelf view: a board under every row of books (board 9). */
+.lb-shelves {
+  --shelf: color-mix(in srgb, var(--foreground) 12%, var(--background));
+  --shelf-edge: color-mix(in srgb, var(--foreground) 22%, var(--background));
+  background-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 214px,
+    var(--shelf) 214px,
+    var(--shelf) 226px,
+    var(--shelf-edge) 226px,
+    var(--shelf-edge) 228px,
+    transparent 228px
+  );
+  background-size: 100% 236px;
+  border-radius: 4px;
+}
+
+/* Printing the shortcut cheat sheet prints only the sheet. */
+@media print {
+  body:has(.lb-print-sheet) #root {
+    display: none;
+  }
+  .lb-print-sheet {
+    position: static !important;
+    transform: none !important;
+    max-height: none !important;
+    width: auto !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+  [data-radix-portal] > div:first-child,
+  .lb-print-sheet [aria-label="Close"] {
+    display: none !important;
+  }
+}

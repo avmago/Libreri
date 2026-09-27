@@ -58,6 +58,10 @@ fn serve(app: &AppHandle, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
     let Ok(relative) = percent_decode(raw) else {
         return status(StatusCode::BAD_REQUEST);
     };
+    // Only books the signed-in profile may see, and covers.
+    if !library.may_open(&relative) {
+        return status(StatusCode::FORBIDDEN);
+    }
     let Some(path) = library.layout().resolve_relative(&relative) else {
         return status(StatusCode::FORBIDDEN);
     };

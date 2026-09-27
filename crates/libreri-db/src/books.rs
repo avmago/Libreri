@@ -114,6 +114,31 @@ fn like_escape(s: &str) -> String {
         .replace('_', "\\_")
 }
 
+/// SQL condition on `b` limiting books to `within` folders (relative to
+/// `Books/`). Empty means no limit. Values are quoted inline because this
+/// is reused in several statements with their own parameters.
+fn scope_sql(within: &[String]) -> String {
+    if within.is_empty() {
+        return "1=1".to_owned();
+    }
+    let parts: Vec<String> = within
+        .iter()
+        .map(|f| {
+            let f = f.trim_matches('/');
+            let prefix = if f.is_empty() {
+                "Books/".to_owned()
+            } else {
+                format!("Books/{f}/")
+            };
+            format!(
+                "b.rel_path LIKE '{}%' ESCAPE '\\'",
+                like_escape(&prefix).replace('\'', "''")
+            )
+        })
+        .collect();
+    format!("({})", parts.join(" OR "))
+}
+
 fn write_metadata(tx: &Transaction<'_>, id: &str, m: &BookMetadata) -> Result<()> {
     tx.execute(
         "UPDATE books SET title=?2, sort_title=?3, subtitle=?4, authors=?5, sort_author=?6,
@@ -283,7 +308,7 @@ impl Database {
 
     /// Books matching `q`, in the requested order.
     pub fn query_books(&self, q: &BookQuery, profile: &ProfileId) -> Result<Vec<Book>> {
-        let mut sql = format!("{SELECT} WHERE 1=1");
+        let mut sql = format!("{SELECT} WHERE {}", scope_sql(&q.within_folders));
         let mut args: Vec<Value> = vec![Value::Text(profile.to_string())];
         let arg = |v: Value, args: &mut Vec<Value>| {
             args.push(v);
@@ -531,8 +556,9 @@ impl Database {
     }
 
     /// Counts for the sidebar and filters.
-    pub fn facets(&self, profile: &ProfileId) -> Result<Facets> {
+    pub fn facets(&self, profile: &ProfileId, within: &[String]) -> Result<Facets> {
         let p = profile.to_string();
+        let scope = scope_sql(within);
         let audio = FileType::ALL
             .iter()
             .filter(|t| t.is_audio())
@@ -548,7 +574,8 @@ impl Database {
                     SUM(COALESCE(u.favorite,0) = 1),
                     SUM(b.file_type IN ({audio})),
                     SUM(b.missing = 1)
-                 FROM books b LEFT JOIN book_user u ON u.book_id=b.id AND u.profile_id=?1"
+                 FROM books b LEFT JOIN book_user u ON u.book_id=b.id AND u.profile_id=?1
+                 WHERE {scope}"
             ),
             [&p],
             |r| {
@@ -573,60 +600,32 @@ impl Database {
             let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get::<_, i64>(1)? as u32)))?;
             Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
         };
-        f.file_types = pairs(
-            "SELECT file_type, COUNT(*) FROM books GROUP BY file_type ORDER BY COUNT(*) DESC",
-        )?
+        f.file_types = pairs(&format!(
+            "SELECT file_type, COUNT(*) FROM books b WHERE {scope}
+             GROUP BY file_type ORDER BY COUNT(*) DESC"
+        ))?
         .into_iter()
         .filter_map(|(t, n)| FileType::parse(&t).map(|t| (t, n)))
         .collect();
-        f.content_types = pairs(
-            "SELECT content_type, COUNT(*) FROM books GROUP BY content_type
-             ORDER BY COUNT(*) DESC",
-        )?
+        f.content_types = pairs(&format!(
+            "SELECT content_type, COUNT(*) FROM books b WHERE {scope} GROUP BY content_type
+             ORDER BY COUNT(*) DESC"
+        ))?
         .into_iter()
         .filter_map(|(t, n)| ContentType::parse(&t).map(|t| (t, n)))
         .collect();
-        f.tags = pairs(
+        f.tags = pairs(&format!(
             "SELECT t.name, COUNT(*) FROM tags t JOIN book_tags bt ON bt.tag_id = t.id
-             GROUP BY t.id ORDER BY COUNT(*) DESC, t.name COLLATE NOCASE",
-        )?;
-        f.categories = pairs(
+             JOIN books b ON b.id = bt.book_id WHERE {scope}
+             GROUP BY t.id ORDER BY COUNT(*) DESC, t.name COLLATE NOCASE"
+        ))?;
+        f.categories = pairs(&format!(
             "SELECT c.path, COUNT(*) FROM categories c
              JOIN book_categories bc ON bc.category_id = c.id
-             GROUP BY c.id ORDER BY c.path COLLATE NOCASE",
-        )?;
+             JOIN books b ON b.id = bc.book_id WHERE {scope}
+             GROUP BY c.id ORDER BY c.path COLLATE NOCASE"
+        ))?;
         Ok(f)
-    }
-
-    /// Adds a profile with a known id (used when rebuilding the database).
-    pub fn insert_profile(&self, id: &ProfileId, name: &str, now: &str) -> Result<()> {
-        self.conn.execute(
-            "INSERT OR IGNORE INTO profiles(id, name, is_owner, created_at) VALUES (?1, ?2, 1, ?3)",
-            params![id.to_string(), name, now],
-        )?;
-        Ok(())
-    }
-
-    /// Returns the first profile, creating an owner profile called `name` in
-    /// an empty library. Phase 3 adds choosing between profiles.
-    pub fn ensure_owner_profile(&self, name: &str, now: &str) -> Result<ProfileId> {
-        let existing: Option<String> = self
-            .conn
-            .query_row(
-                "SELECT id FROM profiles ORDER BY is_owner DESC, created_at LIMIT 1",
-                [],
-                |r| r.get(0),
-            )
-            .optional()?;
-        if let Some(id) = existing.and_then(|s| s.parse().ok()) {
-            return Ok(id);
-        }
-        let id = ProfileId::new();
-        self.conn.execute(
-            "INSERT INTO profiles(id, name, is_owner, created_at) VALUES (?1, ?2, 1, ?3)",
-            params![id.to_string(), name, now],
-        )?;
-        Ok(id)
     }
 }
 
@@ -684,7 +683,10 @@ mod tests {
         assert!(db.update_metadata(&b.id, &m, NOW).unwrap());
         let got = db.book(&b.id, &p).unwrap().unwrap();
         assert_eq!(got.metadata.tags, vec!["physics"]);
-        assert_eq!(db.facets(&p).unwrap().tags, vec![("physics".into(), 1)]);
+        assert_eq!(
+            db.facets(&p, &[]).unwrap().tags,
+            vec![("physics".into(), 1)]
+        );
         assert!(!db.update_metadata(&hex(9), &m, NOW).unwrap());
     }
 
@@ -773,7 +775,7 @@ mod tests {
         assert_eq!(db.book(&b.id, &p).unwrap().unwrap().user.rating, 4);
         let other = ProfileId::new();
         assert_eq!(db.book(&b.id, &other).unwrap().unwrap().user.rating, 0);
-        let f = db.facets(&p).unwrap();
+        let f = db.facets(&p, &[]).unwrap();
         assert_eq!((f.total, f.reading, f.favorites), (1, 1, 1));
         let reading = db
             .query_books(
@@ -830,6 +832,6 @@ mod tests {
 
         db.delete_book(&hex(7)).unwrap();
         assert_eq!(db.book_count().unwrap(), 1);
-        assert!(db.facets(&p).unwrap().tags.is_empty());
+        assert!(db.facets(&p, &[]).unwrap().tags.is_empty());
     }
 }

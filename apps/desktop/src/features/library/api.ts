@@ -3,6 +3,7 @@ import {
   commands,
   unwrap,
   type BookMetadata,
+  type BulkEdit,
   type BookQuery,
   type BookUserState,
   type ImportModeDto,
@@ -146,3 +147,36 @@ export const useImportPaths = () =>
       mode: ImportModeDto;
     }) => unwrap(commands.importPaths(paths, folder, mode)),
   });
+
+export const useBulkEdit = () =>
+  useLibMutation(({ ids, edit }: { ids: string[]; edit: BulkEdit }) =>
+    unwrap(commands.bulkEditBooks(ids, edit)),
+  );
+
+// ---- Smart collections (per profile) ---------------------------------------
+
+const collectionsKey = [...libKey, "collections"] as const;
+
+export function useCollections() {
+  return useQuery({
+    queryKey: collectionsKey,
+    queryFn: () => unwrap(commands.listCollections()),
+  });
+}
+
+export function useSaveCollection() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, name, query }: { id?: string; name: string; query: BookQuery }) =>
+      unwrap(commands.saveCollection(id ?? "", name, query)),
+    onSettled: () => qc.invalidateQueries({ queryKey: collectionsKey }),
+  });
+}
+
+export function useDeleteCollection() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => unwrap(commands.deleteCollection(id)),
+    onSettled: () => qc.invalidateQueries({ queryKey: collectionsKey }),
+  });
+}

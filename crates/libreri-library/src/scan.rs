@@ -112,7 +112,7 @@ impl Library {
                 sidecar::rename(self.layout(), &rec.id, &id);
                 covers::rename(self.layout(), &rec.id, &id);
                 self.rename_annotation_backups(&rec.id, &id);
-                if let Ok(book) = self.book(&id) {
+                if let Ok(book) = self.record(&id) {
                     sidecar::write(self.layout(), &book)?;
                 }
                 report.changed += 1;
@@ -149,7 +149,7 @@ impl Library {
                         db.set_book_path(&existing, &f.rel)?;
                         db.set_file_stamp(&existing, f.size, f.mtime)
                     })?;
-                    if let Ok(book) = self.book(&existing) {
+                    if let Ok(book) = self.record(&existing) {
                         sidecar::write(self.layout(), &book)?;
                     }
                     if was_missing {
@@ -192,6 +192,7 @@ impl Library {
     /// Rebuilds the database from the book files and JSON sidecars. The old
     /// database is kept next to it as `library.db.bak`.
     pub fn rebuild_index(&self, progress: &dyn Progress) -> Result<ScanReport> {
+        self.require_edit()?;
         {
             let _busy = self.busy();
             let mut guard = self.db.lock().unwrap_or_else(|p| p.into_inner());
@@ -208,8 +209,13 @@ impl Library {
             let db = libreri_db::Database::open(&path)?;
             db.meta_set("library_id", &self.info().id.to_string())?;
             db.meta_set("name", &self.info().name)?;
-            // Keep the same owner so personal data in later phases still matches.
-            db.insert_profile(&self.profile(), "Owner", &now())?;
+            // Bring back profiles (and their PINs) from their backups; keep
+            // whoever is signed in even if their backup is missing.
+            self.restore_profiles(&db)?;
+            if let Some(s) = self.session_info() {
+                db.insert_profile(&s.id, "Owner", &now())?;
+            }
+            db.ensure_owner_profile("Owner", &now())?;
             *guard = Some(db);
         }
         self.scan(progress)

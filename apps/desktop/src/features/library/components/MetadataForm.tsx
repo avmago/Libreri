@@ -4,13 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import type { ContentType } from "@/lib/ipc";
-import { DEFAULT_SHORTCUTS, useShortcut } from "@/lib/shortcuts";
+import { useShortcut } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import { CONTENT_TYPE_LABEL, type BookView, type EMPTY_METADATA } from "../model";
 
 type Metadata = typeof EMPTY_METADATA;
 
-function Field({
+export function Field({
   label,
   children,
   className,
@@ -31,7 +31,7 @@ function Field({
  * A list typed as chips: Enter or comma adds, Backspace on an empty field
  * removes the last one. Used for authors, tags and categories.
  */
-function ListInput({
+export function ListInput({
   value,
   onChange,
   placeholder,
@@ -283,7 +283,7 @@ export function MetadataForm({
         <Button type="button" variant="ghost" onClick={onCancel}>
           Cancel
         </Button>
-        <Kbd className="ml-auto" shortcut={DEFAULT_SHORTCUTS["details.save"]} />
+        <Kbd className="ml-auto" action="details.save" />
       </div>
     </form>
   );

@@ -72,6 +72,13 @@ export interface Renderer {
   goTo(target: string | Locator): Promise<void>;
   next(): void;
   prev(): void;
+  /** Scrolls a little (arrow keys, Vim j/k); paged books turn the page. */
+  scrollBy(direction: 1 | -1): void;
+  /** Goes to the first or last page. */
+  start(): Promise<void>;
+  end(): Promise<void>;
+  /** Line spacing for reflowable text (ignored by PDFs and comics). */
+  setLineHeight(lineHeight: number): void;
   /** Draws these highlights (replaces the previous set). */
   setAnnotations(list: Annotation[]): void;
   /** Scrolls to an annotation. */

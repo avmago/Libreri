@@ -31,7 +31,7 @@ libreri/
 │  ├─ libreri-thumbs      thumbnails, covers
 │  ├─ libreri-metadata    providers (openlibrary, googlebooks, crossref, openalex, semanticscholar, arxiv, comicvine, isbndb-optional) + merge
 │  ├─ libreri-annotations highlights, comments, ink, voice notes, links, anchors
-│  ├─ libreri-profiles    profiles, 6-digit PIN (Argon2), permissions, keychain
+│  ├─ libreri-profiles    6-digit PIN rules, Argon2 hashing, lockout, recovery codes
 │  ├─ libreri-search      full-text index
 │  ├─ libreri-export      exporters + importers
 │  ├─ libreri-pdf-edit    page ops, redaction, compare, versions
@@ -68,7 +68,7 @@ libreri/
 4. TanStack Query for data from Rust; Zustand for view state only.
 5. Features import each other only via `index.ts`.
 6. One `Error` enum per crate (thiserror); typed IPC errors with plain-language messages.
-7. Personal data methods take an explicit `ProfileId`; no hidden current-user global.
+7. Personal data methods in `libreri-db` take an explicit `ProfileId`; there is no global current user. The signed-in profile belongs to the open `Library` session so the interface cannot read someone else's data by passing their id (ADR 0010).
 8. Optional capabilities (OCR, handwriting, dictation, maths) are cargo features; models load at runtime.
 9. Tests next to code (crate unit tests, Vitest), plus e2e for import/open/highlight/export.
 10. rustfmt, clippy -D warnings, ESLint + Prettier, Conventional Commits, ADRs in `docs/adr`.

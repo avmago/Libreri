@@ -77,6 +77,7 @@ export class EbookRenderer implements Renderer {
   private tocItems: TocItem[] = [];
   private annotations = new Map<string, Annotation>(); // by CFI
   private scale = 1;
+  private lineHeight = 1.55;
   private theme: PageTheme | null = null;
   private findResults: string[] = [];
   private findIndex = -1;
@@ -245,6 +246,25 @@ export class EbookRenderer implements Renderer {
     void (this.view.book.dir === "rtl" ? this.view.goRight() : this.view.prev());
   }
 
+  /** Pages are turned, not scrolled, so a small step is a page. */
+  scrollBy(direction: 1 | -1) {
+    if (direction > 0) this.next();
+    else this.prev();
+  }
+
+  async start() {
+    await this.view.goToFraction(0);
+  }
+
+  async end() {
+    await this.view.goToFraction(1);
+  }
+
+  setLineHeight(lineHeight: number) {
+    this.lineHeight = lineHeight;
+    if (this.view?.renderer) this.applyStyles();
+  }
+
   setAnnotations(list: Annotation[]) {
     const next = new Map<string, Annotation>();
     for (const a of list) {
@@ -311,7 +331,7 @@ export class EbookRenderer implements Renderer {
       a:link, a:visited { color: ${t.link} !important; }`
           : ""
       }
-      body { line-height: 1.55; hyphens: auto; }
+      body { line-height: ${this.lineHeight}; hyphens: auto; }
       img, svg, video { max-width: 100%; }
     `;
     // Fixed-layout books (comics, some EPUBs) have no reflowable text to style.

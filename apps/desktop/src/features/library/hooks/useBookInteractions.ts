@@ -1,4 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, type MouseEvent, type PointerEvent } from "react";
+import { usePermissions } from "@/features/profiles";
 import { platform } from "@/lib/shortcuts";
 import { startDragOnMove, useDrag } from "../drag";
 import type { BookView } from "../model";
@@ -18,9 +19,10 @@ export interface ItemHandlers {
 
 export function useItemHandlers(books: BookView[]): ItemHandlers {
   const { open } = useBookActions();
-  const latest = useRef({ books, open });
+  const { editLibrary } = usePermissions();
+  const latest = useRef({ books, open, editLibrary });
   useLayoutEffect(() => {
-    latest.current = { books, open };
+    latest.current = { books, open, editLibrary };
   });
 
   return useMemo<ItemHandlers>(
@@ -35,21 +37,27 @@ export function useItemHandlers(books: BookView[]): ItemHandlers {
           .getState()
           .select(id, e.shiftKey ? "range" : toggle ? "toggle" : "replace", ids);
       },
-      pointerDown: (book) =>
-        startDragOnMove(() => {
-          const { selection, setSelection } = useLibraryView.getState();
-          let ids = selection;
-          if (!selection.includes(book.id)) {
-            ids = [book.id];
-            setSelection(ids);
-          }
-          const label =
-            ids.length === 1
-              ? (latest.current.books.find((b) => b.id === ids[0])?.metadata.title ?? "1 book")
-              : `${ids.length} books`;
-          return { kind: "books", ids, label };
-        }),
+      pointerDown: (book) => (e) => {
+        // Only profiles that may change the library can drag books to folders.
+        if (latest.current.editLibrary) dragBooks(book)(e);
+      },
     }),
     [],
   );
+
+  function dragBooks(book: BookView) {
+    return startDragOnMove(() => {
+      const { selection, setSelection } = useLibraryView.getState();
+      let ids = selection;
+      if (!selection.includes(book.id)) {
+        ids = [book.id];
+        setSelection(ids);
+      }
+      const label =
+        ids.length === 1
+          ? (latest.current.books.find((b) => b.id === ids[0])?.metadata.title ?? "1 book")
+          : `${ids.length} books`;
+      return { kind: "books", ids, label };
+    });
+  }
 }

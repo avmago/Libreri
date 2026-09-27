@@ -30,6 +30,12 @@ Requirement (user, 2026-09-27): when the database, metadata and every kind of no
 - Merging into an existing library never duplicates notes (IDs are UUIDs; conflicts resolved by last-modified with a report).
 - Profiles: imported notes attach to the matching profile or a new one; the owner chooses.
 
+## Personal data on disk (Phase 3)
+- Each profile is backed up to `.library-data/profiles/<id>.json` (PIN hashes included, so a rebuild keeps them; exports leave them out) and its smart collections to `<id>.collections.json`.
+- Per book and profile, `.library-data/annotations/<profile>/<book>.json` holds reading status, rating, favourite, progress, position and every highlight, comment and bookmark (format 2; format 1 files with only annotations still load).
+- Notebooks stay Markdown in `Notes/<profile name>/`; renaming a profile renames the folder and notebook links follow. Guests leave nothing on disk.
+- See `docs/adr/0010-profiles-and-pins.md`.
+
 ## Edited PDFs (versions)
 - Page edits create a new version with a **page map** (old page → new page). Anchors are migrated through the map; text-quote fallback catches the rest. Exports include the version history so links to older versions still resolve.
 

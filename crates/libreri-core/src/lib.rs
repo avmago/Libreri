@@ -10,6 +10,8 @@ pub mod ids;
 pub mod isbn;
 pub mod layout;
 pub mod library;
+pub mod organize;
+pub mod profile;
 pub mod query;
 pub mod settings;
 
@@ -18,5 +20,7 @@ pub use book::{Book, BookMetadata, BookUserState, ContentType, FileType, Reading
 pub use ids::{BookId, LibraryId, ProfileId};
 pub use layout::LibraryLayout;
 pub use library::{LibraryInfo, LIBRARY_FORMAT_VERSION};
+pub use organize::BulkEdit;
+pub use profile::{Profile, ProfileKind};
 pub use query::{BookQuery, SortKey};
 pub use settings::{AppSettings, ThemePreference};

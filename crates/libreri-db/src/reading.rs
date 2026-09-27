@@ -93,6 +93,51 @@ impl Database {
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
+    /// Every annotation of a profile, newest first, with the title and
+    /// path of its book (for the Notes hub).
+    pub fn all_annotations(
+        &self,
+        profile: &ProfileId,
+    ) -> Result<Vec<(Annotation, String, String)>> {
+        let cols = ANNOTATION_COLUMNS
+            .split(", ")
+            .map(|c| format!("a.{c}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {cols}, b.title, b.rel_path FROM annotations a
+             JOIN books b ON b.id = a.book_id
+             WHERE a.profile_id = ?1 ORDER BY a.modified_at DESC"
+        ))?;
+        let rows = stmt.query_map([profile.to_string()], |r| {
+            Ok((row_to_annotation(r)?, r.get(13)?, r.get(14)?))
+        })?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    /// Every notebook of a profile: (book id, title, book path, notebook path).
+    pub fn all_notebooks(
+        &self,
+        profile: &ProfileId,
+    ) -> Result<Vec<(BookId, String, String, String)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT n.book_id, b.title, b.rel_path, n.rel_path FROM notebooks n
+             JOIN books b ON b.id = n.book_id WHERE n.profile_id = ?1
+             ORDER BY b.sort_title COLLATE NOCASE",
+        )?;
+        let rows = stmt.query_map([profile.to_string()], |r| {
+            Ok((r.get::<_, String>(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            let (id, title, path, nb) = row?;
+            if let Ok(id) = BookId::from_hex(id) {
+                out.push((id, title, path, nb));
+            }
+        }
+        Ok(out)
+    }
+
     pub fn annotation(&self, id: &str) -> Result<Option<(Annotation, ProfileId)>> {
         Ok(self
             .conn
@@ -168,6 +213,15 @@ impl Database {
             params![book.as_str(), profile.to_string(), rel],
         )?;
         Ok(())
+    }
+
+    /// Rewrites notebook paths starting with `old` (after a profile rename).
+    pub fn move_notebook_paths(&self, profile: &ProfileId, old: &str, new: &str) -> Result<usize> {
+        Ok(self.conn.execute(
+            "UPDATE notebooks SET rel_path = ?3 || substr(rel_path, length(?2) + 1)
+             WHERE profile_id = ?1 AND substr(rel_path, 1, length(?2)) = ?2",
+            params![profile.to_string(), old, new],
+        )?)
     }
 
     pub fn profile_name(&self, profile: &ProfileId) -> Result<Option<String>> {

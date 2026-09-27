@@ -96,6 +96,7 @@ export function BookGrid({
   return (
     <div
       role="listbox"
+      data-shortcuts
       aria-multiselectable
       aria-label="Books"
       data-book-grid

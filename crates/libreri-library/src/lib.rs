@@ -17,7 +17,10 @@ mod covers;
 mod folders;
 mod import;
 mod lock;
+mod notes;
+mod organize;
 mod paths;
+mod profiles;
 mod reading;
 mod scan;
 mod sidecar;
@@ -29,11 +32,22 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
+/// Who is signed in, and what they may see.
+#[derive(Debug, Clone)]
+pub(crate) struct Session {
+    pub id: ProfileId,
+    pub kind: libreri_core::ProfileKind,
+    /// Kids: folders they may open. Unused for other kinds.
+    pub within: Vec<String>,
+}
+
 pub use covers::{cover_rel, thumbnail_rel};
 pub use folders::FolderNode;
 pub use import::{Duplicate, ImportMode, ImportReport, ImportRequest};
 pub use libreri_db::Facets;
 pub use lock::{LibraryLock, LockOwner};
+pub use notes::{NoteEntry, NotebookEntry};
+pub use profiles::{Collection, PinChange};
 pub use reading::Notebook;
 pub use scan::ScanReport;
 pub use watcher::LibraryWatcher;
@@ -71,6 +85,17 @@ pub enum Error {
     Trash(String),
     #[error("cancelled")]
     Cancelled,
+    #[error("nobody is signed in to this library")]
+    SignedOut,
+    #[error("{}", wrong_pin_message(*.attempts_left, *.wait_seconds))]
+    WrongPin {
+        attempts_left: u32,
+        wait_seconds: u64,
+    },
+    #[error("too many wrong PINs. Try again in {}", wait_text(*.0))]
+    PinLocked(u64),
+    #[error("{0}")]
+    NotAllowed(String),
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]
@@ -78,6 +103,31 @@ pub enum Error {
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
+
+/// "30 seconds", "5 minutes", "1 hour".
+fn wait_text(seconds: u64) -> String {
+    let (n, unit) = if seconds >= 3600 {
+        (seconds.div_ceil(3600), "hour")
+    } else if seconds >= 60 {
+        (seconds.div_ceil(60), "minute")
+    } else {
+        (seconds.max(1), "second")
+    };
+    format!("{n} {unit}{}", if n == 1 { "" } else { "s" })
+}
+
+fn wrong_pin_message(attempts_left: u32, wait: u64) -> String {
+    if wait > 0 {
+        format!("wrong PIN. Try again in {}", wait_text(wait))
+    } else if attempts_left <= 2 {
+        format!(
+            "wrong PIN. {attempts_left} {} left before a short wait",
+            if attempts_left == 1 { "try" } else { "tries" }
+        )
+    } else {
+        "wrong PIN".to_owned()
+    }
+}
 
 /// Options for [`Library::open`].
 #[derive(Debug, Clone, Copy, Default)]
@@ -106,7 +156,7 @@ impl Progress for NoProgress {
 pub struct Library {
     layout: LibraryLayout,
     info: LibraryInfo,
-    profile: ProfileId,
+    session: Mutex<Option<Session>>,
     db: Mutex<Option<Database>>,
     lock: Mutex<Option<LibraryLock>>,
     /// Held by imports and scans so they never run at the same time.
@@ -116,6 +166,10 @@ pub struct Library {
 /// Current time as an RFC 3339 string in UTC.
 pub(crate) fn now() -> String {
     chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
+}
+
+fn uuid_nil() -> uuid::Uuid {
+    uuid::Uuid::nil()
 }
 
 fn default_owner_name() -> String {
@@ -167,15 +221,18 @@ impl Library {
         let db = Database::open(&layout.database_path())?;
         db.meta_set("library_id", &info.id.to_string())?;
         db.meta_set("name", &info.name)?;
-        let profile = db.ensure_owner_profile(&default_owner_name(), &now())?;
-        Ok(Self {
+        db.ensure_owner_profile(&default_owner_name(), &now())?;
+        let lib = Self {
             layout,
             info,
-            profile,
+            session: Mutex::new(None),
             db: Mutex::new(Some(db)),
             lock: Mutex::new(Some(lock)),
             busy: Mutex::new(()),
-        })
+        };
+        lib.backup_all_profiles()?;
+        lib.sign_in_if_alone()?;
+        Ok(lib)
     }
 
     /// Returns `true` if `root` looks like a Libreri library.
@@ -191,10 +248,79 @@ impl Library {
         &self.info
     }
 
-    /// The profile personal data is read and written for. Phase 3 lets the
-    /// user pick; until then it is the library owner.
-    pub fn profile(&self) -> ProfileId {
-        self.profile
+    /// The signed-in profile, whose personal data is read and written.
+    pub fn profile(&self) -> Result<ProfileId> {
+        self.session_info().map(|s| s.id).ok_or(Error::SignedOut)
+    }
+
+    pub(crate) fn session_info(&self) -> Option<Session> {
+        self.session
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .clone()
+    }
+
+    pub(crate) fn set_session(&self, session: Option<Session>) {
+        *self.session.lock().unwrap_or_else(|p| p.into_inner()) = session;
+    }
+
+    /// The signed-in profile, or a profile that owns nothing (for internal
+    /// reads that do not depend on who is reading).
+    pub(crate) fn viewer(&self) -> ProfileId {
+        self.session_info()
+            .map(|s| s.id)
+            .unwrap_or(ProfileId(uuid_nil()))
+    }
+
+    /// Refuses unless the signed-in profile may change the shared library.
+    pub(crate) fn require_edit(&self) -> Result<()> {
+        match self.session_info() {
+            None => Err(Error::SignedOut),
+            Some(s) if s.kind.can_edit_library() => Ok(()),
+            Some(_) => Err(Error::NotAllowed(
+                "this profile can read and make notes, but not change the library".into(),
+            )),
+        }
+    }
+
+    /// Folders the signed-in profile is limited to (empty = everything).
+    pub(crate) fn scope(&self) -> Vec<String> {
+        match self.session_info() {
+            Some(s) if s.kind == libreri_core::ProfileKind::Kids => {
+                if s.within.is_empty() {
+                    // Nothing allowed yet: a folder name that cannot exist.
+                    vec!["\u{0}".to_owned()]
+                } else {
+                    s.within
+                }
+            }
+            _ => Vec::new(),
+        }
+    }
+
+    /// True if the signed-in profile may read the file at `rel_path`
+    /// (library-relative) through the `book://` protocol: books it can see,
+    /// covers and thumbnails. Notes, backups and the database are never
+    /// served (notebooks are read through commands that check the profile).
+    pub fn may_open(&self, rel_path: &str) -> bool {
+        if self.session_info().is_none() {
+            return false;
+        }
+        let data = libreri_core::layout::DATA_DIR;
+        if rel_path.starts_with(&format!("{data}/covers/"))
+            || rel_path.starts_with(&format!("{data}/thumbnails/"))
+        {
+            return true;
+        }
+        if !rel_path.starts_with("Books/") {
+            return false;
+        }
+        let scope = self.scope();
+        scope.is_empty()
+            || scope.iter().any(|f| {
+                let f = f.trim_matches('/');
+                f.is_empty() || rel_path.starts_with(&format!("Books/{f}/"))
+            })
     }
 
     /// Runs `f` with the database.
@@ -323,14 +449,14 @@ mod tests {
         let root = dir.path().join("lib");
         let lib = Library::create(&root, Some("Research"), V).unwrap();
         let id = lib.info().id;
-        let profile = lib.profile();
+        let profile = lib.profile().unwrap();
         lib.close().unwrap();
 
         fs::remove_dir_all(root.join("Notes")).unwrap();
         let lib = Library::open(&root, OpenOptions::default()).unwrap();
         assert_eq!(lib.info().id, id);
         assert_eq!(lib.info().name, "Research");
-        assert_eq!(lib.profile(), profile, "owner profile is kept");
+        assert_eq!(lib.profile().unwrap(), profile, "owner profile is kept");
         assert!(root.join("Notes").is_dir());
         lib.close().unwrap();
     }

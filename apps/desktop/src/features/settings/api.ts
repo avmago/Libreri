@@ -22,3 +22,11 @@ export function useForgetRecentLibrary() {
     onSuccess: (settings: SettingsDto) => qc.setQueryData(settingsKey, settings),
   });
 }
+
+export function useSetAccent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (accent: string | null) => unwrap(commands.setAccent(accent)),
+    onSuccess: (settings: SettingsDto) => qc.setQueryData(settingsKey, settings),
+  });
+}

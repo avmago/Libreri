@@ -2,6 +2,8 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef } from "react
 import {
   ArrowDownUp,
   BookOpen,
+  BookmarkPlus,
+  LibraryBig,
   ChevronDown,
   ChevronRight,
   FileUp,
@@ -28,9 +30,11 @@ import {
   menuSeparator,
 } from "@/components/ui/menu";
 import { commands, type SortKey } from "@/lib/ipc";
-import { DEFAULT_SHORTCUTS, displayKeys, platform, useShortcut } from "@/lib/shortcuts";
+import { keysLabel, platform, shortcutFor, useShortcut, type ActionId } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
+import { usePermissions } from "@/features/profiles";
 import { useBooks, useFacets, useFolders, useMoveFolder } from "../api";
+import { useLibraryDialogs } from "../dialogs";
 import type { DragItem } from "../drag";
 import { DragLayer } from "./DragLayer";
 import { pickFilesToImport, pickFolderToImport } from "../import";
@@ -40,11 +44,11 @@ import { CONTENT_TYPE_LABEL, FILE_TYPE_LABEL, SORT_LABEL, type BookView } from "
 import { buildQuery, navTitle, useLibraryView } from "../store";
 import { BookGrid } from "./BookGrid";
 import { BookList } from "./BookList";
+import { BookShelf } from "./BookShelf";
 import { DetailsPanel } from "./DetailsPanel";
 import { findFolder } from "./folderUtils";
 
-const keys = (id: keyof typeof DEFAULT_SHORTCUTS) =>
-  displayKeys(DEFAULT_SHORTCUTS[id], platform).join(platform === "mac" ? "" : "+");
+const keys = (id: ActionId) => keysLabel(shortcutFor(id), platform);
 
 function Breadcrumbs({ path }: { path: string }) {
   const setNav = useLibraryView((s) => s.setNav);
@@ -286,6 +290,7 @@ function ActiveFilters() {
 
 function EmptyState({ filtered, totalBooks }: { filtered: boolean; totalBooks: number }) {
   const clearFilters = useLibraryView((s) => s.clearFilters);
+  const { editLibrary } = usePermissions();
   if (filtered) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 py-20 text-center">
@@ -305,18 +310,24 @@ function EmptyState({ filtered, totalBooks }: { filtered: boolean; totalBooks: n
       <h2 className="text-base font-semibold">
         {totalBooks === 0 ? "No books yet" : "Nothing here yet"}
       </h2>
-      <p className="max-w-sm text-muted-foreground">
-        Drop books or whole folders onto this window, or import them. PDF, EPUB, Markdown, comics,
-        DjVu, FB2, MOBI, text files and audiobooks are all welcome.
-      </p>
-      <div className="flex gap-2">
-        <Button onClick={() => void pickFilesToImport()}>
-          <FileUp /> Import files…
-        </Button>
-        <Button variant="outline" onClick={() => void pickFolderToImport()}>
-          <FolderUp /> Import a folder…
-        </Button>
-      </div>
+      {editLibrary ? (
+        <>
+          <p className="max-w-sm text-muted-foreground">
+            Drop books or whole folders onto this window, or import them. PDF, EPUB, Markdown,
+            comics, DjVu, FB2, MOBI, text files and audiobooks are all welcome.
+          </p>
+          <div className="flex gap-2">
+            <Button onClick={() => void pickFilesToImport()}>
+              <FileUp /> Import files…
+            </Button>
+            <Button variant="outline" onClick={() => void pickFolderToImport()}>
+              <FolderUp /> Import a folder…
+            </Button>
+          </div>
+        </>
+      ) : (
+        <p className="max-w-sm text-muted-foreground">Ask the library's owner to add books here.</p>
+      )}
     </div>
   );
 }
@@ -350,6 +361,14 @@ function useArrowKeys(books: BookView[], columns: () => number) {
     "books.up",
     move((c) => -c),
   );
+  useShortcut(
+    "books.first",
+    move(() => -books.length),
+  );
+  useShortcut(
+    "books.last",
+    move(() => books.length),
+  );
 }
 
 export function LibraryView() {
@@ -376,6 +395,8 @@ export function LibraryView() {
   const actions = useBookActions();
   const moveFolder = useMoveFolder();
   const searchRef = useRef<HTMLInputElement>(null);
+  const { editLibrary } = usePermissions();
+  const dialogs = useLibraryDialogs();
   usePdfCovers(books);
 
   const selected = books.filter((b) => view.selection.includes(b.id));
@@ -397,19 +418,37 @@ export function LibraryView() {
   }, [books]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useShortcut("library.search", () => searchRef.current?.focus());
-  useShortcut("library.import", () => void pickFilesToImport());
-  useShortcut("library.importFolder", () => void pickFolderToImport());
+  useShortcut("library.import", () => editLibrary && void pickFilesToImport());
+  useShortcut("library.importFolder", () => editLibrary && void pickFolderToImport());
   useShortcut("library.refresh", () => void commands.rescanLibrary());
   useShortcut("view.grid", () => view.setView("grid"));
   useShortcut("view.list", () => view.setView("list"));
+  useShortcut("view.shelf", () => view.setView("shelf"));
+  useShortcut("filters.clear", view.clearFilters);
+  useShortcut("collection.save", () => dialogs.setSaveCollection(true));
+  useShortcut("sort.title", () => view.setSort("title"));
+  useShortcut("sort.author", () => view.setSort("author"));
+  useShortcut("sort.added", () => view.setSort("added"));
+  useShortcut("sort.lastOpened", () => view.setSort("lastOpened"));
+  useShortcut("books.bulkEdit", () => editLibrary && dialogs.openBulkEdit(selected));
+  useShortcut("books.markWantToRead", () => actions.setStatus(selected, "wantToRead"));
+  useShortcut("books.markReading", () => actions.setStatus(selected, "reading"));
+  useShortcut("books.markFinished", () => actions.setStatus(selected, "finished"));
+  useShortcut("books.markNone", () => actions.setStatus(selected, "none"));
+  useShortcut("books.rate0", () => actions.setRating(selected, 0));
+  useShortcut("books.rate1", () => actions.setRating(selected, 1));
+  useShortcut("books.rate2", () => actions.setRating(selected, 2));
+  useShortcut("books.rate3", () => actions.setRating(selected, 3));
+  useShortcut("books.rate4", () => actions.setRating(selected, 4));
+  useShortcut("books.rate5", () => actions.setRating(selected, 5));
   useShortcut("details.toggle", view.toggleDetails);
   useShortcut("books.selectAll", () => view.setSelection(books.map((b) => b.id)));
   useShortcut("books.clearSelection", () => view.setSelection([]));
   const only = selected.length === 1 ? selected[0] : undefined;
   useShortcut("books.open", () => only && void actions.open(only));
   useShortcut("books.reveal", () => only && void actions.reveal(only));
-  useShortcut("books.trash", () => void actions.moveToTrash(selected));
-  useShortcut("books.trashMac", () => void actions.moveToTrash(selected));
+  useShortcut("books.trash", () => editLibrary && void actions.moveToTrash(selected));
+  useShortcut("books.trashMac", () => editLibrary && void actions.moveToTrash(selected));
   useShortcut("books.favorite", () => selected.length && actions.toggleFavorite(selected));
   useArrowKeys(books, () => {
     if (view.view === "list") return 1;
@@ -434,7 +473,7 @@ export function LibraryView() {
     [actions, books, moveFolder],
   );
 
-  const Content = view.view === "grid" ? BookGrid : BookList;
+  const Content = view.view === "grid" ? BookGrid : view.view === "shelf" ? BookShelf : BookList;
   const openFolder = (path: string) => view.setNav({ kind: "folder", path });
   const count = books.length;
 
@@ -460,7 +499,12 @@ export function LibraryView() {
                 )}
               </span>
             </div>
-            <ImportMenu />
+            {selected.length > 1 && editLibrary && (
+              <Button variant="outline" size="sm" onClick={() => dialogs.openBulkEdit(selected)}>
+                Edit {selected.length} together…
+              </Button>
+            )}
+            {editLibrary && <ImportMenu />}
             <Button
               variant="ghost"
               size="icon"
@@ -494,11 +538,21 @@ export function LibraryView() {
                 className="h-8 w-full rounded-md border border-input bg-background pr-14 pl-8 text-[13px] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20"
               />
               <Kbd
-                shortcut={DEFAULT_SHORTCUTS["library.search"]}
+                action="library.search"
                 className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2"
               />
             </div>
             <div className="flex-1" />
+            {(filtered || view.nav.kind === "tag" || view.nav.kind === "category") && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => dialogs.setSaveCollection(true)}
+                title={`Save as a smart collection (${keys("collection.save")})`}
+              >
+                <BookmarkPlus /> Save search
+              </Button>
+            )}
             <FilterMenu />
             <SortMenu />
             <div className="flex rounded-md border p-0.5" role="group" aria-label="View">
@@ -523,6 +577,17 @@ export function LibraryView() {
                 onClick={() => view.setView("list")}
               >
                 <List />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn("size-7", view.view === "shelf" && "bg-muted")}
+                aria-label="Shelves"
+                aria-pressed={view.view === "shelf"}
+                title={`Shelves (${keys("view.shelf")})`}
+                onClick={() => view.setView("shelf")}
+              >
+                <LibraryBig />
               </Button>
             </div>
           </div>

@@ -7,12 +7,19 @@ import type { FindResult } from "@/readers";
 export function FindBar({
   onFind,
   onClose,
+  step,
+  initialQuery = "",
+  onQuery,
 }: {
   onFind: (query: string, backwards: boolean) => Promise<FindResult>;
   onClose: () => void;
+  /** Changes when "Find next / previous" is pressed outside the box (F3). */
+  step?: { backwards: boolean; seq: number };
+  initialQuery?: string;
+  onQuery?: (q: string) => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [result, setResult] = useState<FindResult | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => input.current?.focus(), []);
@@ -27,6 +34,14 @@ export function FindBar({
     }
   };
 
+  const runRef = useRef(run);
+  useEffect(() => {
+    runRef.current = run;
+  });
+  useEffect(() => {
+    if (step && step.seq > 0) void runRef.current(step.backwards);
+  }, [step]);
+
   return (
     <div
       role="search"
@@ -37,6 +52,7 @@ export function FindBar({
         value={query}
         onChange={(e) => {
           setQuery(e.target.value);
+          onQuery?.(e.target.value);
           setResult(null);
         }}
         onKeyDown={(e) => {

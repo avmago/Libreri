@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
 import { commands, unwrap, type ReadingStatus } from "@/lib/ipc";
+import { useProfilePrefs } from "@/features/profiles";
 import { useTabs } from "@/lib/tabs";
 import { canRead } from "@/readers";
 import { useMoveBooks, useSetBookState, useTrashBooks } from "../api";
@@ -55,12 +56,15 @@ export function useBookActions() {
     async (books: BookView[]) => {
       if (books.length === 0) return;
       const what = books.length === 1 ? `“${books[0]?.metadata.title}”` : `${books.length} books`;
-      const ok = await ask(
-        `The ${books.length === 1 ? "file goes" : "files go"} to the system Trash. If you restore ${
-          books.length === 1 ? "it" : "them"
-        } from there, ${books.length === 1 ? "its" : "their"} details come back too.`,
-        { title: `Move ${what} to the Trash?`, kind: "warning", okLabel: "Move to Trash" },
-      );
+      const confirm = useProfilePrefs.getState().prefs.library.confirmTrash;
+      const ok =
+        !confirm ||
+        (await ask(
+          `The ${books.length === 1 ? "file goes" : "files go"} to the system Trash. If you restore ${
+            books.length === 1 ? "it" : "them"
+          } from there, ${books.length === 1 ? "its" : "their"} details come back too.`,
+          { title: `Move ${what} to the Trash?`, kind: "warning", okLabel: "Move to Trash" },
+        ));
       if (!ok) return;
       try {
         const n = await trash.mutateAsync(books.map((b) => b.id));
@@ -102,10 +106,33 @@ export function useBookActions() {
   );
 
   const setRating = useCallback(
-    (book: BookView, rating: number) =>
-      setState.mutate({ id: book.id, user: { ...book.user, rating } }),
+    (books: BookView | BookView[], rating: number) => {
+      for (const b of Array.isArray(books) ? books : [books]) {
+        setState.mutate({ id: b.id, user: { ...b.user, rating } });
+      }
+    },
     [setState],
   );
 
-  return { open, openElsewhere, reveal, moveToTrash, moveTo, setStatus, toggleFavorite, setRating };
+  /** Opens the book beside the book being read (split view). */
+  const openBeside = useCallback((book: BookView) => {
+    if (!canRead(book.fileType) || book.missing) return;
+    useTabs.getState().openBeside({
+      bookId: book.id,
+      title: book.metadata.title,
+      fileType: book.fileType,
+    });
+  }, []);
+
+  return {
+    open,
+    openBeside,
+    openElsewhere,
+    reveal,
+    moveToTrash,
+    moveTo,
+    setStatus,
+    toggleFavorite,
+    setRating,
+  };
 }

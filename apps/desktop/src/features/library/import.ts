@@ -81,8 +81,10 @@ export async function pickFolderToImport() {
 }
 
 /** Accepts files and folders dropped from the desktop onto the window. */
-export function useDesktopDrop() {
+/** Files dropped on the window are imported (when the profile may import). */
+export function useDesktopDrop(enabled = true) {
   useEffect(() => {
+    if (!enabled) return;
     const unlisten = getCurrentWebview().onDragDropEvent(({ payload }) => {
       if (payload.type === "enter" || payload.type === "over") {
         useImport.setState({ hovering: true });
@@ -99,5 +101,5 @@ export function useDesktopDrop() {
       }
     });
     return () => void unlisten.then((off) => off());
-  }, []);
+  }, [enabled]);
 }

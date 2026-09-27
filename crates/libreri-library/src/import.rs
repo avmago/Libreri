@@ -129,6 +129,7 @@ impl Library {
     /// Imports files and folders. Runs one at a time with scans; reports
     /// progress per file and stops between files when cancelled.
     pub fn import(&self, req: &ImportRequest, progress: &dyn Progress) -> Result<ImportReport> {
+        self.require_edit()?;
         let _busy = self.busy();
         let mut report = ImportReport::default();
         folder_abs(self.layout(), &req.folder)?;
@@ -156,7 +157,7 @@ impl Library {
         let already_inside = item.source.starts_with(books_dir);
 
         if let Some(existing) = self.with_db(|db| db.resolve_book_id(&id))? {
-            let book = self.book(&existing)?;
+            let book = self.record(&existing)?;
             let existing_path = self.layout().resolve_relative(&book.rel_path);
             let present = existing_path.as_ref().is_some_and(|p| p.is_file());
             if present || already_inside {
@@ -171,7 +172,7 @@ impl Library {
             let dest = self.place(item, books_dir)?;
             let rel = paths::rel_of(self.layout(), &dest).ok_or(Error::BookNotFound)?;
             self.with_db(|db| db.set_book_path(&book.id, &rel))?;
-            sidecar::write(self.layout(), &self.book(&book.id)?)?;
+            sidecar::write(self.layout(), &self.record(&book.id)?)?;
             report.relinked += 1;
             return Ok(());
         }

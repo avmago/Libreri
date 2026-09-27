@@ -1,16 +1,21 @@
 import { create } from "zustand";
 import type { BookQuery, ContentType, FileType, ReadingStatus, SortKey } from "@/lib/ipc";
 
-/** Which list the main area shows. */
+/** What the main area shows: a list of books, the Notes hub or Organize. */
 export type Nav =
   | { kind: "all" }
   | { kind: "status"; status: ReadingStatus }
   | { kind: "favorites" }
   | { kind: "audio" }
   | { kind: "missing" }
-  | { kind: "folder"; path: string };
+  | { kind: "folder"; path: string }
+  | { kind: "tag"; tag: string }
+  | { kind: "category"; path: string }
+  | { kind: "collection"; id: string; name: string; query: BookQuery }
+  | { kind: "notes" }
+  | { kind: "organize" };
 
-export type ViewMode = "grid" | "list";
+export type ViewMode = "grid" | "list" | "shelf";
 
 interface LibraryViewState {
   nav: Nav;
@@ -125,6 +130,25 @@ export function buildQuery(s: QueryInput): BookQuery {
     descending: s.descending,
   };
   switch (s.nav.kind) {
+    case "collection": {
+      // The saved search, with what is typed now and the chosen order.
+      const saved = s.nav.query;
+      return {
+        ...saved,
+        search: q.search ?? saved.search ?? null,
+        fileTypes: [...(saved.fileTypes ?? []), ...q.fileTypes!],
+        contentTypes: [...(saved.contentTypes ?? []), ...q.contentTypes!],
+        tags: [...(saved.tags ?? []), ...q.tags!],
+        sort: s.sort,
+        descending: s.descending,
+      };
+    }
+    case "tag":
+      q.tags = [...q.tags!, s.nav.tag];
+      break;
+    case "category":
+      q.category = s.nav.path;
+      break;
     case "folder":
       q.folder = s.nav.path;
       // Searching inside a folder looks in its subfolders too.
@@ -148,6 +172,16 @@ export function buildQuery(s: QueryInput): BookQuery {
 
 export function navTitle(nav: Nav): string {
   switch (nav.kind) {
+    case "tag":
+      return `#${nav.tag}`;
+    case "category":
+      return nav.path.split("/").join(" › ");
+    case "collection":
+      return nav.name;
+    case "notes":
+      return "Notes";
+    case "organize":
+      return "Organize";
     case "all":
       return "All Books";
     case "favorites":

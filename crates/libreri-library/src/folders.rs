@@ -53,6 +53,32 @@ fn walk(dir: &Path, rel: &str, counts: &HashMap<String, u32>) -> Vec<FolderNode>
     nodes
 }
 
+/// Keeps folders inside `scope`, and their parents so the tree still shows
+/// where they are. Parents outside the scope show only allowed books.
+fn prune(nodes: Vec<FolderNode>, scope: &[String]) -> Vec<FolderNode> {
+    let inside = |p: &str| {
+        scope
+            .iter()
+            .any(|s| p == s || p.starts_with(&format!("{s}/")))
+    };
+    let above = |p: &str| scope.iter().any(|s| s.starts_with(&format!("{p}/")));
+    nodes
+        .into_iter()
+        .filter_map(|mut n| {
+            if inside(&n.path) {
+                Some(n)
+            } else if above(&n.path) {
+                n.children = prune(n.children, scope);
+                n.book_count = 0;
+                n.total_count = n.children.iter().map(|c| c.total_count).sum();
+                Some(n)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
 impl Library {
     /// The folder tree under `Books/` with book counts.
     pub fn folders(&self) -> Result<Vec<FolderNode>> {
@@ -62,12 +88,19 @@ impl Library {
                 .entry(folder_of(&rec.rel_path).to_owned())
                 .or_default() += 1;
         }
-        Ok(walk(&self.layout().books_dir(), "", &counts))
+        let tree = walk(&self.layout().books_dir(), "", &counts);
+        let scope = self.scope();
+        Ok(if scope.is_empty() {
+            tree
+        } else {
+            prune(tree, &scope)
+        })
     }
 
     /// Creates `name` inside `parent` (relative to `Books/`). Returns the new
     /// folder's path.
     pub fn create_folder(&self, parent: &str, name: &str) -> Result<String> {
+        self.require_edit()?;
         let name = validate_name(name)?;
         let parent_abs = folder_abs(self.layout(), parent)?;
         if !parent_abs.is_dir() {
@@ -85,6 +118,7 @@ impl Library {
 
     /// Renames a folder. Returns its new path.
     pub fn rename_folder(&self, path: &str, new_name: &str) -> Result<String> {
+        self.require_edit()?;
         let name = validate_name(new_name)?;
         let parent = path.rsplit_once('/').map(|(p, _)| p).unwrap_or("");
         self.relocate_folder(path, &join(parent, &name))
@@ -92,6 +126,7 @@ impl Library {
 
     /// Moves a folder (and everything in it) into `new_parent`.
     pub fn move_folder(&self, path: &str, new_parent: &str) -> Result<String> {
+        self.require_edit()?;
         let name = path.rsplit('/').next().unwrap_or(path);
         let target = join(new_parent, name);
         if new_parent == path || new_parent.starts_with(&format!("{path}/")) {
@@ -143,6 +178,7 @@ impl Library {
     /// Moves a folder and every book in it to the system trash. Returns how
     /// many books went with it.
     pub fn trash_folder(&self, path: &str) -> Result<usize> {
+        self.require_edit()?;
         let path = path.trim_matches('/');
         if path.is_empty() {
             return Err(Error::InvalidInput("choose a folder".into()));

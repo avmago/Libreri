@@ -2,14 +2,18 @@ import { useState, type ReactNode } from "react";
 import {
   BookOpen,
   Check,
+  Columns2,
   ExternalLink,
   FolderInput,
   FolderSearch,
   Heart,
   Info,
   ListChecks,
+  Pencil,
+  Star,
   Trash2,
 } from "lucide-react";
+import { usePermissions } from "@/features/profiles";
 import {
   ContextMenu,
   MenuShortcut,
@@ -17,23 +21,27 @@ import {
   menuItem,
   menuSeparator,
 } from "@/components/ui/menu";
-import { DEFAULT_SHORTCUTS, displayKeys, platform } from "@/lib/shortcuts";
+import { keysLabel, platform, shortcutFor, type ActionId } from "@/lib/shortcuts";
 import type { ReadingStatus } from "@/lib/ipc";
+import { useTabs } from "@/lib/tabs";
 import { cn } from "@/lib/utils";
 import { useFolders } from "../api";
+import { useLibraryDialogs } from "../dialogs";
 import { useBookActions } from "../hooks/useBookActions";
 import { STATUS_LABEL, type BookView } from "../model";
 import { useLibraryView } from "../store";
 import { flattenFolders } from "./folderUtils";
 
-const keys = (id: keyof typeof DEFAULT_SHORTCUTS) =>
-  displayKeys(DEFAULT_SHORTCUTS[id], platform).join(platform === "mac" ? "" : "+");
+const keys = (id: ActionId) => keysLabel(shortcutFor(id), platform);
 
 const STATUSES: ReadingStatus[] = ["wantToRead", "reading", "finished", "abandoned", "none"];
 
 /** The menu itself; only mounted while open, so closed menus cost nothing. */
 function MenuItems({ book, targets }: { book: BookView; targets: BookView[] }) {
   const actions = useBookActions();
+  const { editLibrary } = usePermissions();
+  const openBulk = useLibraryDialogs((s) => s.openBulkEdit);
+  const hasOpenBook = useTabs((s) => s.tabs.length > 0);
   const setDetailsOpen = useLibraryView((s) => s.setDetailsOpen);
   const { data: folders = [] } = useFolders();
   const single = targets.length === 1;
@@ -46,6 +54,11 @@ function MenuItems({ book, targets }: { book: BookView; targets: BookView[] }) {
           <ContextMenu.Item className={menuItem} onSelect={() => void actions.open(book)}>
             <BookOpen /> Open <MenuShortcut>{keys("books.open")}</MenuShortcut>
           </ContextMenu.Item>
+          {hasOpenBook && (
+            <ContextMenu.Item className={menuItem} onSelect={() => actions.openBeside(book)}>
+              <Columns2 /> Open beside the current book
+            </ContextMenu.Item>
+          )}
           <ContextMenu.Item className={menuItem} onSelect={() => void actions.openElsewhere(book)}>
             <ExternalLink /> Open in another app
           </ContextMenu.Item>
@@ -80,44 +93,77 @@ function MenuItems({ book, targets }: { book: BookView; targets: BookView[] }) {
           </ContextMenu.SubContent>
         </ContextMenu.Portal>
       </ContextMenu.Sub>
-      <ContextMenu.Item className={menuItem} onSelect={() => actions.toggleFavorite(targets)}>
-        <Heart className={cn(allFavourite && "fill-current")} />
-        {allFavourite ? "Remove from Favourites" : "Add to Favourites"}
-        <MenuShortcut>{keys("books.favorite")}</MenuShortcut>
-      </ContextMenu.Item>
       <ContextMenu.Sub>
         <ContextMenu.SubTrigger className={menuItem}>
-          <FolderInput /> Move to
+          <Star /> Rating
         </ContextMenu.SubTrigger>
         <ContextMenu.Portal>
-          <ContextMenu.SubContent className={cn(menuContent, "max-h-80 overflow-y-auto")}>
-            <ContextMenu.Item
-              className={menuItem}
-              onSelect={() => void actions.moveTo(targets, "")}
-            >
-              Books (top level)
-            </ContextMenu.Item>
-            {flattenFolders(folders).map(({ folder, depth }) => (
+          <ContextMenu.SubContent className={menuContent}>
+            {[5, 4, 3, 2, 1, 0].map((n) => (
               <ContextMenu.Item
-                key={folder.path}
+                key={n}
                 className={menuItem}
-                style={{ paddingLeft: 8 + depth * 14 }}
-                onSelect={() => void actions.moveTo(targets, folder.path)}
+                onSelect={() => actions.setRating(targets, n)}
               >
-                {folder.name}
+                <span className="flex size-4 items-center justify-center">
+                  {targets.every((b) => b.user.rating === n) && <Check />}
+                </span>
+                {n === 0 ? "No rating" : `${n} star${n > 1 ? "s" : ""}`}
+                <MenuShortcut>{keys(`books.rate${n}` as ActionId)}</MenuShortcut>
               </ContextMenu.Item>
             ))}
           </ContextMenu.SubContent>
         </ContextMenu.Portal>
       </ContextMenu.Sub>
-      <ContextMenu.Separator className={menuSeparator} />
-      <ContextMenu.Item
-        className={cn(menuItem, "text-destructive [&_svg]:!text-destructive")}
-        onSelect={() => void actions.moveToTrash(targets)}
-      >
-        <Trash2 /> {single ? "Move to Trash" : `Move ${targets.length} books to Trash`}
-        <MenuShortcut>{keys(platform === "mac" ? "books.trashMac" : "books.trash")}</MenuShortcut>
+      <ContextMenu.Item className={menuItem} onSelect={() => actions.toggleFavorite(targets)}>
+        <Heart className={cn(allFavourite && "fill-current")} />
+        {allFavourite ? "Remove from Favourites" : "Add to Favourites"}
+        <MenuShortcut>{keys("books.favorite")}</MenuShortcut>
       </ContextMenu.Item>
+      {editLibrary && (
+        <>
+          <ContextMenu.Item className={menuItem} onSelect={() => openBulk(targets)}>
+            <Pencil />{" "}
+            {single ? "Edit details together…" : `Edit ${targets.length} books together…`}
+            <MenuShortcut>{keys("books.bulkEdit")}</MenuShortcut>
+          </ContextMenu.Item>
+          <ContextMenu.Sub>
+            <ContextMenu.SubTrigger className={menuItem}>
+              <FolderInput /> Move to
+            </ContextMenu.SubTrigger>
+            <ContextMenu.Portal>
+              <ContextMenu.SubContent className={cn(menuContent, "max-h-80 overflow-y-auto")}>
+                <ContextMenu.Item
+                  className={menuItem}
+                  onSelect={() => void actions.moveTo(targets, "")}
+                >
+                  Books (top level)
+                </ContextMenu.Item>
+                {flattenFolders(folders).map(({ folder, depth }) => (
+                  <ContextMenu.Item
+                    key={folder.path}
+                    className={menuItem}
+                    style={{ paddingLeft: 8 + depth * 14 }}
+                    onSelect={() => void actions.moveTo(targets, folder.path)}
+                  >
+                    {folder.name}
+                  </ContextMenu.Item>
+                ))}
+              </ContextMenu.SubContent>
+            </ContextMenu.Portal>
+          </ContextMenu.Sub>
+          <ContextMenu.Separator className={menuSeparator} />
+          <ContextMenu.Item
+            className={cn(menuItem, "text-destructive [&_svg]:!text-destructive")}
+            onSelect={() => void actions.moveToTrash(targets)}
+          >
+            <Trash2 /> {single ? "Move to Trash" : `Move ${targets.length} books to Trash`}
+            <MenuShortcut>
+              {keys(platform === "mac" ? "books.trashMac" : "books.trash")}
+            </MenuShortcut>
+          </ContextMenu.Item>
+        </>
+      )}
     </>
   );
 }

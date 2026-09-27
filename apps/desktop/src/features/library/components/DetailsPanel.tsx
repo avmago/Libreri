@@ -14,7 +14,9 @@ import { NativeSelect } from "@/components/ui/input";
 import type { ReadingStatus } from "@/lib/ipc";
 import { useShortcut } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
+import { usePermissions } from "@/features/profiles";
 import { useUpdateBook } from "../api";
+import { useLibraryDialogs } from "../dialogs";
 import { useBookActions } from "../hooks/useBookActions";
 import {
   CONTENT_TYPE_LABEL,
@@ -85,8 +87,9 @@ function SingleBook({ book }: { book: BookView }) {
   const [error, setError] = useState<string | null>(null);
   const update = useUpdateBook();
   const actions = useBookActions();
+  const { editLibrary } = usePermissions();
   const m = book.metadata;
-  useShortcut("details.edit", () => setEditing(true));
+  useShortcut("details.edit", () => editLibrary && setEditing(true));
 
   if (editing) {
     return (
@@ -157,14 +160,16 @@ function SingleBook({ book }: { book: BookView }) {
         >
           <Heart className={cn(book.user.favorite && "fill-current")} />
         </Button>
-        <Button
-          size="icon"
-          variant="outline"
-          aria-label="Edit details"
-          onClick={() => setEditing(true)}
-        >
-          <Pencil />
-        </Button>
+        {editLibrary && (
+          <Button
+            size="icon"
+            variant="outline"
+            aria-label="Edit details"
+            onClick={() => setEditing(true)}
+          >
+            <Pencil />
+          </Button>
+        )}
       </div>
       <div className="flex items-center gap-2">
         <NativeSelect
@@ -236,6 +241,8 @@ function SingleBook({ book }: { book: BookView }) {
 
 function ManyBooks({ books }: { books: BookView[] }) {
   const actions = useBookActions();
+  const { editLibrary } = usePermissions();
+  const openBulk = useLibraryDialogs((s) => s.openBulkEdit);
   const size = books.reduce((n, b) => n + b.fileSize, 0);
   return (
     <div className="flex flex-col gap-4 px-4 py-6">
@@ -277,17 +284,23 @@ function ManyBooks({ books }: { books: BookView[] }) {
         <Heart />{" "}
         {books.every((b) => b.user.favorite) ? "Remove from Favourites" : "Add to Favourites"}
       </Button>
-      <Button
-        variant="outline"
-        className="text-destructive"
-        onClick={() => void actions.moveToTrash(books)}
-      >
-        <Trash2 /> Move to Trash
-      </Button>
-      <p className="text-center text-[12px] text-muted-foreground">
-        Drag the selection onto a folder to move it. Editing many books at once arrives with Bulk
-        edit.
-      </p>
+      {editLibrary && (
+        <>
+          <Button onClick={() => openBulk(books)}>
+            <Pencil /> Edit {books.length} books together…
+          </Button>
+          <Button
+            variant="outline"
+            className="text-destructive"
+            onClick={() => void actions.moveToTrash(books)}
+          >
+            <Trash2 /> Move to Trash
+          </Button>
+          <p className="text-center text-[12px] text-muted-foreground">
+            Drag the selection onto a folder to move it.
+          </p>
+        </>
+      )}
     </div>
   );
 }

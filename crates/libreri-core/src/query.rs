@@ -42,6 +42,11 @@ pub struct BookQuery {
     pub missing_only: bool,
     pub sort: SortKey,
     pub descending: bool,
+    /// Set by the library, never by the interface: when not empty, only
+    /// books inside these folders (relative to `Books/`) are returned. Used
+    /// for Kids profiles.
+    #[serde(skip)]
+    pub within_folders: Vec<String>,
 }
 
 /// Turns what the user typed into a safe SQLite FTS5 query: each word

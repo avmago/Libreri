@@ -25,6 +25,14 @@ pub enum AppErrorKind {
     NameTaken,
     Trash,
     Cancelled,
+    /// Nobody is signed in: show the profile picker.
+    SignedOut,
+    /// The PIN was wrong; the message says how many tries are left.
+    WrongPin,
+    /// Too many wrong PINs; the message says how long to wait.
+    PinLocked,
+    /// The signed-in profile may not do this (Kids, Guest, not the owner).
+    NotAllowed,
 }
 
 #[derive(Debug, Clone, Serialize, Type, thiserror::Error)]
@@ -61,6 +69,10 @@ impl From<libreri_library::Error> for AppError {
             E::NameTaken(_) => AppErrorKind::NameTaken,
             E::Trash(_) => AppErrorKind::Trash,
             E::Cancelled => AppErrorKind::Cancelled,
+            E::SignedOut => AppErrorKind::SignedOut,
+            E::WrongPin { .. } => AppErrorKind::WrongPin,
+            E::PinLocked(_) => AppErrorKind::PinLocked,
+            E::NotAllowed(_) => AppErrorKind::NotAllowed,
         };
         Self::new(kind, err.to_string())
     }

@@ -17,6 +17,7 @@ export const commands = {
 	openExternalUrl: (url: string) => typedError<null, AppError>(__TAURI_INVOKE("open_external_url", { url })),
 	getSettings: () => __TAURI_INVOKE<SettingsDto>("get_settings"),
 	setTheme: (theme: Theme) => typedError<SettingsDto, AppError>(__TAURI_INVOKE("set_theme", { theme })),
+	setAccent: (accent: string | null) => typedError<SettingsDto, AppError>(__TAURI_INVOKE("set_accent", { accent })),
 	forgetRecentLibrary: (path: string) => typedError<SettingsDto, AppError>(__TAURI_INVOKE("forget_recent_library", { path })),
 	/**  Creates a new library in `path` and opens it. */
 	createLibrary: (path: string, name: string | null) => typedError<LibrarySummary, AppError>(__TAURI_INVOKE("create_library", { path, name })),
@@ -99,6 +100,61 @@ export const commands = {
 	/**  The reader tabs that were open last time (JSON written by the interface). */
 	getSession: () => typedError<string | null, AppError>(__TAURI_INVOKE("get_session")),
 	saveSession: (session: string) => typedError<null, AppError>(__TAURI_INVOKE("save_session", { session })),
+	listProfiles: () => typedError<ProfileDto[], AppError>(__TAURI_INVOKE("list_profiles")),
+	/**  The signed-in profile, or nothing when the profile picker should show. */
+	currentSession: () => typedError<{
+	profile: ProfileDto,
+	/**  The profile's interface preferences (JSON written by the interface). */
+	prefs: string,
+	canEditLibrary: boolean,
+	canManageProfiles: boolean,
+	/**  False for guests: nothing they do is kept. */
+	keepsData: boolean,
+} | null, AppError>(__TAURI_INVOKE("current_session")),
+	signIn: (id: string, pin: string | null) => typedError<SessionDto, AppError>(__TAURI_INVOKE("sign_in", { id, pin })),
+	/**  Locks the library and goes back to the profile picker. */
+	signOut: () => typedError<null, AppError>(__TAURI_INVOKE("sign_out")),
+	createProfile: (profile: NewProfile) => typedError<ProfileDto, AppError>(__TAURI_INVOKE("create_profile", { profile })),
+	updateProfile: (id: string, name: string, colour: string, kind: ProfileKind) => typedError<ProfileDto, AppError>(__TAURI_INVOKE("update_profile", { id, name, colour, kind })),
+	/**
+	 *  Sets, changes or removes a PIN. Returns the owner's new recovery code,
+	 *  which the interface shows once.
+	 */
+	setProfilePin: (id: string, currentPin: string | null, newPin: string | null) => typedError<string | null, AppError>(__TAURI_INVOKE("set_profile_pin", { id, currentPin, newPin })),
+	/**
+	 *  Resets the owner's forgotten PIN with the recovery code and signs in.
+	 *  Returns the next recovery code.
+	 */
+	recoverOwner: (recoveryCode: string, newPin: string) => typedError<string, AppError>(__TAURI_INVOKE("recover_owner", { recoveryCode, newPin })),
+	deleteProfile: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_profile", { id })),
+	setAllowedFolders: (id: string, folders: string[]) => typedError<ProfileDto, AppError>(__TAURI_INVOKE("set_allowed_folders", { id, folders })),
+	/**  Saves the signed-in profile's interface preferences (JSON). */
+	savePrefs: (prefs: string) => typedError<null, AppError>(__TAURI_INVOKE("save_prefs", { prefs })),
+	listCollections: () => typedError<CollectionDto[], AppError>(__TAURI_INVOKE("list_collections")),
+	/**  Adds (empty `id`) or updates a smart collection. */
+	saveCollection: (id: string, name: string, query: BookQuery) => typedError<CollectionDto, AppError>(__TAURI_INVOKE("save_collection", { id, name, query })),
+	deleteCollection: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_collection", { id })),
+	/**  Applies one edit to many books. Returns how many changed. */
+	bulkEditBooks: (ids: string[], edit: BulkEdit) => typedError<number, AppError>(__TAURI_INVOKE("bulk_edit_books", { ids, edit })),
+	renameTag: (from: string, to: string) => typedError<number, AppError>(__TAURI_INVOKE("rename_tag", { from, to })),
+	mergeTags: (sources: string[], into: string) => typedError<number, AppError>(__TAURI_INVOKE("merge_tags", { sources, into })),
+	deleteTag: (tag: string) => typedError<number, AppError>(__TAURI_INVOKE("delete_tag", { tag })),
+	renameCategory: (from: string, to: string) => typedError<number, AppError>(__TAURI_INVOKE("rename_category", { from, to })),
+	deleteCategory: (path: string) => typedError<number, AppError>(__TAURI_INVOKE("delete_category", { path })),
+	/**  Groups of tags that look like the same thing. */
+	similarTags: () => typedError<TagCountDto[][], AppError>(__TAURI_INVOKE("similar_tags")),
+	/**  All highlights, comments and bookmarks of the signed-in profile. */
+	listAllNotes: () => typedError<NoteDto[], AppError>(__TAURI_INVOKE("list_all_notes")),
+	/**  All Markdown notes in the signed-in profile's notes folder. */
+	listNotebooks: () => typedError<NotebookEntryDto[], AppError>(__TAURI_INVOKE("list_notebooks")),
+	readNote: (relPath: string) => typedError<string, AppError>(__TAURI_INVOKE("read_note", { relPath })),
+	writeNote: (relPath: string, content: string) => typedError<null, AppError>(__TAURI_INVOKE("write_note", { relPath, content })),
+	/**  Starts a note that is not about one book. Returns its path. */
+	createNote: (title: string) => typedError<string, AppError>(__TAURI_INVOKE("create_note", { title })),
+	/**  Shows the signed-in profile's notes folder in the file manager. */
+	revealNotesFolder: () => typedError<string, AppError>(__TAURI_INVOKE("reveal_notes_folder")),
+	/**  How much space the library's folders use, in bytes. */
+	libraryStorage: () => typedError<StorageDto, AppError>(__TAURI_INVOKE("library_storage")),
 };
 
 /** Events */
@@ -106,6 +162,7 @@ export const events = {
 	importFinished: makeEvent<ImportFinished>("import-finished"),
 	jobEventPayload: makeEvent<JobEventPayload>("job-event-payload"),
 	libraryChanged: makeEvent<LibraryChanged>("library-changed"),
+	sessionChanged: makeEvent<SessionChanged>("session-changed"),
 };
 
 /* Types */
@@ -139,7 +196,15 @@ export type AppErrorKind = "notALibrary" | "alreadyALibrary" | "folderNotEmpty" 
 /**  No library is open (the window is on the Welcome screen). */
 "noLibrary" | "notFound" | 
 /**  Something the user typed was refused; the message says why. */
-"invalidInput" | "nameTaken" | "trash" | "cancelled";
+"invalidInput" | "nameTaken" | "trash" | "cancelled" | 
+/**  Nobody is signed in: show the profile picker. */
+"signedOut" | 
+/**  The PIN was wrong; the message says how many tries are left. */
+"wrongPin" | 
+/**  Too many wrong PINs; the message says how long to wait. */
+"pinLocked" | 
+/**  The signed-in profile may not do this (Kids, Guest, not the owner). */
+"notAllowed";
 
 export type AppInfo = {
 	version: string,
@@ -244,6 +309,33 @@ export type BookUserState = {
 	lastOpened?: string | null,
 };
 
+/**
+ *  Changes applied to many books at once. `None` leaves a field alone;
+ *  `Some("")` clears a text field.
+ */
+export type BulkEdit = {
+	/**  Replaces the authors (an empty list removes them). */
+	authors?: string[] | null,
+	publisher?: string | null,
+	/**  A year, or "" to clear. */
+	year?: string | null,
+	language?: string | null,
+	contentType?: ContentType | null,
+	series?: string | null,
+	/**  Number the books 1, 2, 3… in the order given. */
+	numberSeries?: boolean,
+	addTags?: string[],
+	removeTags?: string[],
+	addCategories?: string[],
+	removeCategories?: string[],
+};
+
+export type CollectionDto = {
+	id: string,
+	name: string,
+	query: BookQuery,
+};
+
 /**  What kind of document a book is. Chosen by the user; guessed on import. */
 export type ContentType = "book" | "textbook" | "researchPaper" | "conferencePaper" | "preprint" | "thesis" | "lectureNotes" | "slides" | "technicalReport" | "whitePaper" | "manual" | "reference" | "standard" | "magazine" | "article" | "comic" | "cheatSheet" | "personalNotes" | "audiobook" | "other";
 
@@ -338,10 +430,61 @@ export type LibrarySummary = {
 	bookCount: number,
 };
 
+export type NewProfile = {
+	name: string,
+	colour: string,
+	kind: ProfileKind,
+	pin: string | null,
+};
+
+export type NoteDto = {
+	annotation: Annotation,
+	bookTitle: string,
+	fileType: FileType,
+};
+
 export type NotebookDto = {
 	relPath: string,
 	content: string,
 };
+
+export type NotebookEntryDto = {
+	bookId: string | null,
+	title: string,
+	relPath: string,
+	/**  Seconds since 1970. */
+	modified: number | null,
+	excerpt: string,
+	words: number,
+};
+
+/**  A profile as the picker and Settings show it. Never includes hashes. */
+export type ProfileDto = {
+	id: string,
+	name: string,
+	colour: string,
+	kind: ProfileKind,
+	hasPin: boolean,
+	/**  Kids: folders (relative to `Books/`) they may open. */
+	allowedFolders: string[],
+	lastUsed: string | null,
+	/**  Seconds before another PIN may be tried (after wrong ones). */
+	pinWait: number,
+};
+
+/**  What a profile may do. */
+export type ProfileKind = 
+/**  Created the library. Manages profiles and everything else. */
+"owner" | 
+/**  A grown-up: reads, notes, and organises the shared library. */
+"standard" | 
+/**
+ *  Reads and makes notes, only in the folders the owner allows.
+ *  Cannot import, edit details, move or delete books.
+ */
+"kids" | 
+/**  Reads without an account. Nothing is kept after the guest leaves. */
+"guest";
 
 /**  Where a reader is with a book. Personal: stored per profile. */
 export type ReadingStatus = "none" | "wantToRead" | "reading" | "finished" | "abandoned";
@@ -353,6 +496,26 @@ export type RecentLibraryDto = {
 	available: boolean,
 };
 
+/**
+ *  Someone signed in or out (in any window). Every window checks who is
+ *  signed in now, so locking locks them all.
+ */
+export type SessionChanged = {
+	/**  The profile now signed in, if any. */
+	profileId: string | null,
+};
+
+/**  Who is signed in and what they may do. */
+export type SessionDto = {
+	profile: ProfileDto,
+	/**  The profile's interface preferences (JSON written by the interface). */
+	prefs: string,
+	canEditLibrary: boolean,
+	canManageProfiles: boolean,
+	/**  False for guests: nothing they do is kept. */
+	keepsData: boolean,
+};
+
 export type SettingsDto = {
 	theme: Theme,
 	accent: string | null,
@@ -360,6 +523,17 @@ export type SettingsDto = {
 };
 
 export type SortKey = "title" | "author" | "added" | "year" | "size" | "pages" | "lastOpened" | "rating";
+
+export type StorageDto = {
+	books: number | null,
+	notes: number | null,
+	data: number | null,
+};
+
+export type TagCountDto = {
+	name: string,
+	count: number,
+};
 
 /**
  *  The highlighted words with a little text before and after (W3C

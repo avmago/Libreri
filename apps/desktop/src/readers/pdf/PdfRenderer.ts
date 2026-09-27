@@ -270,6 +270,24 @@ export class PdfRenderer implements Renderer {
     this.container.scrollBy({ top: -this.container.clientHeight * 0.9, behavior: "smooth" });
   }
 
+  scrollBy(direction: 1 | -1) {
+    this.container.scrollBy({ top: direction * 60, behavior: "smooth" });
+  }
+
+  async start() {
+    this.viewer.currentPageNumber = 1;
+    this.container.scrollTop = 0;
+  }
+
+  async end() {
+    this.viewer.currentPageNumber = this.viewer.pagesCount;
+    this.container.scrollTop = this.container.scrollHeight;
+  }
+
+  setLineHeight() {
+    /* PDF pages have their own layout. */
+  }
+
   /** Turns the current text selection into a highlight candidate. */
   private onSelection() {
     const sel = document.getSelection();

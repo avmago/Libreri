@@ -8,14 +8,29 @@ use std::fs;
 use std::path::Path;
 
 impl Library {
+    /// Books the signed-in profile can see that match `query`.
     pub fn books(&self, query: &BookQuery) -> Result<Vec<Book>> {
-        let profile = self.profile();
-        self.with_db(|db| db.query_books(query, &profile))
+        let profile = self.profile()?;
+        let mut q = query.clone();
+        q.within_folders = self.scope();
+        self.with_db(|db| db.query_books(&q, &profile))
     }
 
-    /// One book, following old ids of books whose file has changed.
+    /// One book the signed-in profile can see, following old ids of books
+    /// whose file has changed.
     pub fn book(&self, id: &BookId) -> Result<Book> {
-        let profile = self.profile();
+        self.profile()?;
+        let book = self.record(id)?;
+        if self.may_open(&book.rel_path) {
+            Ok(book)
+        } else {
+            Err(Error::BookNotFound)
+        }
+    }
+
+    /// Any book, whoever is signed in (for scans and imports).
+    pub(crate) fn record(&self, id: &BookId) -> Result<Book> {
+        let profile = self.viewer();
         self.with_db(|db| {
             let Some(current) = db.resolve_book_id(id)? else {
                 return Ok(None);
@@ -26,12 +41,14 @@ impl Library {
     }
 
     pub fn facets(&self) -> Result<Facets> {
-        let profile = self.profile();
-        self.with_db(|db| db.facets(&profile))
+        let profile = self.profile()?;
+        let scope = self.scope();
+        self.with_db(|db| db.facets(&profile, &scope))
     }
 
     /// Saves edited details after tidying and validating them.
     pub fn update_metadata(&self, id: &BookId, metadata: BookMetadata) -> Result<Book> {
+        self.require_edit()?;
         let metadata = metadata
             .normalized()
             .map_err(|e| Error::InvalidInput(e.to_string()))?;
@@ -45,15 +62,17 @@ impl Library {
 
     /// Saves personal state (status, rating, favourite) for the current profile.
     pub fn set_user_state(&self, id: &BookId, state: &BookUserState) -> Result<Book> {
-        let profile = self.profile();
-        self.book(id)?;
-        self.with_db(|db| db.set_user_state(id, &profile, state))?;
-        self.book(id)
+        let profile = self.profile()?;
+        let book = self.book(id)?;
+        self.with_db(|db| db.set_user_state(&book.id, &profile, state))?;
+        self.backup_personal(&book.id)?;
+        self.book(&book.id)
     }
 
     /// Moves books into `folder` (relative to `Books/`). Files are renamed on
     /// disk; a name clash gets " (2)" added. Returns the moved books.
     pub fn move_books(&self, ids: &[BookId], folder: &str) -> Result<Vec<Book>> {
+        self.require_edit()?;
         let target = folder_abs(self.layout(), folder)?;
         if !target.is_dir() {
             return Err(Error::InvalidInput("that folder no longer exists".into()));
@@ -88,6 +107,7 @@ impl Library {
     /// library. Their details stay in the sidecar, so restoring a file from
     /// the trash brings everything back.
     pub fn trash_books(&self, ids: &[BookId]) -> Result<usize> {
+        self.require_edit()?;
         let mut n = 0;
         for id in ids {
             let book = self.book(id)?;

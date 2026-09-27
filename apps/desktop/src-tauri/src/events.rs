@@ -118,3 +118,12 @@ impl ImportFinished {
         }
     }
 }
+
+/// Someone signed in or out (in any window). Every window checks who is
+/// signed in now, so locking locks them all.
+#[derive(Debug, Clone, Default, Serialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionChanged {
+    /// The profile now signed in, if any.
+    pub profile_id: Option<String>,
+}

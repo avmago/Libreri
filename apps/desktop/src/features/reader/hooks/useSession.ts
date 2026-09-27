@@ -1,18 +1,31 @@
 import { useEffect, useRef } from "react";
 import { commands, unwrap } from "@/lib/ipc";
-import { useTabs, type BookTab } from "@/lib/tabs";
+import { useTabs, type BookTab, type Split } from "@/lib/tabs";
+import { initialTab, isMainWindow } from "@/lib/windows";
 import { DEFAULT_PREFS, useReaderPrefs, type ReaderPrefs } from "../prefs";
 
 interface Session {
   version: 1;
   tabs: Omit<BookTab, "jumpTo">[];
   active: string | null;
+  split?: Split | null;
   prefs: ReaderPrefs;
+}
+
+/** A save waiting for its debounce, run early by `flushSession`. */
+let pending: (() => Promise<unknown>) | null = null;
+
+/** Saves the open tabs now if a save is waiting (before signing out). */
+export async function flushSession(): Promise<void> {
+  const run = pending;
+  pending = null;
+  if (run) await run();
 }
 
 /**
  * Restores the open tabs and page settings when a library opens, and saves
- * them (per library and profile) whenever they change.
+ * them (per library and profile) whenever they change. Only the main window
+ * does this; a window opened for one book shows just that book.
  */
 export function useSession(libraryId: string) {
   const restored = useRef<string | null>(null);
@@ -24,11 +37,10 @@ export function useSession(libraryId: string) {
     void unwrap(commands.getSession())
       .then((json) => {
         if (cancelled) return;
-        if (json) {
-          const s = JSON.parse(json) as Partial<Session>;
-          useReaderPrefs.getState().set({ ...DEFAULT_PREFS, ...s.prefs });
-          useTabs.getState().restore(s.tabs ?? [], s.active ?? null);
-        }
+        const s = json ? (JSON.parse(json) as Partial<Session>) : {};
+        useReaderPrefs.getState().set({ ...DEFAULT_PREFS, ...s.prefs });
+        if (initialTab) useTabs.getState().restore([initialTab], initialTab.bookId);
+        else if (isMainWindow) useTabs.getState().restore(s.tabs ?? [], s.active ?? null, s.split);
       })
       .catch(() => {})
       .finally(() => {
@@ -42,24 +54,29 @@ export function useSession(libraryId: string) {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const save = () => {
-      if (restored.current !== libraryId) return;
+      if (restored.current !== libraryId || !isMainWindow) return;
       clearTimeout(timer);
-      timer = setTimeout(() => {
-        const { tabs, active } = useTabs.getState();
+      pending = () => {
+        clearTimeout(timer);
+        pending = null;
+        const { tabs, active, split } = useTabs.getState();
         const { theme, followApp, pdfMode } = useReaderPrefs.getState();
         const session: Session = {
           version: 1,
           tabs: tabs.map(({ bookId, title, fileType }) => ({ bookId, title, fileType })),
           active,
+          split,
           prefs: { theme, followApp, pdfMode },
         };
-        void commands.saveSession(JSON.stringify(session));
-      }, 400);
+        return commands.saveSession(JSON.stringify(session));
+      };
+      timer = setTimeout(() => void pending?.(), 400);
     };
     const offTabs = useTabs.subscribe(save);
     const offPrefs = useReaderPrefs.subscribe(save);
     return () => {
       clearTimeout(timer);
+      pending = null;
       offTabs();
       offPrefs();
     };

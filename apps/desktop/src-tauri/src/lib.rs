@@ -25,6 +25,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::app::open_external_url,
             commands::settings::get_settings,
             commands::settings::set_theme,
+            commands::settings::set_accent,
             commands::settings::forget_recent_library,
             commands::library::create_library,
             commands::library::open_library,
@@ -60,11 +61,40 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::reader::save_notebook,
             commands::reader::get_session,
             commands::reader::save_session,
+            commands::profiles::list_profiles,
+            commands::profiles::current_session,
+            commands::profiles::sign_in,
+            commands::profiles::sign_out,
+            commands::profiles::create_profile,
+            commands::profiles::update_profile,
+            commands::profiles::set_profile_pin,
+            commands::profiles::recover_owner,
+            commands::profiles::delete_profile,
+            commands::profiles::set_allowed_folders,
+            commands::profiles::save_prefs,
+            commands::profiles::list_collections,
+            commands::profiles::save_collection,
+            commands::profiles::delete_collection,
+            commands::organize::bulk_edit_books,
+            commands::organize::rename_tag,
+            commands::organize::merge_tags,
+            commands::organize::delete_tag,
+            commands::organize::rename_category,
+            commands::organize::delete_category,
+            commands::organize::similar_tags,
+            commands::notes::list_all_notes,
+            commands::notes::list_notebooks,
+            commands::notes::read_note,
+            commands::notes::write_note,
+            commands::notes::create_note,
+            commands::notes::reveal_notes_folder,
+            commands::notes::library_storage,
         ])
         .events(tauri_specta::collect_events![
             events::JobEventPayload,
             events::LibraryChanged,
             events::ImportFinished,
+            events::SessionChanged,
         ])
 }
 
@@ -86,10 +116,17 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
-                // Close the library cleanly so the database is checkpointed
-                // and the lock released.
-                if let Some(state) = window.app_handle().try_state::<AppState>() {
-                    state.close_library();
+                // When the last window closes, close the library cleanly so
+                // the database is checkpointed and the lock released.
+                let others = window
+                    .app_handle()
+                    .webview_windows()
+                    .keys()
+                    .any(|label| label != window.label());
+                if !others {
+                    if let Some(state) = window.app_handle().try_state::<AppState>() {
+                        state.close_library();
+                    }
                 }
             }
         })

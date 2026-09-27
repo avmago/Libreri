@@ -14,6 +14,7 @@ import { ContextMenu, menuContent, menuItem, menuSeparator } from "@/components/
 import { commands, unwrap, type FolderDto } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
 import { useCreateFolder, useRenameFolder, useTrashFolder } from "../api";
+import { usePermissions } from "@/features/profiles";
 import { startDragOnMove, useDrag } from "../drag";
 import { useLibraryView } from "../store";
 
@@ -74,6 +75,7 @@ function FolderRow({
   setEditing: (e: Editing) => void;
 }) {
   const { nav, setNav, expanded, setExpanded } = useLibraryView();
+  const { editLibrary } = usePermissions();
   const over = useDrag((s) => s.item !== null && s.target === folder.path);
   const rename = useRenameFolder();
   const create = useCreateFolder();
@@ -145,11 +147,15 @@ function FolderRow({
               setNav({ kind: "folder", path: folder.path });
               if (hasChildren) setExpanded(folder.path, true);
             }}
-            onPointerDown={startDragOnMove(() => ({
-              kind: "folder",
-              path: folder.path,
-              label: folder.name,
-            }))}
+            onPointerDown={
+              editLibrary
+                ? startDragOnMove(() => ({
+                    kind: "folder",
+                    path: folder.path,
+                    label: folder.name,
+                  }))
+                : undefined
+            }
             className={cn(
               "group flex h-7 cursor-default items-center gap-1.5 rounded-md pr-2",
               active ? "bg-muted font-medium" : "hover:bg-muted/60",
@@ -179,18 +185,22 @@ function FolderRow({
         </ContextMenu.Trigger>
         <ContextMenu.Portal>
           <ContextMenu.Content className={menuContent}>
-            <ContextMenu.Item
-              className={menuItem}
-              onSelect={() => setEditing({ mode: "create", parent: folder.path })}
-            >
-              <FolderPlus /> New folder inside
-            </ContextMenu.Item>
-            <ContextMenu.Item
-              className={menuItem}
-              onSelect={() => setEditing({ mode: "rename", path: folder.path })}
-            >
-              <Pencil /> Rename
-            </ContextMenu.Item>
+            {editLibrary && (
+              <>
+                <ContextMenu.Item
+                  className={menuItem}
+                  onSelect={() => setEditing({ mode: "create", parent: folder.path })}
+                >
+                  <FolderPlus /> New folder inside
+                </ContextMenu.Item>
+                <ContextMenu.Item
+                  className={menuItem}
+                  onSelect={() => setEditing({ mode: "rename", path: folder.path })}
+                >
+                  <Pencil /> Rename
+                </ContextMenu.Item>
+              </>
+            )}
             <ContextMenu.Item
               className={menuItem}
               onSelect={() =>
@@ -201,13 +211,17 @@ function FolderRow({
             >
               <FolderSearch /> Open in file manager
             </ContextMenu.Item>
-            <ContextMenu.Separator className={menuSeparator} />
-            <ContextMenu.Item
-              className={cn(menuItem, "text-destructive [&_svg]:!text-destructive")}
-              onSelect={() => void onTrash()}
-            >
-              <Trash2 /> Move to Trash
-            </ContextMenu.Item>
+            {editLibrary && (
+              <>
+                <ContextMenu.Separator className={menuSeparator} />
+                <ContextMenu.Item
+                  className={cn(menuItem, "text-destructive [&_svg]:!text-destructive")}
+                  onSelect={() => void onTrash()}
+                >
+                  <Trash2 /> Move to Trash
+                </ContextMenu.Item>
+              </>
+            )}
           </ContextMenu.Content>
         </ContextMenu.Portal>
       </ContextMenu.Root>
