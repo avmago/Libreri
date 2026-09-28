@@ -14,6 +14,7 @@ import {
   type Paper,
 } from "./api";
 import type { CanvasHandle } from "./ExcalidrawHost";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const Host = lazy(() => import("./ExcalidrawHost"));
 
@@ -146,23 +147,38 @@ export function CanvasEditor({
         {content === undefined ? (
           <p className="p-4 text-muted-foreground">Opening…</p>
         ) : (
-          <Suspense
-            fallback={
-              <p className="flex items-center gap-2 p-4 text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" /> Getting the pens ready…
-              </p>
-            }
+          <ErrorBoundary
+            fallback={(e) => (
+              <div className="flex flex-col gap-2 p-4 text-[13px]">
+                <p className="font-medium">The canvas editor could not start.</p>
+                <p className="text-muted-foreground">
+                  The rest of Libreri keeps working, and the canvas file is unchanged. If you run
+                  Libreri from its source code, run <code>pnpm install</code> and start it again.
+                </p>
+                <p className="font-mono text-[11.5px] break-all text-muted-foreground">
+                  {e.message}
+                </p>
+              </div>
+            )}
           >
-            <Host
-              key={relPath}
-              content={content}
-              paper={paper}
-              dark={dark}
-              onSave={save}
-              onLink={onLink}
-              onReady={(h) => (handle.current = h)}
-            />
-          </Suspense>
+            <Suspense
+              fallback={
+                <p className="flex items-center gap-2 p-4 text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" /> Getting the pens ready…
+                </p>
+              }
+            >
+              <Host
+                key={relPath}
+                content={content}
+                paper={paper}
+                dark={dark}
+                onSave={save}
+                onLink={onLink}
+                onReady={(h) => (handle.current = h)}
+              />
+            </Suspense>
+          </ErrorBoundary>
         )}
       </div>
     </div>
