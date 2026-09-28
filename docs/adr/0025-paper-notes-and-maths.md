@@ -35,7 +35,16 @@ Phase 8b lets you photograph paper notes and keep them beside the page they belo
 - **Exact, always on:**
   - Clicking a formula in a Markdown book gives the TeX that KaTeX keeps.
   - In an EPUB, it gives the MathML's TeX annotation, or the MathML turned into LaTeX (`readers/math/latex.ts`).
-  - Selected text from a PDF can be copied as LaTeX. Symbols, superscripts and subscripts are rebuilt, and the popover says to check fractions and roots.
+  - Selected maths in a PDF (or a scan's text layer) is rebuilt from where each character sits (`readers/math/layout.ts`), because a PDF's text is only characters in reading order:
+    - Characters are compared by baseline and size. Smaller characters raised after a base are its superscript, and lowered ones its subscript, however many characters they have.
+    - Characters stacked over and under ∑, ∏, ∫ or lim are its limits.
+    - Rows stacked with nothing on the main line between them are a fraction, including nested ones.
+    - A pair of TeX's large brackets around one stack is a binomial.
+    - What follows √ up to the next relation sign is under the root.
+    - TeX's maths-italic letters (𝑥, 𝜋) become plain letters and commands, and function names become `\sin` and the like.
+    - Tested on PDFs made by pdfLaTeX and by Chrome: 14 of 14 TeX formulas were exact.
+    - Bars and roots drawn as lines cannot be seen, so the popover asks you to check. When the maths model is on, it offers *Read it from the picture instead*.
+  - Fixed after 8b was first delivered (user, 2026-09-29): a PDF's sums lost their limits, and scripts kept only their first character.
 - **The popover:** a live KaTeX preview, the LaTeX to correct, *Copy LaTeX*, *Copy as $…$* and *Add to notebook* (a `$$` block).
 - **From pictures, optional** (`libreri-maths`):
   - The model is pix2tex (Lukas Blecher, MIT): a ResNet and vision-transformer encoder with a transformer decoder.

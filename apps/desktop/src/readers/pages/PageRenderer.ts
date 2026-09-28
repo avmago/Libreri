@@ -13,6 +13,7 @@
  * exports treat both alike.
  */
 import { clipFrom, imageOf } from "../clip";
+import { glyphsOf } from "../math/layout";
 import { bookUrl, commands, unwrap, type Annotation, type WordDto } from "@/lib/ipc";
 import type { MarkupLayer } from "../markup/MarkupLayer";
 import { makeQuote } from "../quote";
@@ -390,6 +391,7 @@ export class PageRenderer implements Renderer {
         ]),
     );
     const exact = sel.toString().replace(/\s+/g, " ").trim();
+    const copy = range.cloneRange();
     if (!exact || !rects.length) return this.events.selection(null);
     const text = this.pageText(page);
     const at = text.indexOf(exact);
@@ -401,6 +403,7 @@ export class PageRenderer implements Renderer {
       label: `p. ${page}`,
       position: (page - 1 + (rects[0]?.[1] ?? 0)) / this.slots.length,
       rect: range.getBoundingClientRect(),
+      glyphs: () => glyphsOf(copy),
     });
   }
 

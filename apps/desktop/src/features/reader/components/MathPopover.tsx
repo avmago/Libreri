@@ -14,6 +14,7 @@ export function MathPopover({
   latex: initial,
   rect,
   from,
+  onPicture,
   onNotebook,
   onClose,
 }: {
@@ -22,6 +23,8 @@ export function MathPopover({
   /** The book's own maths (exact), rebuilt from a page's text, or read
    * from a picture by the maths model (both best attempts). */
   from: "book" | "text" | "picture";
+  /** Reads the same place with the maths model instead (when it is on). */
+  onPicture?: () => void;
   onNotebook: (block: string) => void;
   onClose: () => void;
 }) {
@@ -63,8 +66,20 @@ export function MathPopover({
         />
         {from === "text" && (
           <p className="text-[12px] text-muted-foreground">
-            Rebuilt from the page's text: fractions, roots and layout cannot be seen there, so check
-            it against the preview.
+            Rebuilt from the characters on the page and where they sit. Roots, bars and other drawn
+            lines are not text, so check it against the preview.
+            {onPicture && (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  className="underline hover:text-foreground"
+                  onClick={onPicture}
+                >
+                  Read it from the picture instead
+                </button>
+              </>
+            )}
           </p>
         )}
         {from === "picture" && (

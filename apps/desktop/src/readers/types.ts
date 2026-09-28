@@ -9,6 +9,7 @@ import type { MarkupLayer } from "./markup/MarkupLayer";
 import type { PageTheme } from "./themes";
 import type { SpeechSource } from "./speech/types";
 import type { PageClip } from "./clip";
+import type { Glyph } from "./math/layout";
 
 /** A place in a book. Stored as JSON (`locator` in the database). */
 export type Locator =
@@ -50,6 +51,9 @@ export interface SelectionInfo {
   position: number;
   /** Where the selection is on screen, for the highlight menu. */
   rect: DOMRect;
+  /** Page-based books: the selected characters with their boxes, for
+   * rebuilding maths as LaTeX. */
+  glyphs?: () => Glyph[];
 }
 
 export interface FindResult {

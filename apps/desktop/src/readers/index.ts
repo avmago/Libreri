@@ -61,3 +61,4 @@ export type { SpeechPiece, SpeechSource } from "./speech/types";
 export { sentences, mathmlToSpeech, texToSpeech } from "./speech";
 export type { PageClip } from "./clip";
 export { mathmlToLatex, textToLatex } from "./math/latex";
+export { layoutToLatex } from "./math/layout";

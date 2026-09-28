@@ -8,6 +8,7 @@
  * a layer on top of each rendered page.
  */
 import { clipFrom } from "../clip";
+import { glyphsOf } from "../math/layout";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { commands, unwrap, type Annotation, type WordDto } from "@/lib/ipc";
 import type { MarkupLayer } from "../markup/MarkupLayer";
@@ -324,6 +325,7 @@ export class PdfRenderer implements Renderer {
         ]),
     );
     const exact = sel.toString().replace(/\s+/g, " ").trim();
+    const copy = range.cloneRange();
     if (!exact || !rects.length) return this.events.selection(null);
     const pageText = (layer.textContent ?? "").replace(/\s+/g, " ");
     const at = pageText.indexOf(exact);
@@ -336,6 +338,7 @@ export class PdfRenderer implements Renderer {
       label: `p. ${this.pageLabel(page)}`,
       position: (page - 1 + (rects[0]?.[1] ?? 0)) / pages,
       rect: range.getBoundingClientRect(),
+      glyphs: () => glyphsOf(copy),
     });
   }
 

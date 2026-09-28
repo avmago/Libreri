@@ -35,6 +35,7 @@ import {
   PAGE_THEMES,
   pageTheme,
   parseLocator,
+  layoutToLatex,
   textToLatex,
   type Locator,
   type PageLayout,
@@ -172,6 +173,8 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
     latex: string;
     rect: DOMRect;
     from: "book" | "text" | "picture";
+    /** Where the maths is on the page, to read it from the picture. */
+    area?: DOMRect;
   } | null>(null);
   const [canvasOpen, setCanvasOpenRaw] = useState(false);
   // The notebook and the canvas share the right side: one at a time.
@@ -748,7 +751,12 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
     const rect = await new Promise<DOMRect | null>((done) =>
       setClipping({ done, what: "the formula" }),
     );
-    if (!rect) return;
+    if (rect) await readMathsIn(rect);
+  };
+  /** Reads the maths in a part of the page with the maths model. */
+  const readMathsIn = async (rect: DOMRect) => {
+    const renderer = r();
+    if (!renderer?.clipPicture) return;
     const clip = await renderer.clipPicture(rect);
     if (!clip) {
       toast("No maths there", { description: "Draw the box over a page." });
@@ -1434,6 +1442,19 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
           latex={math.latex}
           rect={math.rect}
           from={math.from}
+          onPicture={
+            math.area && mathsModel?.on && mathsModel.downloaded
+              ? () => {
+                  const a = math.area!;
+                  setMath(null);
+                  // A little room around the selection, for limits and roots.
+                  const pad = Math.max(6, a.height * 0.6);
+                  void readMathsIn(
+                    new DOMRect(a.x - pad, a.y - pad, a.width + 2 * pad, a.height + 2 * pad),
+                  );
+                }
+              : undefined
+          }
           onClose={() => setMath(null)}
           onNotebook={(block) => {
             setMath(null);
@@ -1493,10 +1514,14 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
           onNotebook={() => highlightFromSelection(profilePrefs.notes.defaultColor, addToNotebook)}
           onVoice={() => startVoice(true)}
           onLatex={() => {
+            // PDFs and scans: rebuilt from where the characters sit, so
+            // limits, scripts and fractions come through.
+            const laid = selection.glyphs ? layoutToLatex(selection.glyphs()) : "";
             setMath({
-              latex: textToLatex(selection.quote.exact ?? ""),
+              latex: laid || textToLatex(selection.quote.exact ?? ""),
               rect: selection.rect,
               from: "text",
+              area: selection.glyphs ? selection.rect : undefined,
             });
             r()?.clearSelection();
             setSelection(null);

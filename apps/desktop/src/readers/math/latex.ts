@@ -169,8 +169,10 @@ function plainLetter(ch: string): string {
 /** A symbol's LaTeX, with a space after a command so it does not run into
  * the next letter. */
 function symbol(ch: string): string {
-  const s = SYMBOLS[ch];
-  if (s === undefined) return plainLetter(ch);
+  // Mathematical italic and bold letters, Greek too (𝜋 → π).
+  const plain = (ch.codePointAt(0) ?? 0) >= 0x1d400 ? ch.normalize("NFKC") : ch;
+  const s = SYMBOLS[plain];
+  if (s === undefined) return plainLetter(plain);
   return /^\\[a-zA-Z]+$/.test(s) ? `${s} ` : s;
 }
 
@@ -204,7 +206,16 @@ export function textToLatex(text: string): string {
     if (SUPER[ch] !== undefined || SUB[ch] !== undefined) continue;
     out += symbol(ch);
   }
-  return tidy(out);
+  return tidy(functionNames(out));
+}
+
+/** "sin", "log", "lim"… written as plain letters, as commands. */
+function functionNames(s: string): string {
+  return s.replace(
+    // A name on its own, or run into a one-letter variable ("sinx").
+    /(?<![\\a-zA-Z])(arcsin|arccos|arctan|sinh|cosh|tanh|sin|cos|tan|cot|sec|csc|log|ln|exp|lim|max|min|sup|inf|det|gcd|arg|deg|dim)(?![a-zA-Z](?=[a-zA-Z]))(?=[a-zA-Z]?(?![a-zA-Z]))/g,
+    "\\$1 ",
+  );
 }
 
 const FUNCTIONS = new Set([
