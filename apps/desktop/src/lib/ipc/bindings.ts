@@ -448,6 +448,19 @@ export const commands = {
 	downloadCanvasFont: (id: string) => typedError<ExtraFont[], AppError>(__TAURI_INVOKE("download_canvas_font", { id })),
 	cancelCanvasFontDownload: (id: string) => __TAURI_INVOKE<void>("cancel_canvas_font_download", { id }),
 	removeCanvasFont: (id: string) => typedError<ExtraFont[], AppError>(__TAURI_INVOKE("remove_canvas_font", { id })),
+	mathsSettings: () => __TAURI_INVOKE<MathsSettingsDto>("maths_settings"),
+	/**
+	 *  Turns reading maths from pictures on or off (the model stays until
+	 *  removed).
+	 */
+	setMathsFromPictures: (on: boolean) => typedError<MathsSettingsDto, AppError>(__TAURI_INVOKE("set_maths_from_pictures", { on })),
+	/**  Downloads the model; progress arrives as `MathsDownload`. */
+	downloadMathsModel: () => typedError<MathsSettingsDto, AppError>(__TAURI_INVOKE("download_maths_model")),
+	cancelMathsDownload: () => __TAURI_INVOKE<void>("cancel_maths_download"),
+	/**  Removes the model and turns the feature off. */
+	removeMathsModel: () => typedError<MathsSettingsDto, AppError>(__TAURI_INVOKE("remove_maths_model")),
+	/**  Reads a picture of maths (PNG or JPEG, base64 or a data URL) as LaTeX. */
+	mathsFromPicture: (picture: string) => typedError<string, AppError>(__TAURI_INVOKE("maths_from_picture", { picture })),
 	spellDictionaries: () => __TAURI_INVOKE<DictionaryInfo[]>("spell_dictionaries"),
 	/**  Downloads a dictionary; progress arrives as `DictionaryDownload`. */
 	downloadDictionary: (code: string) => typedError<DictionaryInfo[], AppError>(__TAURI_INVOKE("download_dictionary", { code })),
@@ -490,6 +503,7 @@ export const events = {
 	importFinished: makeEvent<ImportFinished>("import-finished"),
 	jobEventPayload: makeEvent<JobEventPayload>("job-event-payload"),
 	libraryChanged: makeEvent<LibraryChanged>("library-changed"),
+	mathsDownload: makeEvent<MathsDownload>("maths-download"),
 	ocrFinished: makeEvent<OcrFinished>("ocr-finished"),
 	ocrLanguageDownload: makeEvent<OcrLanguageDownload>("ocr-language-download"),
 	phonePage: makeEvent<PhonePage>("phone-page"),
@@ -1380,6 +1394,22 @@ export type Lookup = {
 	/**  Best first. */
 	candidates: Candidate[],
 	errors: SourceError[],
+};
+
+/**  Progress of downloading the maths model. */
+export type MathsDownload = {
+	done: number | null,
+	total: number | null,
+	finished: boolean,
+	error: string | null,
+};
+
+export type MathsSettingsDto = {
+	/**  Turned on in Settings. */
+	on: boolean,
+	downloaded: boolean,
+	sizeMb: number,
+	downloading: boolean,
 };
 
 /**  A word that looks misspelt (UTF-16 offsets, end exclusive). */

@@ -13,6 +13,8 @@ import {
   PanelLeft,
   PenLine,
   Search,
+  Loader2,
+  SquareSigma,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -33,6 +35,7 @@ import {
   PAGE_THEMES,
   pageTheme,
   parseLocator,
+  textToLatex,
   type Locator,
   type PageLayout,
   type PdfDarkMode,
@@ -57,6 +60,7 @@ import { ContentsPanel, type LeftPanel } from "./ContentsPanel";
 import { FindBar } from "./FindBar";
 import { NotebookPanel } from "./NotebookPanel";
 import { AnnotationMenu, SelectionMenu } from "./Popovers";
+import { MathPopover } from "./MathPopover";
 import { save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { drawList, markupModel } from "@/readers";
 import { useMarkup } from "../markup/useMarkup";
@@ -77,6 +81,7 @@ import { CompareDialog } from "../compare/CompareDialog";
 import { useReadAloud } from "../speech/useReadAloud";
 import { AudiobookView } from "../listening/AudiobookView";
 import { CaptureDialog, CaptureViewer } from "../capture";
+import { mathsFromPicture, useMathsSettings } from "../maths/api";
 import { useListening } from "../listening/store";
 import { timeAt } from "../listening/sync";
 import { ReadAloudBar } from "../speech/ReadAloudBar";
@@ -162,6 +167,12 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   const [left, setLeft] = useState<LeftPanel | null>("contents");
   const [lastLeft, setLastLeft] = useState<LeftPanel>("contents");
   const [notebookOpen, setNotebookOpenRaw] = useState(false);
+  // A formula shown as LaTeX (clicked, or rebuilt from selected text).
+  const [math, setMath] = useState<{
+    latex: string;
+    rect: DOMRect;
+    from: "book" | "text" | "picture";
+  } | null>(null);
   const [canvasOpen, setCanvasOpenRaw] = useState(false);
   // The notebook and the canvas share the right side: one at a time.
   const setNotebookOpen = (v: boolean | ((o: boolean) => boolean)) =>
@@ -177,7 +188,10 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
       return next;
     });
   // Clipping a figure: a box drawn over the page.
-  const [clipping, setClipping] = useState<{ done: (r: DOMRect | null) => void } | null>(null);
+  const [clipping, setClipping] = useState<{
+    done: (r: DOMRect | null) => void;
+    what: string;
+  } | null>(null);
   const [clipBox, setClipBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(
     null,
   );
@@ -301,6 +315,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
               if (sel) setMenu(null);
             },
             annotationClick: (id, rect) => setMenu({ id, rect, edit: false }),
+            mathClick: (latex, rect) => setMath({ latex, rect, from: "book" }),
             externalLink: (href) => linkRef.current(href),
             formChanged: (dirty) => setFormDirty(dirty),
           },
@@ -706,7 +721,9 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   const clipFromPage = async () => {
     const renderer = r();
     if (!renderer?.clipPicture) return null;
-    const rect = await new Promise<DOMRect | null>((done) => setClipping({ done }));
+    const rect = await new Promise<DOMRect | null>((done) =>
+      setClipping({ done, what: "the figure" }),
+    );
     if (!rect) return null;
     const clip = await renderer.clipPicture(rect);
     if (!clip) {
@@ -719,6 +736,34 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
       link: `libreri://book/${bookId}#page=${clip.page}&rect=${box}`,
       label: `${book?.metadata.title ?? "Book"}, p. ${clip.page}`,
     };
+  };
+
+  /** Reads maths from a box drawn on the page, with the model turned on
+   * in Settings › Writing. */
+  const { data: mathsModel } = useMathsSettings();
+  const [readingMaths, setReadingMaths] = useState(false);
+  const mathsFromPage = async () => {
+    const renderer = r();
+    if (!renderer?.clipPicture) return;
+    const rect = await new Promise<DOMRect | null>((done) =>
+      setClipping({ done, what: "the formula" }),
+    );
+    if (!rect) return;
+    const clip = await renderer.clipPicture(rect);
+    if (!clip) {
+      toast("No maths there", { description: "Draw the box over a page." });
+      return;
+    }
+    setReadingMaths(true);
+    try {
+      const latex = await mathsFromPicture(clip.dataUrl);
+      if (!latex.trim()) toast("No maths was found in the box");
+      else setMath({ latex, rect, from: "picture" });
+    } catch (e) {
+      toast.error("Could not read the maths", { description: String((e as Error).message ?? e) });
+    } finally {
+      setReadingMaths(false);
+    }
   };
 
   // Paper notes: photographed pages saved as a PDF, linked to this place.
@@ -1114,6 +1159,18 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
         >
           <Camera />
         </Button>
+        {mathsModel?.on && mathsModel.downloaded && (fileType === "pdf" || isPaged(fileType)) && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Read maths from the page"
+            title="Read maths from the page as LaTeX: draw a box around a formula"
+            disabled={readingMaths || !!clipping}
+            onClick={() => void mathsFromPage()}
+          >
+            {readingMaths ? <Loader2 className="animate-spin" /> : <SquareSigma />}
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon"
@@ -1279,7 +1336,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
               }}
             >
               <div className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 rounded-md bg-foreground px-3 py-1.5 text-[12.5px] text-background shadow">
-                Draw a box around the figure · Esc to cancel
+                Draw a box around {clipping.what} · Esc to cancel
               </div>
               {clipBox && (
                 <div
@@ -1371,6 +1428,20 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
         )}
       </div>
 
+      {active && math && (
+        <MathPopover
+          key={math.latex}
+          latex={math.latex}
+          rect={math.rect}
+          from={math.from}
+          onClose={() => setMath(null)}
+          onNotebook={(block) => {
+            setMath(null);
+            setNotebookOpen(true);
+            setNotebookInsert(block);
+          }}
+        />
+      )}
       <CaptureDialog
         key={capturing ? "capturing" : "idle"}
         open={capturing}
@@ -1421,6 +1492,15 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
           }
           onNotebook={() => highlightFromSelection(profilePrefs.notes.defaultColor, addToNotebook)}
           onVoice={() => startVoice(true)}
+          onLatex={() => {
+            setMath({
+              latex: textToLatex(selection.quote.exact ?? ""),
+              rect: selection.rect,
+              from: "text",
+            });
+            r()?.clearSelection();
+            setSelection(null);
+          }}
           onCopy={() => {
             void navigator.clipboard.writeText(selection.quote.exact ?? "");
             r()?.clearSelection();

@@ -4,3 +4,10 @@ export { useSession, flushSession } from "./hooks/useSession";
 export { parseBookLink } from "./links";
 export { useAppDark } from "./hooks/useAppDark";
 export { CaptureViewer, captureOf } from "./capture";
+export {
+  cancelMathsDownload,
+  useDownloadMathsModel,
+  useMathsSettings,
+  useRemoveMathsModel,
+  useSetMathsFromPictures,
+} from "./maths/api";

@@ -40,6 +40,9 @@ pub struct AppSettings {
     /// recognition) or "tesseract". `None` picks the system's where there
     /// is one.
     pub ink_engine: Option<String>,
+    /// Read maths from pictures with the downloaded model (off: LaTeX is
+    /// only copied where a book has it exactly).
+    pub maths_from_pictures: bool,
 }
 
 /// Speech recognition: which downloaded model to use and how.

@@ -21,6 +21,7 @@ import type {
   ZoomValue,
 } from "../types";
 import { isDrawn } from "../types";
+import { mathmlToLatex } from "../math/latex";
 
 interface FoliateTocItem {
   label: string;
@@ -224,6 +225,16 @@ export class EbookRenderer implements Renderer {
           rect: this.toScreen(range.getBoundingClientRect(), doc.defaultView?.frameElement),
         });
       }, 0);
+    doc.addEventListener("click", (e) => {
+      const formula = (e.target as Element | null)?.closest?.("math");
+      if (!formula || !doc.getSelection()?.isCollapsed) return;
+      const latex = mathmlToLatex(formula);
+      if (latex)
+        this.events.mathClick?.(
+          latex,
+          this.toScreen(formula.getBoundingClientRect(), doc.defaultView?.frameElement),
+        );
+    });
     doc.addEventListener("pointerup", onUp);
     doc.addEventListener("keyup", onUp);
   }

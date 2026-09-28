@@ -51,6 +51,11 @@ pub struct AppState {
     pub extras_dir: std::path::PathBuf,
     /// Extra font downloads running, to cancel them.
     pub font_downloads: Mutex<std::collections::HashMap<String, Arc<AtomicBool>>>,
+    /// The maths model (app data `maths/`), loaded once when used, and
+    /// its download, to cancel it.
+    pub maths_dir: std::path::PathBuf,
+    pub maths_reader: Mutex<Option<Arc<libreri_maths::Reader>>>,
+    pub maths_download: Mutex<Option<Arc<AtomicBool>>>,
     /// Speech models downloaded by Libreri (this computer only).
     pub whisper_dir: std::path::PathBuf,
     /// Spell check: dictionaries (downloaded into app data `dictionaries/`)
@@ -237,6 +242,7 @@ impl AppState {
         let whisper_dir = app.path().app_data_dir()?.join("whisper");
         let dictionaries = app.path().app_data_dir()?.join("dictionaries");
         let extras_dir = app.path().app_data_dir()?.join("excalidraw");
+        let maths_dir = app.path().app_data_dir()?;
         // Keep the page cache under 2 GB (least recently read books go first).
         let cache = page_cache.clone();
         std::thread::spawn(move || {
@@ -266,6 +272,9 @@ impl AppState {
             tessdata,
             whisper_dir,
             extras_dir,
+            maths_dir,
+            maths_reader: Mutex::default(),
+            maths_download: Mutex::default(),
             capture_photos: Mutex::default(),
             font_downloads: Mutex::default(),
             spell: Arc::new(crate::spell_cache::SpellCache::new(dictionaries)),

@@ -14,7 +14,7 @@ Phase 8a lets you write and draw by hand beside a book, clip figures from its pa
 - **Ink to text:** the system's recogniser or Tesseract, chosen in Settings. Linux uses Tesseract.
 - **Maths from pictures (8b):**
   - Exact LaTeX stays the default: EPUB MathML, Markdown, and a rebuild from a PDF's text layer.
-  - An optional maths model (pix2tex, MIT) can be downloaded in Settings. Its runtime is downloaded with it, so nothing is added to Libreri until then, and a failure only affects that feature.
+  - An optional maths model (pix2tex, MIT) can be downloaded in Settings. It runs with candle, a pure-Rust engine built into Libreri, so a missing or bad model only affects that feature (see ADR 0025).
 
 ## Canvases
 

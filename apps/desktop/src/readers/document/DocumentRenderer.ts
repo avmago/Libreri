@@ -5,6 +5,7 @@
  * (`{type:"text", start, end}`) with a text quote as fallback, so they
  * survive small edits to the file.
  */
+import { mathmlToLatex } from "../math/latex";
 import { renderMarkdown, renderMermaid } from "@/lib/markdown";
 import type { Annotation } from "@/lib/ipc";
 import { findQuote, makeQuote } from "../quote";
@@ -172,6 +173,13 @@ export class DocumentRenderer implements Renderer {
       const mark = target.closest<HTMLElement>("mark[data-annotation]");
       if (mark && document.getSelection()?.isCollapsed) {
         this.events.annotationClick(mark.dataset.annotation!, mark.getBoundingClientRect());
+        return;
+      }
+      const formula = target.closest<HTMLElement>(".katex, math");
+      if (formula && document.getSelection()?.isCollapsed) {
+        const m = formula.localName === "math" ? formula : formula.querySelector("math");
+        const latex = m ? mathmlToLatex(m) : "";
+        if (latex) this.events.mathClick?.(latex, formula.getBoundingClientRect());
         return;
       }
       const a = target.closest<HTMLAnchorElement>("a[href]");

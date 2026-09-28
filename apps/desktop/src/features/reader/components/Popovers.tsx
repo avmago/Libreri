@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { Copy, MessageSquarePlus, Mic, NotebookPen, Trash2 } from "lucide-react";
+import { Copy, MessageSquarePlus, Mic, NotebookPen, Sigma, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DictateButton, VoicePlayer, voiceOf } from "@/features/speech";
 import { SpellTextarea } from "@/features/spell";
@@ -100,6 +100,7 @@ export function SelectionMenu({
   onComment,
   onNotebook,
   onVoice,
+  onLatex,
   onCopy,
   onClose,
 }: {
@@ -108,6 +109,7 @@ export function SelectionMenu({
   onComment: () => void;
   onNotebook: () => void;
   onVoice: () => void;
+  onLatex: () => void;
   onCopy: () => void;
   onClose: () => void;
 }) {
@@ -153,6 +155,15 @@ export function SelectionMenu({
           onClick={onVoice}
         >
           <Mic />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Copy as LaTeX"
+          title="Copy maths as LaTeX"
+          onClick={onLatex}
+        >
+          <Sigma />
         </Button>
         <Button variant="ghost" size="icon" aria-label="Copy" title="Copy" onClick={onCopy}>
           <Copy />

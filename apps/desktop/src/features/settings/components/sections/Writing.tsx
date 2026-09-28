@@ -12,6 +12,13 @@ import {
 } from "@/features/canvas";
 import { useProfilePrefs } from "@/features/profiles";
 import {
+  cancelMathsDownload,
+  useDownloadMathsModel,
+  useMathsSettings,
+  useRemoveMathsModel,
+  useSetMathsFromPictures,
+} from "@/features/reader";
+import {
   cancelDictionaryDownload,
   useDictionaries,
   useDownloadDictionary,
@@ -46,6 +53,31 @@ export function WritingSettings() {
   const getFont = useDownloadCanvasFont();
   const removeFont = useRemoveCanvasFont();
   const [fontProgress, setFontProgress] = useState<Record<string, number>>({});
+  const { data: maths } = useMathsSettings();
+  const setMaths = useSetMathsFromPictures();
+  const getMaths = useDownloadMathsModel();
+  const removeMaths = useRemoveMathsModel();
+  const [mathsProgress, setMathsProgress] = useState(0);
+  useEffect(() => {
+    const off = events.mathsDownload.listen(({ payload: p }) => {
+      if (p.total) setMathsProgress(Math.min(1, (p.done ?? 0) / p.total));
+    });
+    return () => void off.then((f) => f());
+  }, []);
+  const turnMaths = (on: boolean) => {
+    if (!on || maths?.downloaded) return setMaths.mutate(on);
+    setMathsProgress(0);
+    getMaths.mutate(undefined, {
+      onSuccess: () =>
+        setMaths.mutate(true, {
+          onSuccess: () => toast.success("Maths can now be read from pictures"),
+        }),
+      onError: (e) => {
+        if (e.message.toLowerCase() !== "cancelled")
+          toast.error("Could not download the maths model", { description: e.message });
+      },
+    });
+  };
   useEffect(() => {
     const off = events.canvasFontDownload.listen(({ payload: p }) => {
       if (p.total)
@@ -268,6 +300,59 @@ export function WritingSettings() {
               }
             />
           </Row>
+        </Group>
+      )}
+      {maths && (
+        <Group
+          title="Maths"
+          scope="computer"
+          description="Libreri copies maths as LaTeX exactly where a book has it (Markdown formulas, MathML in EPUBs). It can also read maths from pictures, such as scanned PDFs and clips, with a model that runs on this computer."
+        >
+          <Row
+            label="Read maths from pictures"
+            help={`Turning this on downloads the pix2tex model (MIT licence, about ${maths.sizeMb} MB) once. What it reads is a best attempt to check.`}
+          >
+            <Switch
+              label="Read maths from pictures"
+              checked={maths.on && maths.downloaded}
+              onChange={(v) => {
+                if (!getMaths.isPending && !maths.downloading) turnMaths(v);
+              }}
+            />
+          </Row>
+          {(getMaths.isPending || maths.downloading) && (
+            <Row label="Downloading the maths model">
+              <span className="flex items-center gap-1.5 text-[12.5px] text-muted-foreground tabular-nums">
+                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                {Math.round(mathsProgress * 100)}%
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Stop downloading the maths model"
+                onClick={() => void cancelMathsDownload()}
+              >
+                <X />
+              </Button>
+            </Row>
+          )}
+          {maths.downloaded && (
+            <Row label={`Maths model · ${maths.sizeMb} MB`} help="Kept on this computer.">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Remove the maths model"
+                onClick={() =>
+                  removeMaths.mutate(undefined, {
+                    onSuccess: () => toast("The maths model was removed"),
+                    onError: (e) => toast.error(e.message),
+                  })
+                }
+              >
+                <Trash2 />
+              </Button>
+            </Row>
+          )}
         </Group>
       )}
       {fonts.length > 0 && (

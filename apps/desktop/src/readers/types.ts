@@ -66,6 +66,8 @@ export interface RendererEvents {
   annotationClick: (id: string, rect: DOMRect) => void;
   /** A `libreri://` link (from notes inside a book) or external link was clicked. */
   externalLink?: (href: string) => void;
+  /** A formula was clicked: its LaTeX and where it is on screen. */
+  mathClick?: (latex: string, rect: DOMRect) => void;
   /** PDF forms: fields were filled in (true) or put back (false). */
   formChanged?: (dirty: boolean) => void;
 }

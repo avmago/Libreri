@@ -195,6 +195,12 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::canvas::download_canvas_font,
             commands::canvas::cancel_canvas_font_download,
             commands::canvas::remove_canvas_font,
+            commands::maths::maths_settings,
+            commands::maths::set_maths_from_pictures,
+            commands::maths::download_maths_model,
+            commands::maths::cancel_maths_download,
+            commands::maths::remove_maths_model,
+            commands::maths::maths_from_picture,
             commands::spell::spell_dictionaries,
             commands::spell::download_dictionary,
             commands::spell::cancel_dictionary_download,
@@ -228,6 +234,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::AutoSyncFinished,
             events::DictionaryDownload,
             events::CanvasFontDownload,
+            events::MathsDownload,
         ])
 }
 

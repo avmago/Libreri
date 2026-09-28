@@ -1,0 +1,28 @@
+[package]
+name = "libreri-maths"
+description = "Reading maths from pictures as LaTeX (pix2tex, run with candle), downloaded on request."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+candle-core = "0.11.0"
+candle-nn = "0.11.0"
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
+ureq = "3.4"
+regex = "1"
+sha2 = "0.10"
+specta = { version = "=2.0.0-rc.25", features = ["derive"], optional = true }
+
+[features]
+specta = ["dep:specta"]
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

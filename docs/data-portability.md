@@ -68,6 +68,12 @@ Requirement (user, 2026-09-27): when the database, metadata and every kind of no
   - Speech models are per computer (app data `whisper/`) and never exported. See `docs/adr/0022-voice-notes-dictation-and-sync.md`.
 - The personal spelling dictionary is `Notes/<profile>/Dictionary.txt` (one word per line), so it travels with the notes folder. Writing settings (spell check, completion, languages) are profile preferences; downloaded dictionaries are per computer (app data `dictionaries/`) and never exported. See `docs/adr/0023-spell-check-and-word-suggestions.md`.
 - Canvases are standard Excalidraw files in `Notes/<profile>/Canvases/` (pictures inside). Their `libreri.book` is a `libreri://book/<id>` link, and clipped figures link to `libreri://book/<id>#page=<n>&rect=x,y,w,h`. Both follow book id changes through aliases. They open in other Excalidraw tools, which ignore Libreri's details. The ink-to-text choice is per computer. See `docs/adr/0024-handwriting-canvases.md`.
+- Paper notes are PDFs in `Notes/<profile>/Captures/`, with a text layer when OCR was used.
+  - Each is linked to its page by an annotation of kind `capture`. Its locator is an ordinary reader locator plus `"capture": "Notes/<profile>/Captures/<title>.pdf"`, `"pages"` and `"title"`, and its `note` is the text read.
+  - The path is relative to the library, so it travels with the notes folder.
+  - Deleting the note keeps the PDF, so Undo works.
+  - See `docs/adr/0025-paper-notes-and-maths.md`.
+- The maths model and the maths setting are per computer (app data `maths/`) and never exported. LaTeX added to a notebook is ordinary `$$` Markdown.
 
 ## Edited PDFs (versions)
 - Page edits create a new version with a **page map** (old page → new page). Anchors are migrated through the map; text-quote fallback catches the rest. Exports include the version history so links to older versions still resolve.
