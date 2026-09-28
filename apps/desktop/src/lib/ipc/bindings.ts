@@ -427,6 +427,12 @@ export const commands = {
 	 *  Settings. `lang` is the book's language, when known.
 	 */
 	inkToText: (pngBase64: string, lang: string | null) => typedError<string, AppError>(__TAURI_INVOKE("ink_to_text", { pngBase64, lang })),
+	/**  Extra fonts for canvases, and which are downloaded. */
+	canvasFonts: () => __TAURI_INVOKE<ExtraFont[]>("canvas_fonts"),
+	/**  Downloads an extra canvas font; progress arrives as `CanvasFontDownload`. */
+	downloadCanvasFont: (id: string) => typedError<ExtraFont[], AppError>(__TAURI_INVOKE("download_canvas_font", { id })),
+	cancelCanvasFontDownload: (id: string) => __TAURI_INVOKE<void>("cancel_canvas_font_download", { id }),
+	removeCanvasFont: (id: string) => typedError<ExtraFont[], AppError>(__TAURI_INVOKE("remove_canvas_font", { id })),
 	spellDictionaries: () => __TAURI_INVOKE<DictionaryInfo[]>("spell_dictionaries"),
 	/**  Downloads a dictionary; progress arrives as `DictionaryDownload`. */
 	downloadDictionary: (code: string) => typedError<DictionaryInfo[], AppError>(__TAURI_INVOKE("download_dictionary", { code })),
@@ -459,6 +465,7 @@ export const events = {
 	archiveImported: makeEvent<ArchiveImported>("archive-imported"),
 	autoSyncFinished: makeEvent<AutoSyncFinished>("auto-sync-finished"),
 	backupFinished: makeEvent<BackupFinished>("backup-finished"),
+	canvasFontDownload: makeEvent<CanvasFontDownload>("canvas-font-download"),
 	compareFinished: makeEvent<CompareFinished>("compare-finished"),
 	detailsFilled: makeEvent<DetailsFilled>("details-filled"),
 	dictionaryDownload: makeEvent<DictionaryDownload>("dictionary-download"),
@@ -814,6 +821,15 @@ export type CanvasDto = {
 	elements: number,
 };
 
+/**  Progress of downloading an extra canvas font. */
+export type CanvasFontDownload = {
+	id: string,
+	done: number | null,
+	total: number | null,
+	finished: boolean,
+	error: string | null,
+};
+
 /**  One difference. `pair` is the index into the page pairs. */
 export type Change = {
 	kind: ChangeKind,
@@ -1040,6 +1056,15 @@ export type ExportRequestDto = {
 	notes: boolean,
 	bookFiles: boolean,
 	everyone: boolean,
+};
+
+/**  A font that can be added. */
+export type ExtraFont = {
+	id: string,
+	name: string,
+	description: string,
+	sizeMb: number,
+	downloaded: boolean,
 };
 
 /**  Counts for the sidebar and the filter menus. */

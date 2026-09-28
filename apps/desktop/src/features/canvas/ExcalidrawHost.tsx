@@ -24,14 +24,16 @@ import "@excalidraw/excalidraw/index.css";
 import { paperStyle } from "./paper";
 import type { Paper } from "./api";
 import type { PageClip } from "@/readers";
+import { bookUrl } from "@/lib/ipc";
 
 declare global {
   interface Window {
     EXCALIDRAW_ASSET_PATH?: string | string[];
   }
 }
-// Fonts are served by Libreri (copied from the package), never a CDN.
-window.EXCALIDRAW_ASSET_PATH = "/excalidraw/";
+// Fonts are served by Libreri, never a CDN: the ones shipped with the app,
+// then extra ones downloaded in Settings › Writing (served from app data).
+window.EXCALIDRAW_ASSET_PATH = ["/excalidraw/", bookUrl(".extras/")];
 
 export interface CanvasHandle {
   /** Adds a clipped figure, linked back to its page. */

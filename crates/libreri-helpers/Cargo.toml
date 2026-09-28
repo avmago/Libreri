@@ -10,6 +10,8 @@ publish.workspace = true
 [dependencies]
 serde.workspace = true
 ureq = "3.4"
+flate2 = "1.1.10"
+tar = "0.4.46"
 # Only the desktop shell turns this on, to generate TypeScript types.
 specta = { version = "=2.0.0-rc.25", features = ["derive"], optional = true }
 

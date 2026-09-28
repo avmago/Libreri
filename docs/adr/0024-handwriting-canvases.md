@@ -18,7 +18,7 @@ Phase 8a lets you write and draw by hand beside a book, clip figures from its pa
 
 ## Canvases
 
-- **The editor:** Excalidraw (MIT) is loaded only when a canvas opens, because it is large. Its fonts are served by Libreri (copied from the package at build time; the 13 MB Chinese/Japanese handwriting font is left out), never from a CDN.
+- **The editor:** Excalidraw (MIT) is loaded only when a canvas opens, because it is large. Its fonts are served by Libreri (copied from the package at build time), never from a CDN. The 13 MB Chinese, Japanese and Korean handwriting font (Xiaolai) is left out of the app. It can be downloaded in Settings › Writing › Canvas fonts, and removed there too. It is taken from the same Excalidraw release on the npm registry, kept in app data `excalidraw/fonts/`, and served to canvases through `book://…/.extras/`, the second place Excalidraw looks for fonts.
 - **Files:** each canvas is a standard `.excalidraw` file in `Notes/<profile>/Canvases/`, so it opens in excalidraw.com and other tools. Libreri's details sit in a `libreri` object that other tools ignore:
   - `book` is a `libreri://book/<id>` link, resolved through the book's aliases, so it keeps working after a book changes.
   - `paper` is plain, lined, squared or dotted.

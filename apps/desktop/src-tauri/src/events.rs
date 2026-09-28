@@ -384,6 +384,17 @@ pub struct AutoSyncFinished {
     pub error: Option<String>,
 }
 
+/// Progress of downloading an extra canvas font.
+#[derive(Debug, Clone, Serialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct CanvasFontDownload {
+    pub id: String,
+    pub done: f64,
+    pub total: Option<f64>,
+    pub finished: bool,
+    pub error: Option<String>,
+}
+
 /// Progress of downloading a spelling dictionary.
 #[derive(Debug, Clone, Serialize, Type, Event)]
 #[serde(rename_all = "camelCase")]

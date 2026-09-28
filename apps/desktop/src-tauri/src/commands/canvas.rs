@@ -191,3 +191,92 @@ pub async fn ink_to_text(
     })
     .await
 }
+
+/// Extra fonts for canvases, and which are downloaded.
+#[tauri::command]
+#[specta::specta]
+pub fn canvas_fonts(state: State<'_, AppState>) -> Vec<libreri_helpers::fonts::ExtraFont> {
+    libreri_helpers::fonts::fonts(&state.extras_dir)
+}
+
+/// Downloads an extra canvas font; progress arrives as `CanvasFontDownload`.
+#[tauri::command]
+#[specta::specta]
+pub async fn download_canvas_font(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+) -> AppResult<Vec<libreri_helpers::fonts::ExtraFont>> {
+    use crate::events::CanvasFontDownload;
+    use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
+    use tauri_specta::Event;
+    let dir = state.extras_dir.clone();
+    let cancel: Arc<AtomicBool> = Arc::default();
+    {
+        let mut running = state.font_downloads.lock().expect("downloads lock");
+        if running.contains_key(&id) {
+            return Err(AppError::invalid("that font is already downloading"));
+        }
+        running.insert(id.clone(), Arc::clone(&cancel));
+    }
+    let font = id.clone();
+    let result = blocking(move || {
+        let mut last = std::time::Instant::now();
+        let handle = app.clone();
+        let f = font.clone();
+        let result = libreri_helpers::fonts::download(&dir, &font, &cancel, move |done, total| {
+            if last.elapsed().as_millis() > 250 {
+                last = std::time::Instant::now();
+                let _ = CanvasFontDownload {
+                    id: f.clone(),
+                    done: done as f64,
+                    total: total.map(|t| t as f64),
+                    finished: false,
+                    error: None,
+                }
+                .emit(&handle);
+            }
+        });
+        let _ = CanvasFontDownload {
+            id: font.clone(),
+            done: 0.0,
+            total: None,
+            finished: true,
+            error: result.as_ref().err().cloned(),
+        }
+        .emit(&app);
+        result.map_err(AppError::invalid)
+    })
+    .await;
+    state
+        .font_downloads
+        .lock()
+        .expect("downloads lock")
+        .remove(&id);
+    result?;
+    Ok(libreri_helpers::fonts::fonts(&state.extras_dir))
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn cancel_canvas_font_download(state: State<'_, AppState>, id: String) {
+    if let Some(c) = state
+        .font_downloads
+        .lock()
+        .expect("downloads lock")
+        .get(&id)
+    {
+        c.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn remove_canvas_font(
+    state: State<'_, AppState>,
+    id: String,
+) -> AppResult<Vec<libreri_helpers::fonts::ExtraFont>> {
+    libreri_helpers::fonts::remove(&state.extras_dir, &id).map_err(AppError::invalid)?;
+    Ok(libreri_helpers::fonts::fonts(&state.extras_dir))
+}

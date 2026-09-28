@@ -51,12 +51,25 @@ fn serve(app: &AppHandle, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
     let Some(state) = app.try_state::<AppState>() else {
         return status(StatusCode::SERVICE_UNAVAILABLE);
     };
-    let Some(library) = state.library_if_open() else {
-        return status(StatusCode::NOT_FOUND);
-    };
     let raw = request.uri().path().trim_start_matches('/');
     let Ok(relative) = percent_decode(raw) else {
         return status(StatusCode::BAD_REQUEST);
+    };
+    // `.extras/fonts/<font>/<file>.woff2`: canvas fonts downloaded in Settings.
+    if let Some(rest) = relative.strip_prefix(".extras/") {
+        return match libreri_helpers::fonts::file(&state.extras_dir, rest)
+            .and_then(|p| std::fs::read(p).ok())
+        {
+            Some(bytes) => base(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "font/woff2")
+                .header(header::CACHE_CONTROL, "max-age=31536000")
+                .body(bytes)
+                .expect("font response"),
+            None => status(StatusCode::NOT_FOUND),
+        };
+    }
+    let Some(library) = state.library_if_open() else {
+        return status(StatusCode::NOT_FOUND);
     };
     // `.pages/<book id>/<page>?w=<width>`: a comic or DjVu page image.
     if let Some(rest) = relative.strip_prefix(".pages/") {

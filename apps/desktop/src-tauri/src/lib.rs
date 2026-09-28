@@ -185,6 +185,10 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::canvas::ink_settings,
             commands::canvas::set_ink_engine,
             commands::canvas::ink_to_text,
+            commands::canvas::canvas_fonts,
+            commands::canvas::download_canvas_font,
+            commands::canvas::cancel_canvas_font_download,
+            commands::canvas::remove_canvas_font,
             commands::spell::spell_dictionaries,
             commands::spell::download_dictionary,
             commands::spell::cancel_dictionary_download,
@@ -217,6 +221,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::SpeechModelDownload,
             events::AutoSyncFinished,
             events::DictionaryDownload,
+            events::CanvasFontDownload,
         ])
 }
 

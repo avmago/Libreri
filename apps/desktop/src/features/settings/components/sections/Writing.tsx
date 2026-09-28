@@ -2,7 +2,14 @@ import { useEffect, useState } from "react";
 import { Download, Loader2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { useInkSettings, useSetInkEngine } from "@/features/canvas";
+import {
+  cancelCanvasFontDownload,
+  useCanvasFonts,
+  useDownloadCanvasFont,
+  useInkSettings,
+  useRemoveCanvasFont,
+  useSetInkEngine,
+} from "@/features/canvas";
 import { useProfilePrefs } from "@/features/profiles";
 import {
   cancelDictionaryDownload,
@@ -35,6 +42,17 @@ export function WritingSettings() {
   const [pick, setPick] = useState("");
   const { data: ink } = useInkSettings();
   const setInk = useSetInkEngine();
+  const { data: fonts = [] } = useCanvasFonts();
+  const getFont = useDownloadCanvasFont();
+  const removeFont = useRemoveCanvasFont();
+  const [fontProgress, setFontProgress] = useState<Record<string, number>>({});
+  useEffect(() => {
+    const off = events.canvasFontDownload.listen(({ payload: p }) => {
+      if (p.total)
+        setFontProgress((s) => ({ ...s, [p.id]: Math.min(1, (p.done ?? 0) / p.total!) }));
+    });
+    return () => void off.then((f) => f());
+  }, []);
 
   useEffect(() => {
     const off = events.dictionaryDownload.listen(({ payload: p }) => {
@@ -250,6 +268,64 @@ export function WritingSettings() {
               }
             />
           </Row>
+        </Group>
+      )}
+      {fonts.length > 0 && (
+        <Group
+          title="Canvas fonts"
+          scope="computer"
+          description="Fonts canvases can use for text. They are downloaded to this computer and can be removed here."
+        >
+          {fonts.map((f) => (
+            <Row key={f.id} label={`${f.name} · ${f.sizeMb} MB`} help={f.description}>
+              {f.downloaded ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Remove ${f.name}`}
+                  onClick={() =>
+                    removeFont.mutate(f.id, {
+                      onSuccess: () => toast(`${f.name} was removed`),
+                      onError: (e) => toast.error(e.message),
+                    })
+                  }
+                >
+                  <Trash2 />
+                </Button>
+              ) : getFont.isPending && getFont.variables === f.id ? (
+                <>
+                  <span className="flex items-center gap-1.5 text-[12.5px] text-muted-foreground tabular-nums">
+                    <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                    {Math.round((fontProgress[f.id] ?? 0) * 100)}%
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Stop downloading ${f.name}`}
+                    onClick={() => void cancelCanvasFontDownload(f.id)}
+                  >
+                    <X />
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    getFont.mutate(f.id, {
+                      onSuccess: () => toast.success(`${f.name} is ready for canvases`),
+                      onError: (e) => {
+                        if (e.message.toLowerCase() !== "cancelled")
+                          toast.error(`Could not download ${f.name}`, { description: e.message });
+                      },
+                    })
+                  }
+                >
+                  <Download /> Download
+                </Button>
+              )}
+            </Row>
+          ))}
         </Group>
       )}
     </>

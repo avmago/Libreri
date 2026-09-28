@@ -2974,8 +2974,10 @@ dependencies = [
 name = "libreri-helpers"
 version = "0.1.0"
 dependencies = [
+ "flate2",
  "serde",
  "specta",
+ "tar",
  "tempfile",
  "ureq",
 ]

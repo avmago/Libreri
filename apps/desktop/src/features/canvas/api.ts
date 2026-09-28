@@ -63,3 +63,28 @@ export function useSetInkEngine() {
     onSuccess: (d) => qc.setQueryData(["ink"], d),
   });
 }
+
+export const canvasFontsKey = ["canvas-fonts"] as const;
+
+/** Extra canvas fonts that can be downloaded. */
+export function useCanvasFonts() {
+  return useQuery({ queryKey: canvasFontsKey, queryFn: () => commands.canvasFonts() });
+}
+
+export function useDownloadCanvasFont() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => unwrap(commands.downloadCanvasFont(id)),
+    onSettled: () => void qc.invalidateQueries({ queryKey: canvasFontsKey }),
+  });
+}
+
+export function useRemoveCanvasFont() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => unwrap(commands.removeCanvasFont(id)),
+    onSuccess: (d) => qc.setQueryData(canvasFontsKey, d),
+  });
+}
+
+export const cancelCanvasFontDownload = (id: string) => commands.cancelCanvasFontDownload(id);
