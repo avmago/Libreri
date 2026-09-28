@@ -30,7 +30,7 @@ Phase 7c checks spelling everywhere you write, suggests corrections, and complet
 - **Learning words:**
   - A book's words come from its text, with OCR text for scanned pages. The notes' words come from the profile's Markdown notes (up to 20 MB, relearned every five minutes).
   - Both are learned in the background and kept in memory for the last four books. Checking never waits for them: until they are ready, only the dictionaries are used.
-- **Settings › Writing (the profile's):** spell check on or off, word completion on or off, and up to four languages checked together. It also downloads and removes dictionaries (this computer), and lists and removes words in your dictionary.
+- **Settings › Writing (the profile's):** spell check on or off, word completion on or off, and up to four languages checked together. It also downloads dictionaries (chosen from a drop-down list) and removes them with a bin button (this computer), and lists and removes words in your dictionary.
 
 ## In the interface
 

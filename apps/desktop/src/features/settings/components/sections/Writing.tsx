@@ -31,7 +31,7 @@ export function WritingSettings() {
   const removeWord = useRemoveOwnWord();
   const [progress, setProgress] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState<string[]>([]);
-  const [more, setMore] = useState(false);
+  const [pick, setPick] = useState("");
 
   useEffect(() => {
     const off = events.dictionaryDownload.listen(({ payload: p }) => {
@@ -125,48 +125,57 @@ export function WritingSettings() {
             )}
           </Row>
         ))}
-        <div className="flex flex-col gap-2 px-4 py-3">
-          <button
-            type="button"
-            onClick={() => setMore((v) => !v)}
-            aria-expanded={more}
-            className="self-start text-[12.5px] font-medium text-muted-foreground hover:text-foreground"
+        {dicts
+          .filter((d) => busy.includes(d.code))
+          .map((d) => (
+            <Row key={d.code} label={d.name} help="Downloading…">
+              <span className="flex items-center gap-1.5 text-[12.5px] text-muted-foreground tabular-nums">
+                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                {Math.round((progress[d.code] ?? 0) * 100)}%
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={`Stop downloading ${d.name}`}
+                onClick={() => void cancelDictionaryDownload(d.code)}
+              >
+                <X />
+              </Button>
+            </Row>
+          ))}
+        <Row
+          label="Add a language"
+          help="Downloaded to this computer. Remove it here any time with the bin button."
+          htmlFor="lb-add-dictionary"
+        >
+          <select
+            id="lb-add-dictionary"
+            className="h-8 max-w-56 rounded-md border border-input bg-background px-2 text-[13px] outline-none focus-visible:border-ring"
+            value={pick}
+            onChange={(e) => setPick(e.target.value)}
           >
-            {more ? "Hide other languages" : `Get another language (${others.length} available)…`}
-          </button>
-          {more && (
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-              {others.map((d) => (
-                <div key={d.code} className="flex items-center gap-2">
-                  <span className="flex-1 text-[12.5px]">
-                    {d.name} <span className="text-muted-foreground">· {size(d.sizeKb)}</span>
-                  </span>
-                  {busy.includes(d.code) ? (
-                    <>
-                      <span className="flex items-center gap-1 text-[12px] text-muted-foreground tabular-nums">
-                        <Loader2 className="size-3 animate-spin" aria-hidden />
-                        {Math.round((progress[d.code] ?? 0) * 100)}%
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-7"
-                        aria-label={`Stop downloading ${d.name}`}
-                        onClick={() => void cancelDictionaryDownload(d.code)}
-                      >
-                        <X />
-                      </Button>
-                    </>
-                  ) : (
-                    <Button variant="ghost" size="sm" onClick={() => get(d)}>
-                      <Download /> Get
-                    </Button>
-                  )}
-                </div>
+            <option value="">Choose a language…</option>
+            {others
+              .filter((d) => !busy.includes(d.code))
+              .map((d) => (
+                <option key={d.code} value={d.code}>
+                  {d.name} ({size(d.sizeKb)})
+                </option>
               ))}
-            </div>
-          )}
-        </div>
+          </select>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!pick}
+            onClick={() => {
+              const d = others.find((x) => x.code === pick);
+              if (d) get(d);
+              setPick("");
+            }}
+          >
+            <Download /> Download
+          </Button>
+        </Row>
       </Group>
 
       <Group
