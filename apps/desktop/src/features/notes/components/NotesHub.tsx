@@ -20,7 +20,7 @@ import {
   useDeleteCanvas,
   type Paper,
 } from "@/features/canvas";
-import { parseBookLink, useAppDark } from "@/features/reader";
+import { CaptureViewer, parseBookLink, useAppDark } from "@/features/reader";
 import { commands, type HighlightColor, type NoteDto } from "@/lib/ipc";
 import { useShortcut } from "@/lib/shortcuts";
 import { useTabs } from "@/lib/tabs";
@@ -36,6 +36,7 @@ const KINDS: { id: NoteKind; label: string }[] = [
   { id: "highlights", label: "Highlights" },
   { id: "comments", label: "With comments" },
   { id: "voice", label: "Voice notes" },
+  { id: "captures", label: "Paper notes" },
   { id: "bookmarks", label: "Bookmarks" },
 ];
 
@@ -142,6 +143,7 @@ function Marks({ search }: { search: string }) {
   const [colors, setColors] = useState<HighlightColor[]>([]);
   const [bookId, setBookId] = useState<string | null>(null);
   const [grouped, setGrouped] = useState(true);
+  const [viewing, setViewing] = useState<{ path: string; title: string } | null>(null);
 
   const books = useMemo(
     () => byBook(notes).map((g) => ({ id: g.bookId, title: g.title })),
@@ -170,6 +172,7 @@ function Marks({ search }: { search: string }) {
       showBook={showBook}
       onOpen={() => openAt(n)}
       onChange={(a) => update.mutate(a)}
+      onOpenCapture={(path, title) => setViewing({ path, title })}
       onDelete={() =>
         remove.mutate(n.annotation, {
           onSuccess: () =>
@@ -183,6 +186,11 @@ function Marks({ search }: { search: string }) {
 
   return (
     <>
+      <CaptureViewer
+        path={viewing?.path ?? null}
+        title={viewing?.title ?? ""}
+        onClose={() => setViewing(null)}
+      />
       <div className="flex flex-wrap items-center gap-2 border-b px-6 pb-3">
         <div className="flex rounded-md border p-0.5" role="group" aria-label="Show">
           {KINDS.map((k) => (

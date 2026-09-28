@@ -38,7 +38,8 @@ pub use compare::{
 };
 pub use draw::{mark_up, pages_to_pdf, DrawOp, DrawPage, PageImage};
 pub use edit::{
-    apply, Correction, EditPlan, EditReport, OcrWords, OutPage, PageMove, Quality, Redaction,
+    apply, pictures_pdf, Correction, EditPlan, EditReport, OcrWords, OutPage, PageMove, Quality,
+    Redaction,
 };
 pub use report::{compare_report, ReportInfo, ReportPicture};
 

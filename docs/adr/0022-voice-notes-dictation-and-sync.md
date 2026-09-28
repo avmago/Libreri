@@ -29,7 +29,7 @@ Phase 7b adds speech recognition: voice notes, dictation and finding an audioboo
   - Voice notes on selected text are drawn with a dotted underline.
   - They are listed under *Voice notes* in the Marks panel, with a player.
   - The Notes hub has a *Voice notes* filter.
-  - Deleting the annotation moves the recording to the system trash.
+  - Deleting the voice note keeps the recording in the notes folder (changed in 8b), so the Notes hub's *Undo* brings it back whole.
 - **In notebooks and notes:** a microphone button records and inserts `**Voice note** [0:42](<Voice notes/….flac>)` with the transcript as a quote. The relative link also works in other Markdown editors. The preview shows a player in place of the link.
 - **Validation:** a voice annotation must name an audio file under `Notes/`, with no `..` parts. The `book://` protocol serves only the signed-in profile's own notes folder.
 

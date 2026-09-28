@@ -2,6 +2,8 @@ import { useRef, useState } from "react";
 import {
   ArrowUpRight,
   Bookmark,
+  Camera,
+  FileText,
   Copy,
   MessageSquareText,
   Mic,
@@ -9,6 +11,7 @@ import {
   StickyNote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { captureOf } from "@/features/reader";
 import { DictateButton, VoicePlayer, voiceOf } from "@/features/speech";
 import { SpellTextarea } from "@/features/spell";
 import type { HighlightColor, NoteDto } from "@/lib/ipc";
@@ -30,12 +33,14 @@ export function NoteCard({
   onOpen,
   onChange,
   onDelete,
+  onOpenCapture,
 }: {
   note: NoteDto;
   showBook: boolean;
   onOpen: () => void;
   onChange: (a: NoteDto["annotation"]) => void;
   onDelete: () => void;
+  onOpenCapture?: (path: string, title: string) => void;
 }) {
   const a = note.annotation;
   const [editing, setEditing] = useState(false);
@@ -44,6 +49,7 @@ export function NoteCard({
   const markup = a.kind === "markup";
   const drawn = markup ? (markupText(a) ?? "Sticky note") : null;
   const voice = a.kind === "voice" ? voiceOf(a.locator) : null;
+  const capture = captureOf(a);
   const box = useRef<HTMLTextAreaElement>(null);
 
   return (
@@ -78,7 +84,20 @@ export function NoteCard({
             <VoicePlayer path={voice} className="max-w-md" />
           </>
         )}
-        {voice ? null : markup ? (
+        {capture && (
+          <p className="flex items-center gap-2 font-medium">
+            <Camera className="size-4 text-muted-foreground" aria-hidden /> {capture.title}
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-2"
+              onClick={() => onOpenCapture?.(capture.path, capture.title)}
+            >
+              <FileText /> Show {capture.pages} {capture.pages === 1 ? "page" : "pages"}
+            </Button>
+          </p>
+        )}
+        {voice || capture ? null : markup ? (
           <p className="flex items-center gap-2 font-medium">
             <StickyNote className="size-4 text-muted-foreground" aria-hidden /> {drawn}
           </p>
@@ -128,6 +147,10 @@ export function NoteCard({
           a.note &&
           (voice ? (
             <p className="text-[13px] leading-relaxed whitespace-pre-line italic">“{a.note}”</p>
+          ) : capture ? (
+            <p className="line-clamp-4 text-[12.5px] leading-relaxed whitespace-pre-line text-muted-foreground">
+              {a.note}
+            </p>
           ) : (
             <p className="flex gap-2 rounded-md bg-muted px-2.5 py-2 text-[13px] leading-relaxed whitespace-pre-line">
               <MessageSquareText

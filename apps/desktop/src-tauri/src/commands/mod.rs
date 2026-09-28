@@ -6,6 +6,7 @@
 pub mod app;
 pub mod books;
 pub mod canvas;
+pub mod capture;
 pub mod compare;
 pub mod details;
 pub mod edit;

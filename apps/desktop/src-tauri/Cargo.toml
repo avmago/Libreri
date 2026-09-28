@@ -20,7 +20,7 @@ uuid.workspace = true
 libreri-library.workspace = true
 libreri-jobs.workspace = true
 libreri-metadata = { workspace = true, features = ["specta"] }
-libreri-scan.workspace = true
+libreri-scan = { workspace = true, features = ["specta"] }
 libreri-helpers = { workspace = true, features = ["specta"] }
 libreri-speech = { workspace = true, features = ["specta"] }
 libreri-spell = { workspace = true, features = ["specta"] }
@@ -40,6 +40,7 @@ specta-typescript = "0.0.12"
 tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
 tauri-plugin-opener = "2.5.5"
 base64 = "0.23.1"
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp", "gif", "bmp"] }
 
 [dev-dependencies]
 tempfile.workspace = true

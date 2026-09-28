@@ -8,6 +8,9 @@ authors.workspace = true
 publish.workspace = true
 
 [dependencies]
+serde.workspace = true
+# Only the desktop shell turns this on, to generate TypeScript types.
+specta = { version = "=2.0.0-rc.25", features = ["derive"], optional = true }
 libreri-core.workspace = true
 rxing = { version = "0.9.3", default-features = false, features = ["decoders", "oned", "encoding_rs"] }
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp", "gif", "bmp"] }
@@ -16,6 +19,9 @@ qrcode = { version = "0.14.1", default-features = false, features = ["svg"] }
 local-ip-address = "0.6.13"
 rand_core = { version = "0.6", features = ["getrandom"] }
 
+
+[features]
+specta = ["dep:specta"]
 
 [dev-dependencies]
 rxing = { version = "0.9.3", default-features = false, features = ["decoders", "oned", "encoding_rs", "encoders"] }

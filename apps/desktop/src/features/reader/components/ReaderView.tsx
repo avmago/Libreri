@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Bookmark,
+  Camera,
   BookmarkCheck,
   GitCompare,
   Headphones,
@@ -75,6 +76,7 @@ import { CompareView } from "../compare/CompareView";
 import { CompareDialog } from "../compare/CompareDialog";
 import { useReadAloud } from "../speech/useReadAloud";
 import { AudiobookView } from "../listening/AudiobookView";
+import { CaptureDialog, CaptureViewer } from "../capture";
 import { useListening } from "../listening/store";
 import { timeAt } from "../listening/sync";
 import { ReadAloudBar } from "../speech/ReadAloudBar";
@@ -113,8 +115,15 @@ function countLabel(list: Annotation[]): string {
   const b = list.filter((a) => a.kind === "bookmark").length;
   const m = list.filter((a) => a.kind === "markup").length;
   const v = list.filter((a) => a.kind === "voice").length;
+  const c = list.filter((a) => a.kind === "capture").length;
   const part = (n: number, one: string) => (n ? `${n} ${one}${n === 1 ? "" : "s"}` : "");
-  return [part(h, "highlight"), part(b, "bookmark"), part(m, "mark"), part(v, "voice note")]
+  return [
+    part(h, "highlight"),
+    part(b, "bookmark"),
+    part(m, "mark"),
+    part(v, "voice note"),
+    part(c, "paper note"),
+  ]
     .filter(Boolean)
     .join(" · ");
 }
@@ -712,6 +721,53 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
     };
   };
 
+  // Paper notes: photographed pages saved as a PDF, linked to this place.
+  const [capturing, setCapturing] = useState(false);
+  const captureAt = useRef<typeof voiceAt.current>(null);
+  const [viewing, setViewing] = useState<{ path: string; title: string } | null>(null);
+  const startCapture = () => {
+    if (!location) return;
+    captureAt.current = {
+      locator:
+        location.locator.type === "pdf"
+          ? { type: "pdf", page: location.page ?? 1 }
+          : location.locator,
+      quote: null,
+      label:
+        location.section && location.page === undefined ? location.section : location.shortLabel,
+      position: location.progress,
+    };
+    setCapturing(true);
+  };
+  const savedCapture = (saved: { path: string; pages: number; text: string }, title: string) => {
+    setCapturing(false);
+    const at = captureAt.current;
+    if (!at) return;
+    saveAnnotation.mutate(
+      {
+        id: newId(),
+        bookId,
+        kind: "capture",
+        color: null,
+        locator: JSON.stringify({ ...at.locator, capture: saved.path, pages: saved.pages, title }),
+        quote: null,
+        note: saved.text.slice(0, 4000) || null,
+        label: at.label,
+        position: at.position,
+        createdAt: "",
+        modifiedAt: "",
+      },
+      {
+        onSuccess: () =>
+          toast.success(`${saved.pages} ${saved.pages === 1 ? "page" : "pages"} saved`, {
+            description: saved.path,
+            action: { label: "Show", onClick: () => setViewing({ path: saved.path, title }) },
+          }),
+        onError: (e) => toast.error("Could not link the pages", { description: String(e) }),
+      },
+    );
+  };
+
   const addToNotebook = (a: Annotation) => {
     setNotebookOpen(true);
     const block = quoteBlock(a, bookId, location?.shortLabel ?? "");
@@ -1051,6 +1107,16 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
         <Button
           variant="ghost"
           size="icon"
+          aria-label="Capture paper notes"
+          title="Capture paper notes with the camera, your phone or pictures"
+          disabled={!location}
+          onClick={startCapture}
+        >
+          <Camera />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           aria-label="Canvas"
           aria-pressed={canvasOpen}
           title="Canvas: write and draw by hand"
@@ -1151,6 +1217,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
             onGo={(target) => jump(() => r()?.goTo(target))}
             onShow={(a) => jump(() => r()?.showAnnotation(a))}
             onDelete={(a) => deleteAnnotation.mutate(a.id)}
+            onOpenCapture={(path, title) => setViewing({ path, title })}
             markup={
               markup.available ? (
                 <MarkupPanel
@@ -1303,6 +1370,22 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
           />
         )}
       </div>
+
+      <CaptureDialog
+        key={capturing ? "capturing" : "idle"}
+        open={capturing}
+        defaultTitle={`${book?.metadata.title ?? "Notes"}, ${location?.shortLabel ?? ""}`.replace(
+          /, $/,
+          "",
+        )}
+        onClose={() => setCapturing(false)}
+        onSaved={savedCapture}
+      />
+      <CaptureViewer
+        path={viewing?.path ?? null}
+        title={viewing?.title ?? ""}
+        onClose={() => setViewing(null)}
+      />
 
       {/* Status bar */}
       <div

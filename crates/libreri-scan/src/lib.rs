@@ -5,6 +5,7 @@
 //! [`PhoneScanner`] serves a one-time page on the local network so a phone
 //! can take the photo (see docs/adr/0013-online-details.md).
 
+pub mod paper;
 mod phone;
 
 pub use phone::{PhoneEvent, PhoneMode, PhonePairing, PhoneScanner};

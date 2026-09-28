@@ -410,6 +410,21 @@ export const commands = {
 	 *  Returns the job id.
 	 */
 	autoSyncAudiobook: (id: string) => typedError<string, AppError>(__TAURI_INVOKE("auto_sync_audiobook", { id })),
+	/**  Adds a photo (a data: URL, from the camera or the phone). */
+	captureAdd: (photo: string) => typedError<CapturePhoto, AppError>(__TAURI_INVOKE("capture_add", { photo })),
+	/**  Adds a picture file from the computer. */
+	captureAddFile: (path: string) => typedError<CapturePhoto, AppError>(__TAURI_INVOKE("capture_add_file", { path })),
+	/**  The page as it will be saved, small (a data: URL). */
+	capturePreview: (page: CapturePageSpec) => typedError<string, AppError>(__TAURI_INVOKE("capture_preview", { page })),
+	/**
+	 *  Saves the pages as one PDF. With `read_text`, Tesseract (when installed)
+	 *  reads them first, so the PDF can be searched.
+	 */
+	captureSave: (pages: CapturePageSpec[], title: string, readText: boolean) => typedError<CaptureSaved, AppError>(__TAURI_INVOKE("capture_save", { pages, title, readText })),
+	/**  Forgets photos that were not saved. */
+	captureDiscard: (ids: string[]) => __TAURI_INVOKE<void>("capture_discard", { ids }),
+	/**  Opens a captured PDF in the system's PDF app. */
+	openNoteFile: (path: string) => typedError<null, AppError>(__TAURI_INVOKE("open_note_file", { path })),
 	/**  The profile's canvases, newest first (only a book's, when given). */
 	canvases: (book: string | null) => typedError<CanvasDto[], AppError>(__TAURI_INVOKE("canvases", { book })),
 	/**  Starts a canvas. Returns its path. */
@@ -515,7 +530,12 @@ export type AnnotationKind = "highlight" | "bookmark" |
  *  locator's `audio` is the recording in the profile's notes folder;
  *  `note` holds its transcript.
  */
-"voice";
+"voice" | 
+/**
+ *  Photographed paper notes about a place: the locator's `capture` is
+ *  the PDF in the profile's notes folder; `note` holds its text.
+ */
+"capture";
 
 export type AppError = {
 	kind: AppErrorKind,
@@ -830,6 +850,37 @@ export type CanvasFontDownload = {
 	error: string | null,
 };
 
+/**  How one page should come out. */
+export type CapturePageSpec = {
+	id: string,
+	corners: ([(number | null), (number | null)])[],
+	clean: Clean,
+	/**  Quarter turns, clockwise. */
+	turns: number,
+};
+
+export type CapturePhoto = {
+	/**  The photo, kept for this capture only. */
+	id: string,
+	width: number,
+	height: number,
+	/**
+	 *  Where the page was found (top-left, top-right, bottom-right,
+	 *  bottom-left), as fractions.
+	 */
+	corners: ([(number | null), (number | null)])[],
+	/**  A small copy to show, as a data: URL. */
+	preview: string,
+};
+
+export type CaptureSaved = {
+	/**  The PDF in the library: `Notes/<profile>/Captures/….pdf`. */
+	path: string,
+	pages: number,
+	/**  The text read from the pages (empty when not read). */
+	text: string,
+};
+
 /**  One difference. `pair` is the index into the page pairs. */
 export type Change = {
 	kind: ChangeKind,
@@ -865,6 +916,17 @@ export type Citation = {
 export type CitationStyle = "apa" | "mla" | "chicago" | "harvard" | "ieee" | 
 /**  A BibTeX entry, for pasting into a `.bib` file. */
 "bibtex";
+
+/**  How a page is cleaned. */
+export type Clean = 
+/**  Colours kept, shadows and a grey cast removed. */
+"colour" | 
+/**  Grey, with even lighting. */
+"grey" | 
+/**  Black ink on white paper. */
+"blackWhite" | 
+/**  Left as photographed. */
+"none";
 
 export type CollectionDto = {
 	id: string,

@@ -44,6 +44,9 @@ pub struct AppState {
     index_running: Arc<AtomicBool>,
     /// OCR language files downloaded by Libreri (this computer only).
     pub tessdata: std::path::PathBuf,
+    /// Photos of paper notes being captured (id → file in the library's
+    /// scratch folder).
+    pub capture_photos: Mutex<std::collections::HashMap<String, std::path::PathBuf>>,
     /// Extra canvas fonts downloaded by Libreri (this computer only).
     pub extras_dir: std::path::PathBuf,
     /// Extra font downloads running, to cancel them.
@@ -263,6 +266,7 @@ impl AppState {
             tessdata,
             whisper_dir,
             extras_dir,
+            capture_photos: Mutex::default(),
             font_downloads: Mutex::default(),
             spell: Arc::new(crate::spell_cache::SpellCache::new(dictionaries)),
             transcriber: Mutex::new(None),

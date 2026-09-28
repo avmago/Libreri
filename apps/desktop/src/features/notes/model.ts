@@ -1,7 +1,7 @@
 import { markupModel } from "@/readers";
 import type { HighlightColor, NoteDto } from "@/lib/ipc";
 
-export type NoteKind = "all" | "highlights" | "comments" | "voice" | "bookmarks";
+export type NoteKind = "all" | "highlights" | "comments" | "voice" | "captures" | "bookmarks";
 
 export interface NoteFilter {
   search: string;
@@ -29,7 +29,9 @@ export function filterNotes(notes: NoteDto[], f: NoteFilter): NoteDto[] {
     if (f.kind === "highlights" && a.kind !== "highlight") return false;
     if (f.kind === "bookmarks" && a.kind !== "bookmark") return false;
     if (f.kind === "voice" && a.kind !== "voice") return false;
-    if (f.kind === "comments" && (a.kind === "voice" || !a.note?.trim())) return false;
+    if (f.kind === "captures" && a.kind !== "capture") return false;
+    if (f.kind === "comments" && (a.kind === "voice" || a.kind === "capture" || !a.note?.trim()))
+      return false;
     if (f.colors.length && (a.kind !== "highlight" || !f.colors.includes(a.color ?? "yellow"))) {
       return false;
     }
@@ -72,6 +74,20 @@ export function notesToMarkdown(notes: NoteDto[]): string {
         const words = markupText(a);
         out.push(
           `- ${words ? `“${words.replace(/\s+/g, " ")}”` : "Note"} on [${a.label ?? "page"}](${link})${a.note?.trim() ? `: ${a.note.trim()}` : ""}`,
+          "",
+        );
+        continue;
+      }
+      if (a.kind === "capture") {
+        let path = "";
+        try {
+          path = (JSON.parse(a.locator) as { capture?: string }).capture ?? "";
+        } catch {
+          /* no file */
+        }
+        const rel = path.split("/").slice(2).join("/");
+        out.push(
+          `- Paper notes on [${a.label || "page"}](${link})${rel ? `: [${rel.split("/").pop()}](<${rel}>)` : ""}`,
           "",
         );
         continue;

@@ -17,6 +17,7 @@ mod archive;
 mod archive_tests;
 mod books;
 mod canvases;
+pub mod captures;
 mod compare;
 mod covers;
 mod details;

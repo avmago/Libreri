@@ -23,6 +23,9 @@ pub enum AnnotationKind {
     /// locator's `audio` is the recording in the profile's notes folder;
     /// `note` holds its transcript.
     Voice,
+    /// Photographed paper notes about a place: the locator's `capture` is
+    /// the PDF in the profile's notes folder; `note` holds its text.
+    Capture,
 }
 
 impl AnnotationKind {
@@ -32,6 +35,7 @@ impl AnnotationKind {
             Self::Bookmark => "bookmark",
             Self::Markup => "markup",
             Self::Voice => "voice",
+            Self::Capture => "capture",
         }
     }
 
@@ -41,6 +45,7 @@ impl AnnotationKind {
             "bookmark" => Some(Self::Bookmark),
             "markup" => Some(Self::Markup),
             "voice" => Some(Self::Voice),
+            "capture" => Some(Self::Capture),
             _ => None,
         }
     }
@@ -121,6 +126,8 @@ pub enum AnnotationError {
     BadMarkup,
     #[error("the voice note's recording is missing")]
     BadVoice,
+    #[error("the captured pages are missing")]
+    BadCapture,
     #[error("the markup item is too large (pictures are limited to about 2 MB)")]
     MarkupTooLarge,
 }
@@ -175,6 +182,18 @@ impl Annotation {
             });
             if !ok {
                 return Err(AnnotationError::BadVoice);
+            }
+        }
+        if self.kind == AnnotationKind::Capture {
+            let v: serde_json::Value =
+                serde_json::from_str(&self.locator).map_err(|_| AnnotationError::BadLocator)?;
+            let ok = v.get("capture").and_then(|a| a.as_str()).is_some_and(|a| {
+                a.starts_with("Notes/")
+                    && !a.split('/').any(|p| p == ".." || p.is_empty())
+                    && a.to_ascii_lowercase().ends_with(".pdf")
+            });
+            if !ok {
+                return Err(AnnotationError::BadCapture);
             }
         }
         self.position = self.position.clamp(0.0, 1.0);
@@ -256,6 +275,12 @@ mod tests {
         voice.locator = r#"{"type":"pdf","page":2,"audio":"Notes/../secret.flac"}"#.into();
         assert_eq!(voice.clone().validated(), Err(AnnotationError::BadVoice));
         voice.locator = r#"{"type":"pdf","page":2}"#.into();
-        assert_eq!(voice.validated(), Err(AnnotationError::BadVoice));
+        assert_eq!(voice.clone().validated(), Err(AnnotationError::BadVoice));
+        let mut cap = voice;
+        cap.kind = AnnotationKind::Capture;
+        cap.locator = r#"{"type":"pdf","page":2,"capture":"Notes/Me/Captures/p. 2.pdf"}"#.into();
+        assert!(cap.clone().validated().is_ok());
+        cap.locator = r#"{"type":"pdf","page":2,"capture":"Books/x.pdf"}"#.into();
+        assert_eq!(cap.validated(), Err(AnnotationError::BadCapture));
     }
 }

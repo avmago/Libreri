@@ -1,7 +1,17 @@
 import type * as React from "react";
 import { useState } from "react";
-import { Bookmark, ChevronRight, Highlighter, MessageSquare, Mic, Trash2 } from "lucide-react";
+import {
+  Bookmark,
+  Camera,
+  ChevronRight,
+  FileText,
+  Highlighter,
+  MessageSquare,
+  Mic,
+  Trash2,
+} from "lucide-react";
 import { VoicePlayer, voiceOf } from "@/features/speech";
+import { captureOf } from "../capture/model";
 import type { Annotation } from "@/lib/ipc";
 import { highlightFill, type TocItem } from "@/readers";
 import { cn } from "@/lib/utils";
@@ -88,12 +98,15 @@ function MarkRow({
   a,
   onGo,
   onDelete,
+  onOpenCapture,
 }: {
   a: Annotation;
   onGo: (a: Annotation) => void;
   onDelete: (a: Annotation) => void;
+  onOpenCapture?: (path: string, title: string) => void;
 }) {
   const isBookmark = a.kind === "bookmark";
+  const capture = captureOf(a);
   const voice = a.kind === "voice" ? voiceOf(a.locator) : null;
   return (
     <li className="group relative">
@@ -107,6 +120,8 @@ function MarkRow({
             <Bookmark className="size-3" aria-hidden />
           ) : voice ? (
             <Mic className="size-3" aria-hidden />
+          ) : capture ? (
+            <Camera className="size-3" aria-hidden />
           ) : (
             <span
               className="size-2.5 rounded-full border border-black/10"
@@ -115,11 +130,14 @@ function MarkRow({
             />
           )}
           {a.label || (isBookmark ? "Bookmark" : voice ? "Voice note" : "Highlight")}
+          {capture && ` · ${capture.title}`}
         </span>
         {a.quote?.exact && <span className="line-clamp-3 leading-snug">{a.quote.exact}</span>}
         {a.note && (
           <span className="flex gap-1.5 text-[12px] text-muted-foreground">
-            {voice ? (
+            {capture ? (
+              <span className="line-clamp-3">{a.note}</span>
+            ) : voice ? (
               <span className="line-clamp-4 italic">“{a.note}”</span>
             ) : (
               <>
@@ -131,6 +149,16 @@ function MarkRow({
         )}
       </button>
       {voice && <VoicePlayer path={voice} className="mb-1.5 px-1.5" />}
+      {capture && onOpenCapture && (
+        <button
+          type="button"
+          onClick={() => onOpenCapture(capture.path, capture.title)}
+          className="mx-2.5 mb-2 flex items-center gap-1.5 rounded-md border px-2 py-1 text-[12px] hover:bg-muted"
+        >
+          <FileText className="size-3.5" aria-hidden /> Show {capture.pages}{" "}
+          {capture.pages === 1 ? "page" : "pages"}
+        </button>
+      )}
       <button
         type="button"
         aria-label="Delete"
@@ -155,6 +183,7 @@ export function ContentsPanel({
   onGo,
   onShow,
   onDelete,
+  onOpenCapture,
   markup,
 }: {
   panel: LeftPanel;
@@ -165,6 +194,7 @@ export function ContentsPanel({
   onGo: (target: string) => void;
   onShow: (a: Annotation) => void;
   onDelete: (a: Annotation) => void;
+  onOpenCapture?: (path: string, title: string) => void;
   /** Fixed-page books: the markup tab's content. */
   markup?: React.ReactNode;
 }) {
@@ -173,6 +203,7 @@ export function ContentsPanel({
   const bookmarks = annotations.filter((a) => a.kind === "bookmark");
   const highlights = annotations.filter((a) => a.kind === "highlight");
   const voices = annotations.filter((a) => a.kind === "voice");
+  const captures = annotations.filter((a) => a.kind === "capture");
   return (
     <aside
       aria-label="Contents and marks"
@@ -227,6 +258,24 @@ export function ContentsPanel({
                   <ul>
                     {bookmarks.map((a) => (
                       <MarkRow key={a.id} a={a} onGo={onShow} onDelete={onDelete} />
+                    ))}
+                  </ul>
+                </section>
+              )}
+              {captures.length > 0 && (
+                <section>
+                  <h3 className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground">
+                    PAPER NOTES
+                  </h3>
+                  <ul>
+                    {captures.map((a) => (
+                      <MarkRow
+                        key={a.id}
+                        a={a}
+                        onGo={onShow}
+                        onDelete={onDelete}
+                        onOpenCapture={onOpenCapture}
+                      />
                     ))}
                   </ul>
                 </section>

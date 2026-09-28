@@ -488,6 +488,14 @@ fn materialize(doc: &mut Document, page: ObjectId) {
 
 fn picture_page(doc: &mut Document, pages_root: ObjectId, src: &str) -> Result<ObjectId> {
     let bytes = decode_data_url(src)?;
+    picture_page_bytes(doc, pages_root, bytes)
+}
+
+fn picture_page_bytes(
+    doc: &mut Document,
+    pages_root: ObjectId,
+    bytes: Vec<u8>,
+) -> Result<ObjectId> {
     let (pw, ph, xobj) = if bytes.starts_with(&[0xFF, 0xD8]) {
         let img = image::load_from_memory(&bytes).map_err(|e| Error::Picture(e.to_string()))?;
         let gray = img.color().channel_count() == 1;
@@ -721,6 +729,38 @@ fn to_bytes(doc: &mut Document) -> Result<Vec<u8>> {
     let mut out = Vec::new();
     doc.save_to(&mut out)?;
     Ok(out)
+}
+
+/// Makes a PDF of pictures (JPEG or PNG), one page each, A4 wide, with
+/// OCR words (pages counted from 1) written as an invisible text layer so
+/// the PDF can be searched and its text selected.
+pub fn pictures_pdf(pictures: Vec<Vec<u8>>, ocr: &[OcrWords], dest: &Path) -> Result<u32> {
+    let mut doc = Document::with_version("1.5");
+    let root = doc.new_object_id();
+    let mut kids = Vec::new();
+    for bytes in pictures {
+        kids.push(picture_page_bytes(&mut doc, root, bytes)?);
+    }
+    if !ocr.is_empty() {
+        let font = glyphless_font(&mut doc);
+        for o in ocr {
+            if let Some(&id) = kids.get(o.page.saturating_sub(1) as usize) {
+                write_ocr_layer(&mut doc, id, font, &o.words)?;
+            }
+        }
+    }
+    let count = kids.len() as u32;
+    doc.objects.insert(
+        root,
+        Object::Dictionary(dictionary! {
+            "Type" => "Pages", "Count" => i64::from(count),
+            "Kids" => kids.into_iter().map(Object::Reference).collect::<Vec<_>>(),
+        }),
+    );
+    let catalog = doc.add_object(dictionary! { "Type" => "Catalog", "Pages" => root });
+    doc.trailer.set("Root", catalog);
+    save(&mut doc, dest)?;
+    Ok(count)
 }
 
 /// Applies `plan` to the PDF at `src` and writes the result to `dest`.
@@ -1378,5 +1418,36 @@ mod look {
         let out = std::path::PathBuf::from(dir).join("edited.pdf");
         let report = super::apply(std::path::Path::new(&src), &plan, &[], &out).unwrap();
         println!("{report:?}");
+    }
+}
+
+#[cfg(test)]
+mod pictures_tests {
+    use super::*;
+
+    #[test]
+    fn makes_a_searchable_pdf_of_pictures() {
+        let dir = tempfile::tempdir().unwrap();
+        let img = image::RgbImage::from_pixel(400, 560, image::Rgb([250, 250, 250]));
+        let mut jpeg = Vec::new();
+        image::DynamicImage::ImageRgb8(img)
+            .write_to(
+                &mut std::io::Cursor::new(&mut jpeg),
+                image::ImageFormat::Jpeg,
+            )
+            .unwrap();
+        let dest = dir.path().join("notes.pdf");
+        let ocr = [OcrWords {
+            page: 2,
+            words: vec![("Refraction".into(), [0.1, 0.1, 0.3, 0.04])],
+        }];
+        assert_eq!(
+            pictures_pdf(vec![jpeg.clone(), jpeg], &ocr, &dest).unwrap(),
+            2
+        );
+        let doc = Document::load(&dest).unwrap();
+        assert_eq!(doc.get_pages().len(), 2);
+        let text = doc.extract_text(&[2]).unwrap_or_default();
+        assert!(text.contains("Refraction"), "{text:?}");
     }
 }

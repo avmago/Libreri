@@ -173,12 +173,8 @@ impl Library {
             ));
         }
         self.with_db(|db| db.delete_annotation(id))?;
-        if a.kind == libreri_core::AnnotationKind::Voice {
-            // The recording goes to the system trash, so it can be taken back.
-            if let Some(rel) = crate::voice::voice_of(&a.locator) {
-                let _ = self.delete_voice(&rel);
-            }
-        }
+        // Recordings and captured pages stay in the notes folder: deleting
+        // can be undone, and they are the person's own files.
         self.backup_personal(&a.book_id)
     }
 
