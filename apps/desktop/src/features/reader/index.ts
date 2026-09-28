@@ -4,6 +4,8 @@ export { useSession, flushSession } from "./hooks/useSession";
 export { parseBookLink } from "./links";
 export { useAppDark } from "./hooks/useAppDark";
 export { CaptureViewer, captureOf } from "./capture";
+export { CopyViewer, LinkCard, linkHref, linkOf, type LinkInfo } from "./weblinks";
+export { openLinkFile, openWeb } from "./weblinks/api";
 export {
   cancelMathsDownload,
   useDownloadMathsModel,

@@ -171,7 +171,7 @@ function MarkRow({
   );
 }
 
-export type LeftPanel = "contents" | "marks" | "markup";
+export type LeftPanel = "contents" | "marks" | "markup" | "links";
 
 /** Left side of the reader: table of contents, and bookmarks + highlights. */
 export function ContentsPanel({
@@ -185,6 +185,8 @@ export function ContentsPanel({
   onDelete,
   onOpenCapture,
   markup,
+  links,
+  linkCount = 0,
 }: {
   panel: LeftPanel;
   setPanel: (p: LeftPanel) => void;
@@ -197,9 +199,12 @@ export function ContentsPanel({
   onOpenCapture?: (path: string, title: string) => void;
   /** Fixed-page books: the markup tab's content. */
   markup?: React.ReactNode;
+  /** The links tab's content (the player and the book's links). */
+  links?: React.ReactNode;
+  linkCount?: number;
 }) {
-  const marks = annotations.filter((a) => a.kind !== "markup");
-  const markupCount = annotations.length - marks.length;
+  const marks = annotations.filter((a) => a.kind !== "markup" && a.kind !== "link");
+  const markupCount = annotations.filter((a) => a.kind === "markup").length;
   const bookmarks = annotations.filter((a) => a.kind === "bookmark");
   const highlights = annotations.filter((a) => a.kind === "highlight");
   const voices = annotations.filter((a) => a.kind === "voice");
@@ -207,7 +212,10 @@ export function ContentsPanel({
   return (
     <aside
       aria-label="Contents and marks"
-      className="flex w-64 shrink-0 flex-col border-r bg-sidebar"
+      className={cn(
+        "flex shrink-0 flex-col border-r bg-sidebar",
+        panel === "links" ? "w-80" : "w-64",
+      )}
     >
       <div role="tablist" className="flex h-10 shrink-0 items-end gap-1 border-b px-3">
         {(
@@ -217,6 +225,7 @@ export function ContentsPanel({
             ...(markup
               ? ([["markup", `Markup${markupCount ? ` (${markupCount})` : ""}`]] as const)
               : []),
+            ...(links ? ([["links", `Links${linkCount ? ` (${linkCount})` : ""}`]] as const) : []),
           ] as const
         ).map(([id, label]) => (
           <button
@@ -238,6 +247,8 @@ export function ContentsPanel({
       </div>
       {panel === "markup" && markup ? (
         markup
+      ) : panel === "links" && links ? (
+        links
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto px-1.5 py-2">
           {panel === "contents" ? (

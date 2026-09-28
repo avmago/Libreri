@@ -30,6 +30,7 @@ import {
   type TocItem,
   type ZoomValue,
   drawnClass,
+  highlightAt,
   isDrawn,
 } from "../types";
 import { WordSpeech, type Box as SpeechBox } from "../speech/words";
@@ -410,9 +411,7 @@ export class PageRenderer implements Renderer {
   private onClick(e: MouseEvent) {
     // Drawing with a markup tool is not a page turn.
     if ((e.target as Element | null)?.closest?.("svg.lb-markup-active")) return;
-    const hit = document
-      .elementsFromPoint(e.clientX, e.clientY)
-      .find((el): el is HTMLElement => el.classList.contains("lb-pdf-hl"));
+    const hit = highlightAt(this.scroller, e.clientX, e.clientY);
     if (hit && document.getSelection()?.isCollapsed) {
       this.events.annotationClick(hit.dataset.annotation!, hit.getBoundingClientRect());
       return;

@@ -130,6 +130,33 @@ pub fn book_note(e: &Entry, notebook: Option<&str>) -> String {
             }
         }
     }
+    let links: Vec<_> = notes
+        .iter()
+        .filter(|a| a.kind == AnnotationKind::Link)
+        .filter_map(|a| link_of(&a.locator).map(|l| (a, l)))
+        .collect();
+    if !links.is_empty() {
+        s += "\n## Links\n\n";
+        for (a, (title, href)) in links {
+            let target = if href.contains([' ', '(', ')', '<', '>']) {
+                format!("<{href}>")
+            } else {
+                href.clone()
+            };
+            let about = a
+                .quote
+                .as_ref()
+                .map(|q| q.exact.split_whitespace().collect::<Vec<_>>().join(" "))
+                .filter(|q| !q.is_empty())
+                .map(|q| format!(" about “{q}”"))
+                .unwrap_or_default();
+            let label = a.label.as_deref().unwrap_or("Open");
+            s += &format!("- [{title}]({target}){about} — [{label}]({})\n", a.link());
+            if let Some(note) = a.note.as_deref().filter(|n| !n.trim().is_empty()) {
+                s += &format!("  {}\n", note.trim());
+            }
+        }
+    }
     let bookmarks: Vec<_> = notes
         .iter()
         .filter(|a| a.kind == AnnotationKind::Bookmark)
@@ -152,6 +179,27 @@ pub fn book_note(e: &Entry, notebook: Option<&str>) -> String {
         }
     }
     s
+}
+
+/// A link annotation's title and where it goes (a video at its start
+/// time; a file by its path).
+fn link_of(locator: &str) -> Option<(String, String)> {
+    let v: serde_json::Value = serde_json::from_str(locator).ok()?;
+    let l = v.get("link")?;
+    let s = |k: &str| l.get(k).and_then(|x| x.as_str()).filter(|x| !x.is_empty());
+    let mut href = s("url").or_else(|| s("file"))?.to_owned();
+    if let Some(start) = l.get("start").and_then(|x| x.as_f64()).filter(|t| *t > 0.0) {
+        let t = start.round() as u64;
+        let youtube = l.pointer("/video/provider").and_then(|p| p.as_str()) == Some("youtube");
+        if youtube {
+            let sep = if href.contains('?') { '&' } else { '?' };
+            href = format!("{href}{sep}t={t}s");
+        } else if s("url").is_some() {
+            href = format!("{}#t={t}s", href.split('#').next().unwrap_or(&href));
+        }
+    }
+    let title = s("title").unwrap_or(&href).replace(['[', ']'], " ");
+    Some((title, href))
 }
 
 /// An index note linking every book note: (title, note name).
@@ -194,6 +242,18 @@ mod tests {
             .contains("#annotation=8f14e45f-ceea-4e7a-9c3f-0b6d9d2a1c11) · yellow\n\nSee ch. 3\n"));
         assert!(note.contains("- [Start here](libreri://book/"));
         assert!(note.contains("Notebook: [[Optics notebook]]"));
+
+        let mut link = highlight(&b, "light bends", Some("A good demo"));
+        link.id = "22222222-2222-4222-8222-222222222222".into();
+        link.kind = AnnotationKind::Link;
+        link.locator = r#"{"type":"pdf","page":4,"link":{"url":"https://www.youtube.com/watch?v=abc123def45","kind":"video","title":"Refraction [demo]","start":90,"video":{"provider":"youtube","id":"abc123def45"}}}"#.into();
+        e.annotations.push(link);
+        let note = book_note(&e, None);
+        assert!(
+            note.contains("## Links\n\n- [Refraction  demo ](https://www.youtube.com/watch?v=abc123def45&t=90s) about “light bends” — [p. 4](libreri://book/"),
+            "{note}"
+        );
+        assert!(note.contains("  A good demo\n"));
     }
 
     #[test]

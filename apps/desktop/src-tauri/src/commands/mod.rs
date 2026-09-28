@@ -12,6 +12,7 @@ pub mod details;
 pub mod edit;
 pub mod folders;
 pub mod library;
+pub mod links;
 pub mod listening;
 pub mod maths;
 pub mod notes;

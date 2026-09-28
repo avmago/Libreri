@@ -1,11 +1,23 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { Copy, MessageSquarePlus, Mic, NotebookPen, Sigma, Trash2 } from "lucide-react";
+import {
+  Copy,
+  ExternalLink,
+  FileText,
+  Link2,
+  MessageSquarePlus,
+  Mic,
+  NotebookPen,
+  Play,
+  Sigma,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DictateButton, VoicePlayer, voiceOf } from "@/features/speech";
 import { SpellTextarea } from "@/features/spell";
 import type { Annotation, HighlightColor } from "@/lib/ipc";
 import { HIGHLIGHT_COLORS, highlightFill } from "@/readers";
 import { cn } from "@/lib/utils";
+import { LinkCard, formatTime, linkOf, playable } from "../weblinks";
 
 const COLOR_NAME: Record<HighlightColor, string> = {
   yellow: "Yellow",
@@ -100,6 +112,7 @@ export function SelectionMenu({
   onComment,
   onNotebook,
   onVoice,
+  onLink,
   onLatex,
   onCopy,
   onClose,
@@ -109,6 +122,7 @@ export function SelectionMenu({
   onComment: () => void;
   onNotebook: () => void;
   onVoice: () => void;
+  onLink: () => void;
   onLatex: () => void;
   onCopy: () => void;
   onClose: () => void;
@@ -159,6 +173,15 @@ export function SelectionMenu({
         <Button
           variant="ghost"
           size="icon"
+          aria-label="Link a web page or video to this"
+          title="Link a web page, video or recording"
+          onClick={onLink}
+        >
+          <Link2 />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           aria-label="Copy as LaTeX"
           title="Copy maths as LaTeX"
           onClick={onLatex}
@@ -183,6 +206,7 @@ export function AnnotationMenu({
   onDelete,
   onClose,
   lang,
+  onLink,
 }: {
   annotation: Annotation;
   rect: DOMRect;
@@ -192,8 +216,11 @@ export function AnnotationMenu({
   onNotebook: (a: Annotation) => void;
   onDelete: (a: Annotation) => void;
   onClose: () => void;
+  /** Links: play, open, or read the offline copy. */
+  onLink?: (a: Annotation, what: "play" | "open" | "copy") => void;
 }) {
   const [note, setNote] = useState(annotation.note ?? "");
+  const link = annotation.kind === "link" ? linkOf(annotation.locator) : null;
   const voice = annotation.kind === "voice" ? voiceOf(annotation.locator) : null;
   const [editing, setEditing] = useState(
     startEditing || Boolean(annotation.note) || annotation.kind === "voice",
@@ -211,9 +238,37 @@ export function AnnotationMenu({
         onClose();
       }}
     >
+      {link && (
+        <div className="flex w-72 flex-col gap-1.5 p-1">
+          <LinkCard link={link} />
+          <div className="flex flex-wrap gap-1.5">
+            {playable(link) ? (
+              <Button size="sm" onClick={() => onLink?.(annotation, "play")}>
+                <Play /> Play{link.start ? ` from ${formatTime(link.start)}` : ""}
+              </Button>
+            ) : (
+              <Button size="sm" onClick={() => onLink?.(annotation, "open")}>
+                <ExternalLink /> {link.kind === "book" ? "Open the book" : "Open in browser"}
+              </Button>
+            )}
+            {link.copy && (
+              <Button variant="outline" size="sm" onClick={() => onLink?.(annotation, "copy")}>
+                <FileText /> Offline copy
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
       <div className="flex items-center gap-1">
-        <Swatches value={annotation.color} onPick={(color) => onChange({ ...annotation, color })} />
-        <div className="mx-0.5 h-6 w-px bg-border" />
+        {!link && (
+          <>
+            <Swatches
+              value={annotation.color}
+              onPick={(color) => onChange({ ...annotation, color })}
+            />
+            <div className="mx-0.5 h-6 w-px bg-border" />
+          </>
+        )}
         <Button
           variant="ghost"
           size="icon"
@@ -234,7 +289,7 @@ export function AnnotationMenu({
         <Button
           variant="ghost"
           size="icon"
-          aria-label={voice ? "Delete voice note" : "Delete highlight"}
+          aria-label={voice ? "Delete voice note" : link ? "Delete link" : "Delete highlight"}
           className="text-destructive"
           onClick={() => onDelete(annotation)}
         >

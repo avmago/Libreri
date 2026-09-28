@@ -155,8 +155,9 @@ export class EbookRenderer implements Renderer {
       "draw-annotation",
       ({ draw, annotation }) => {
         const a = this.annotations.get(annotation.value);
-        draw(a?.kind === "voice" ? Overlayer.underline : Overlayer.highlight, {
-          color: OPAQUE[a?.color ?? "yellow"],
+        const under = a?.kind === "voice" || a?.kind === "link";
+        draw(under ? Overlayer.underline : Overlayer.highlight, {
+          color: a?.kind === "link" ? "#2563eb" : OPAQUE[a?.color ?? "yellow"],
         });
       },
     );

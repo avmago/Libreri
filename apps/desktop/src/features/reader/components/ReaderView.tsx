@@ -14,6 +14,7 @@ import {
   PenLine,
   Search,
   Loader2,
+  Link2,
   SquareSigma,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -83,6 +84,7 @@ import { useReadAloud } from "../speech/useReadAloud";
 import { AudiobookView } from "../listening/AudiobookView";
 import { CaptureDialog, CaptureViewer } from "../capture";
 import { mathsFromPicture, useMathsSettings } from "../maths/api";
+import { AddLinkDialog, CopyViewer, LinksPanel, linkOf, type LinkInfo } from "../weblinks";
 import { useListening } from "../listening/store";
 import { timeAt } from "../listening/sync";
 import { ReadAloudBar } from "../speech/ReadAloudBar";
@@ -774,6 +776,95 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
     }
   };
 
+  // Links to web pages, videos, files and other books (Phase 8c).
+  /** Adding a link: where it goes ("p. 4", or the selected words). */
+  const [linking, setLinking] = useState<string | null>(null);
+  const linkAt = useRef<typeof voiceAt.current>(null);
+  const [playing, setPlaying] = useState<Annotation | null>(null);
+  const [copyView, setCopyView] = useState<{ copy: string; url: string; title: string } | null>(
+    null,
+  );
+  const links = annotations.filter((a) => a.kind === "link");
+  const startLink = (fromSelection: boolean) => {
+    const sel = fromSelection ? selection : null;
+    if (sel) {
+      linkAt.current = {
+        locator: sel.locator,
+        quote: sel.quote,
+        label: sel.label || location?.shortLabel || null,
+        position: sel.position,
+      };
+      r()?.clearSelection();
+      setSelection(null);
+    } else if (location) {
+      linkAt.current = {
+        locator:
+          location.locator.type === "pdf"
+            ? { type: "pdf", page: location.page ?? 1 }
+            : location.locator,
+        quote: null,
+        label:
+          location.section && location.page === undefined ? location.section : location.shortLabel,
+        position: location.progress,
+      };
+    } else return;
+    const q = linkAt.current.quote?.exact;
+    setLinking(
+      q ? `“${q.slice(0, 60)}${q.length > 60 ? "…" : ""}”` : (linkAt.current.label ?? "this place"),
+    );
+  };
+  const savedLink = (link: LinkInfo, note: string | null) => {
+    setLinking(null);
+    const at = linkAt.current;
+    if (!at) return;
+    const a: Annotation = {
+      id: newId(),
+      bookId,
+      kind: "link",
+      color: null,
+      locator: JSON.stringify({ ...at.locator, link }),
+      quote: at.quote,
+      note,
+      label: at.label,
+      position: at.position,
+      createdAt: "",
+      modifiedAt: "",
+    };
+    saveAnnotation.mutate(a, {
+      onSuccess: () => {
+        toast.success("Link added", { description: link.title });
+        setLeft("links");
+        setLastLeft("links");
+      },
+      onError: (e) => toast.error("Could not add the link", { description: String(e) }),
+    });
+  };
+  const linkAction = (a: Annotation, what: "play" | "open" | "copy") => {
+    const link = linkOf(a.locator);
+    if (!link) return;
+    if (what === "play") {
+      setPlaying(a);
+      setLeft("links");
+      setLastLeft("links");
+    } else if (what === "copy" && link.copy) {
+      setCopyView({ copy: link.copy, url: link.url, title: link.title });
+    } else if (link.kind === "book") handleLink(link.url);
+    else if (link.url)
+      void commands.openExternalUrl(link.url).then((r) => {
+        if (r.status === "error") toast.error(r.error.message);
+      });
+  };
+  const pageLinks =
+    location?.page !== undefined
+      ? links.filter((a) => {
+          try {
+            return (JSON.parse(a.locator) as { page?: number }).page === location.page;
+          } catch {
+            return false;
+          }
+        }).length
+      : 0;
+
   // Paper notes: photographed pages saved as a PDF, linked to this place.
   const [capturing, setCapturing] = useState(false);
   const captureAt = useRef<typeof voiceAt.current>(null);
@@ -955,6 +1046,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
       );
     }
   });
+  useShortcut("reader.addLink", () => startLink(!!selection));
   useShortcut("reader.addToNotebook", () =>
     highlightFromSelection(profilePrefs.notes.defaultColor, addToNotebook),
   );
@@ -1167,6 +1259,16 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
         >
           <Camera />
         </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Add a link here"
+          title={`Link a web page, video or recording to this page (${keys("reader.addLink")})`}
+          disabled={!location}
+          onClick={() => startLink(false)}
+        >
+          <Link2 />
+        </Button>
         {mathsModel?.on && mathsModel.downloaded && (fileType === "pdf" || isPaged(fileType)) && (
           <Button
             variant="ghost"
@@ -1283,6 +1385,24 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
             onShow={(a) => jump(() => r()?.showAnnotation(a))}
             onDelete={(a) => deleteAnnotation.mutate(a.id)}
             onOpenCapture={(path, title) => setViewing({ path, title })}
+            linkCount={links.length}
+            links={
+              <LinksPanel
+                links={links}
+                page={location?.page ?? null}
+                playing={playing && links.some((l) => l.id === playing.id) ? playing : null}
+                onStop={() => setPlaying(null)}
+                onAdd={() => startLink(false)}
+                onPlay={(a) => linkAction(a, "play")}
+                onOpen={(a) => linkAction(a, "open")}
+                onCopy={(a) => linkAction(a, "copy")}
+                onShow={(a) => jump(() => r()?.showAnnotation(a))}
+                onDelete={(a) => {
+                  if (playing?.id === a.id) setPlaying(null);
+                  deleteAnnotation.mutate(a.id);
+                }}
+              />
+            }
             markup={
               markup.available ? (
                 <MarkupPanel
@@ -1463,6 +1583,20 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
           }}
         />
       )}
+      <AddLinkDialog
+        key={linking ?? "no-link"}
+        open={linking !== null}
+        bookId={bookId}
+        where={linking ?? ""}
+        onClose={() => setLinking(null)}
+        onSave={savedLink}
+      />
+      <CopyViewer
+        copy={copyView?.copy ?? null}
+        url={copyView?.url ?? ""}
+        title={copyView?.title ?? ""}
+        onClose={() => setCopyView(null)}
+      />
       <CaptureDialog
         key={capturing ? "capturing" : "idle"}
         open={capturing}
@@ -1495,6 +1629,19 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
         </div>
         <span className="tabular-nums">{Math.round((location?.progress ?? 0) * 100)}%</span>
         <span className="flex-1" />
+        {pageLinks > 0 && (
+          <button
+            type="button"
+            className="flex items-center gap-1 hover:text-foreground"
+            onClick={() => {
+              setLeft("links");
+              setLastLeft("links");
+            }}
+          >
+            <Link2 className="size-3.5" aria-hidden />
+            {pageLinks === 1 ? "1 link on this page" : `${pageLinks} links on this page`}
+          </button>
+        )}
         {annotations.length > 0 && (
           <button type="button" className="hover:text-foreground" onClick={() => setLeft("marks")}>
             {countLabel(annotations)}
@@ -1513,6 +1660,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
           }
           onNotebook={() => highlightFromSelection(profilePrefs.notes.defaultColor, addToNotebook)}
           onVoice={() => startVoice(true)}
+          onLink={() => startLink(true)}
           onLatex={() => {
             // PDFs and scans: rebuilt from where the characters sit, so
             // limits, scripts and fractions come through.
@@ -1551,6 +1699,10 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
             deleteAnnotation.mutate(a.id);
           }}
           onClose={() => setMenu(null)}
+          onLink={(a, what) => {
+            setMenu(null);
+            linkAction(a, what);
+          }}
         />
       )}
       {markup.noteEdit && (

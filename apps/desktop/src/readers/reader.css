@@ -430,6 +430,17 @@ mark.lb-hl.lb-hl-voice {
   border-bottom: 2px dotted color-mix(in srgb, currentColor 55%, transparent);
   border-radius: 0;
 }
+mark.lb-hl.lb-hl-link {
+  background: none !important;
+  border-bottom: 2px dashed color-mix(in srgb, #2563eb 70%, transparent);
+  border-radius: 0;
+}
+.lb-pdf-hl.lb-hl-link {
+  background: none !important;
+  border-bottom: 2px dashed rgba(37, 99, 235, 0.85);
+  border-radius: 0;
+  mix-blend-mode: normal;
+}
 .lb-pdf-hl.lb-hl-voice {
   background: none !important;
   border-bottom: 2px dotted rgba(37, 99, 235, 0.8);

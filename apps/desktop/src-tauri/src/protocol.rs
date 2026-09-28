@@ -68,6 +68,21 @@ fn serve(app: &AppHandle, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
             None => status(StatusCode::NOT_FOUND),
         };
     }
+    // `.media/<token>/<name>`: a video or audio file on this computer that
+    // a link points to (registered when it is played).
+    if let Some(rest) = relative.strip_prefix(".media/") {
+        let token = rest.split('/').next().unwrap_or("");
+        let path = state
+            .media_files
+            .lock()
+            .expect("media lock")
+            .get(token)
+            .cloned();
+        return match path {
+            Some(p) => serve_file(request, &p, &p.to_string_lossy()),
+            None => status(StatusCode::NOT_FOUND),
+        };
+    }
     let Some(library) = state.library_if_open() else {
         return status(StatusCode::NOT_FOUND);
     };
@@ -86,7 +101,13 @@ fn serve(app: &AppHandle, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
     let Some(path) = library.layout().resolve_relative(&relative) else {
         return status(StatusCode::FORBIDDEN);
     };
-    let Ok(mut file) = File::open(&path) else {
+    serve_file(request, &path, &relative)
+}
+
+/// A file, with range requests (for seeking in audio and video).
+fn serve_file(request: &Request<Vec<u8>>, path: &std::path::Path, name: &str) -> Response<Vec<u8>> {
+    let relative = name;
+    let Ok(mut file) = File::open(path) else {
         return status(StatusCode::NOT_FOUND);
     };
     let Ok(total) = file.metadata().map(|m| m.len()) else {
@@ -98,10 +119,18 @@ fn serve(app: &AppHandle, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
         .and_then(|v| v.to_str().ok())
         .and_then(|v| parse_range(v, total));
 
-    let builder = base(StatusCode::OK)
-        .header(header::CONTENT_TYPE, content_type(&relative))
+    let kind = content_type(relative);
+    let mut builder = base(StatusCode::OK)
+        .header(header::CONTENT_TYPE, kind)
         .header(header::CACHE_CONTROL, "no-cache")
         .header(header::ACCEPT_RANGES, "bytes");
+    if kind.starts_with("text/html") {
+        // Saved web pages: nothing in them may run or reach out.
+        builder = builder.header(
+            header::CONTENT_SECURITY_POLICY,
+            "sandbox; default-src 'none'; img-src data:; style-src 'unsafe-inline'",
+        );
+    }
     let head = request.method() == Method::HEAD;
 
     match range {
@@ -272,6 +301,14 @@ fn content_type(path: &str) -> &'static str {
         "ogg" | "opus" => "audio/ogg",
         "flac" => "audio/flac",
         "aac" => "audio/aac",
+        "wav" => "audio/wav",
+        "mp4" | "m4v" => "video/mp4",
+        "webm" => "video/webm",
+        "mov" => "video/quicktime",
+        "mkv" => "video/x-matroska",
+        "ogv" => "video/ogg",
+        // Offline copies of web pages (shown in a sandboxed frame).
+        "html" | "htm" => "text/html; charset=utf-8",
         _ => "application/octet-stream",
     }
 }

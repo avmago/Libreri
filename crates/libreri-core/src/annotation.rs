@@ -26,6 +26,9 @@ pub enum AnnotationKind {
     /// Photographed paper notes about a place: the locator's `capture` is
     /// the PDF in the profile's notes folder; `note` holds its text.
     Capture,
+    /// A link to a web page, a video, a file on this computer or another
+    /// book, from selected text or a place: the locator's `link` holds it.
+    Link,
 }
 
 impl AnnotationKind {
@@ -36,6 +39,7 @@ impl AnnotationKind {
             Self::Markup => "markup",
             Self::Voice => "voice",
             Self::Capture => "capture",
+            Self::Link => "link",
         }
     }
 
@@ -46,6 +50,7 @@ impl AnnotationKind {
             "markup" => Some(Self::Markup),
             "voice" => Some(Self::Voice),
             "capture" => Some(Self::Capture),
+            "link" => Some(Self::Link),
             _ => None,
         }
     }
@@ -128,6 +133,8 @@ pub enum AnnotationError {
     BadVoice,
     #[error("the captured pages are missing")]
     BadCapture,
+    #[error("the link is not valid")]
+    BadLink,
     #[error("the markup item is too large (pictures are limited to about 2 MB)")]
     MarkupTooLarge,
 }
@@ -194,6 +201,27 @@ impl Annotation {
             });
             if !ok {
                 return Err(AnnotationError::BadCapture);
+            }
+        }
+        if self.kind == AnnotationKind::Link {
+            let v: serde_json::Value =
+                serde_json::from_str(&self.locator).map_err(|_| AnnotationError::BadLocator)?;
+            let link = v.get("link").ok_or(AnnotationError::BadLink)?;
+            let url = link.get("url").and_then(|u| u.as_str()).unwrap_or("");
+            let web = url.starts_with("https://") || url.starts_with("http://");
+            let book = url.starts_with("libreri://book/");
+            let file = link
+                .get("file")
+                .and_then(|f| f.as_str())
+                .is_some_and(|f| !f.is_empty());
+            // Files Libreri made for the link stay in the notes folder.
+            let in_notes = |key: &str| {
+                link.get(key).and_then(|p| p.as_str()).is_none_or(|p| {
+                    p.starts_with("Notes/") && !p.split('/').any(|s| s == ".." || s.is_empty())
+                })
+            };
+            if !(web || book || file) || !in_notes("picture") || !in_notes("copy") {
+                return Err(AnnotationError::BadLink);
             }
         }
         self.position = self.position.clamp(0.0, 1.0);
@@ -282,5 +310,18 @@ mod tests {
         assert!(cap.clone().validated().is_ok());
         cap.locator = r#"{"type":"pdf","page":2,"capture":"Books/x.pdf"}"#.into();
         assert_eq!(cap.validated(), Err(AnnotationError::BadCapture));
+
+        let mut link = highlight();
+        link.kind = AnnotationKind::Link;
+        link.locator = r#"{"type":"pdf","page":2,"link":{"url":"https://vimeo.com/1","picture":"Notes/Me/Links/a.jpg"}}"#.into();
+        assert!(link.clone().validated().is_ok());
+        link.locator = r#"{"type":"pdf","page":2,"link":{"url":"javascript:alert(1)"}}"#.into();
+        assert_eq!(link.clone().validated(), Err(AnnotationError::BadLink));
+        link.locator =
+            r#"{"type":"pdf","page":2,"link":{"url":"https://a.b","copy":"../x.html"}}"#.into();
+        assert_eq!(link.clone().validated(), Err(AnnotationError::BadLink));
+        link.locator =
+            r#"{"type":"pdf","page":2,"link":{"url":"","file":"/Users/me/talk.mp4"}}"#.into();
+        assert!(link.validated().is_ok());
     }
 }

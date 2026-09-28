@@ -1,7 +1,9 @@
 import { markupModel } from "@/readers";
+import { linkHref, linkOf } from "@/features/reader";
 import type { HighlightColor, NoteDto } from "@/lib/ipc";
 
-export type NoteKind = "all" | "highlights" | "comments" | "voice" | "captures" | "bookmarks";
+export type NoteKind =
+  "all" | "highlights" | "comments" | "voice" | "captures" | "links" | "bookmarks";
 
 export interface NoteFilter {
   search: string;
@@ -30,15 +32,26 @@ export function filterNotes(notes: NoteDto[], f: NoteFilter): NoteDto[] {
     if (f.kind === "bookmarks" && a.kind !== "bookmark") return false;
     if (f.kind === "voice" && a.kind !== "voice") return false;
     if (f.kind === "captures" && a.kind !== "capture") return false;
-    if (f.kind === "comments" && (a.kind === "voice" || a.kind === "capture" || !a.note?.trim()))
+    if (f.kind === "links" && a.kind !== "link") return false;
+    if (
+      f.kind === "comments" &&
+      (a.kind === "voice" || a.kind === "capture" || a.kind === "link" || !a.note?.trim())
+    )
       return false;
     if (f.colors.length && (a.kind !== "highlight" || !f.colors.includes(a.color ?? "yellow"))) {
       return false;
     }
     if (!q) return true;
-    return [a.quote?.exact ?? markupText(a), a.note, a.label, bookTitle].some((t) =>
-      t?.toLowerCase().includes(q),
-    );
+    const link = a.kind === "link" ? linkOf(a.locator) : null;
+    return [
+      a.quote?.exact ?? markupText(a),
+      a.note,
+      a.label,
+      bookTitle,
+      link?.title,
+      link?.url,
+      link?.site,
+    ].some((t) => t?.toLowerCase().includes(q));
   });
 }
 
@@ -91,6 +104,23 @@ export function notesToMarkdown(notes: NoteDto[]): string {
           "",
         );
         continue;
+      }
+      if (a.kind === "link") {
+        const l = linkOf(a.locator);
+        if (l) {
+          const about = a.quote?.exact
+            ? ` about “${a.quote.exact.replace(/\s+/g, " ").trim()}”`
+            : "";
+          const href = linkHref(l);
+          const target = /[\s()<>]/.test(href) ? `<${href}>` : href;
+          const copy = l.copy ? ` ([offline copy](<${l.copy.split("/").slice(2).join("/")}>))` : "";
+          out.push(
+            `- [${l.title || href}](${target})${copy}${about} on [${a.label || "page"}](${link})`,
+          );
+          if (a.note?.trim()) out.push(`  ${a.note.trim()}`);
+          out.push("");
+          continue;
+        }
       }
       if (a.kind === "voice") {
         const said = a.note?.trim() ? `: “${a.note.trim().replace(/\s+/g, " ")}”` : "";

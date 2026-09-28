@@ -73,6 +73,11 @@ Requirement (user, 2026-09-27): when the database, metadata and every kind of no
   - The path is relative to the library, so it travels with the notes folder.
   - Deleting the note keeps the PDF, so Undo works.
   - See `docs/adr/0025-paper-notes-and-maths.md`.
+- Links are annotations of kind `link`.
+  - Their locator is an ordinary reader locator plus `"link"`, which holds the address (`https://…` or `libreri://book/…`), title, site, start time, and the picture and offline copy in `Notes/<profile>/Links/` and `Notes/<profile>/Web pages/`. These travel with the notes folder, and deleting the link keeps them so Undo works.
+  - A linked video or recording inside the library is kept relative to it, so it travels with the library. One outside the library is a full path and works on that computer only.
+  - Exports write links as normal Markdown links, with videos at their start time.
+  - See `docs/adr/0026-links-to-pages-and-videos.md`.
 - The maths model and the maths setting are per computer (app data `maths/`) and never exported. LaTeX added to a notebook is ordinary `$$` Markdown.
 
 ## Edited PDFs (versions)

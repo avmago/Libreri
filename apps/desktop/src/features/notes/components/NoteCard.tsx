@@ -5,13 +5,15 @@ import {
   Camera,
   FileText,
   Copy,
+  ExternalLink,
   MessageSquareText,
   Mic,
   Trash2,
   StickyNote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { captureOf } from "@/features/reader";
+import { toast } from "sonner";
+import { LinkCard, captureOf, linkHref, linkOf, openLinkFile, openWeb } from "@/features/reader";
 import { DictateButton, VoicePlayer, voiceOf } from "@/features/speech";
 import { SpellTextarea } from "@/features/spell";
 import type { HighlightColor, NoteDto } from "@/lib/ipc";
@@ -34,6 +36,7 @@ export function NoteCard({
   onChange,
   onDelete,
   onOpenCapture,
+  onOpenCopy,
 }: {
   note: NoteDto;
   showBook: boolean;
@@ -41,6 +44,7 @@ export function NoteCard({
   onChange: (a: NoteDto["annotation"]) => void;
   onDelete: () => void;
   onOpenCapture?: (path: string, title: string) => void;
+  onOpenCopy?: (copy: string, url: string, title: string) => void;
 }) {
   const a = note.annotation;
   const [editing, setEditing] = useState(false);
@@ -50,6 +54,17 @@ export function NoteCard({
   const drawn = markup ? (markupText(a) ?? "Sticky note") : null;
   const voice = a.kind === "voice" ? voiceOf(a.locator) : null;
   const capture = captureOf(a);
+  const link = a.kind === "link" ? linkOf(a.locator) : null;
+  const openLink = () => {
+    if (!link) return;
+    const go =
+      link.kind === "file" && link.file
+        ? openLinkFile(link.file)
+        : link.kind === "book"
+          ? Promise.resolve(onOpen())
+          : openWeb(linkHref(link));
+    void go.catch((e: unknown) => toast.error(String((e as Error).message ?? e)));
+  };
   const box = useRef<HTMLTextAreaElement>(null);
 
   return (
@@ -60,14 +75,17 @@ export function NoteCard({
           ? `Bookmark, ${a.label ?? ""}`
           : voice
             ? `Voice note, ${a.label ?? ""}`
-            : `Highlight: ${a.quote?.exact ?? ""}`
+            : link
+              ? `Link: ${link.title}`
+              : `Highlight: ${a.quote?.exact ?? ""}`
       }
     >
       <span
         aria-hidden
         className="absolute inset-y-3 left-0 w-1 rounded-r"
         style={{
-          background: bookmark || voice ? "var(--muted-foreground)" : SWATCH[a.color ?? "yellow"],
+          background:
+            bookmark || voice || link ? "var(--muted-foreground)" : SWATCH[a.color ?? "yellow"],
         }}
       />
       <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -97,7 +115,38 @@ export function NoteCard({
             </Button>
           </p>
         )}
-        {voice || capture ? null : markup ? (
+        {link && (
+          <>
+            <LinkCard link={link} />
+            {a.quote?.exact && (
+              <blockquote className="line-clamp-3 border-l-2 pl-2.5 text-[13px] leading-relaxed text-muted-foreground">
+                {a.quote.exact}
+              </blockquote>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={openLink}>
+                <ExternalLink />
+                {link.kind === "book"
+                  ? "Open the book"
+                  : link.kind === "file"
+                    ? "Open in another app"
+                    : link.kind === "video"
+                      ? "Watch in browser"
+                      : "Open in browser"}
+              </Button>
+              {link.copy && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onOpenCopy?.(link.copy!, link.url, link.title)}
+                >
+                  <FileText /> Offline copy
+                </Button>
+              )}
+            </div>
+          </>
+        )}
+        {voice || capture || link ? null : markup ? (
           <p className="flex items-center gap-2 font-medium">
             <StickyNote className="size-4 text-muted-foreground" aria-hidden /> {drawn}
           </p>
@@ -223,7 +272,7 @@ export function NoteCard({
             <Trash2 />
           </Button>
         </div>
-        {!bookmark && (
+        {!bookmark && !link && (
           <div className="flex gap-1 pr-1.5" role="radiogroup" aria-label="Colour">
             {HIGHLIGHT_COLORS.map((c) => (
               <button

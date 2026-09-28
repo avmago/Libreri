@@ -292,6 +292,11 @@ export const ACTIONS = {
     group: "Highlights and notes",
     keys: "Mod+Shift+M",
   },
+  "reader.addLink": {
+    label: "Link a web page, video or recording to the selection or page",
+    group: "Highlights and notes",
+    keys: "Alt+L",
+  },
   "reader.addToNotebook": {
     label: "Quote the selection in the notebook",
     group: "Highlights and notes",

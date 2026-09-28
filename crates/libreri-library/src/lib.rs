@@ -27,6 +27,7 @@ mod folders;
 mod foreign;
 mod health;
 mod import;
+pub mod links;
 mod listening;
 mod lock;
 mod notes;

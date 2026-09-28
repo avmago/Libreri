@@ -51,6 +51,12 @@ pub struct AppState {
     pub extras_dir: std::path::PathBuf,
     /// Extra font downloads running, to cancel them.
     pub font_downloads: Mutex<std::collections::HashMap<String, Arc<AtomicBool>>>,
+    /// Links (Phase 8c): video and audio files on this computer being
+    /// played (token → file), the local player page for embedded videos,
+    /// and details fetched for a link being added (address → details).
+    pub media_files: Mutex<std::collections::HashMap<String, std::path::PathBuf>>,
+    pub player: Mutex<Option<Arc<libreri_links::PlayerServer>>>,
+    pub fetched_links: Mutex<std::collections::HashMap<String, Arc<libreri_links::Fetched>>>,
     /// The maths model (app data `maths/`), loaded once when used, and
     /// its download, to cancel it.
     pub maths_dir: std::path::PathBuf,
@@ -274,6 +280,9 @@ impl AppState {
             extras_dir,
             maths_dir,
             maths_reader: Mutex::default(),
+            media_files: Mutex::default(),
+            player: Mutex::default(),
+            fetched_links: Mutex::default(),
             maths_download: Mutex::default(),
             capture_photos: Mutex::default(),
             font_downloads: Mutex::default(),

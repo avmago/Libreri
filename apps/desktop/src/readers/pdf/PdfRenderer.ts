@@ -28,6 +28,7 @@ import {
   type TocItem,
   type ZoomValue,
   drawnClass,
+  highlightAt,
   isDrawn,
 } from "../types";
 import { PDF_ASSETS } from "./assets";
@@ -169,9 +170,7 @@ export class PdfRenderer implements Renderer {
     this.container.addEventListener("pointerup", onUp);
     this.container.addEventListener("keyup", onUp);
     const onClick = (e: MouseEvent) => {
-      const hit = document
-        .elementsFromPoint(e.clientX, e.clientY)
-        .find((el): el is HTMLElement => el.classList.contains("lb-pdf-hl"));
+      const hit = highlightAt(this.container, e.clientX, e.clientY);
       if (hit && document.getSelection()?.isCollapsed) {
         this.events.annotationClick(hit.dataset.annotation!, hit.getBoundingClientRect());
       }
@@ -345,9 +344,7 @@ export class PdfRenderer implements Renderer {
   private hoverHighlights(e: PointerEvent) {
     // Highlights are pointer-events:none so text stays selectable; show a
     // pointer when hovering one so it is clearly clickable.
-    const under = document
-      .elementsFromPoint(e.clientX, e.clientY)
-      .some((el) => el.classList.contains("lb-pdf-hl"));
+    const under = highlightAt(this.container, e.clientX, e.clientY) !== null;
     this.container.classList.toggle("lb-over-hl", under);
   }
 

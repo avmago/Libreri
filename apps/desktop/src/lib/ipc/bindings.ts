@@ -448,6 +448,32 @@ export const commands = {
 	downloadCanvasFont: (id: string) => typedError<ExtraFont[], AppError>(__TAURI_INVOKE("download_canvas_font", { id })),
 	cancelCanvasFontDownload: (id: string) => __TAURI_INVOKE<void>("cancel_canvas_font_download", { id }),
 	removeCanvasFont: (id: string) => typedError<ExtraFont[], AppError>(__TAURI_INVOKE("remove_canvas_font", { id })),
+	/**
+	 *  Fetches a link's details (once, when it is being added). Nothing is
+	 *  saved until [`link_save`].
+	 */
+	linkFetch: (url: string) => typedError<LinkPreviewDto, AppError>(__TAURI_INVOKE("link_fetch", { url })),
+	/**
+	 *  Keeps a fetched link's picture and, for a web page when asked, an
+	 *  offline copy of it. `url` is the address [`link_fetch`] returned.
+	 */
+	linkSave: (url: string, title: string, keepCopy: boolean) => typedError<LinkSavedDto, AppError>(__TAURI_INVOKE("link_save", { url, title, keepCopy })),
+	/**  A video or audio file chosen to link to. */
+	linkFile: (path: string) => typedError<LinkFileDto, AppError>(__TAURI_INVOKE("link_file", { path })),
+	/**
+	 *  Where a linked video or audio file plays from: a `book://` path
+	 *  (`.media/<token>/<name>`), usable while the app runs.
+	 */
+	linkMediaUrl: (file: string) => typedError<string, AppError>(__TAURI_INVOKE("link_media_url", { file })),
+	/**  The player for an embedded video, at a start time (seconds). */
+	linkPlayer: (url: string, video: { provider: "youtube"; id: string } | { provider: "vimeo"; id: string; hash: string | null } | null, embed: string | null, start: number | null) => typedError<PlayerDto, AppError>(__TAURI_INVOKE("link_player", { url, video, embed, start })),
+	/**  Opens a player in a window of its own. */
+	linkPopOut: (page: string, title: string) => typedError<null, AppError>(__TAURI_INVOKE("link_pop_out", { page, title })),
+	/**
+	 *  Opens a linked file (an offline copy, or a video or recording) in the
+	 *  app the system uses for it.
+	 */
+	linkOpenFile: (file: string) => typedError<null, AppError>(__TAURI_INVOKE("link_open_file", { file })),
 	mathsSettings: () => __TAURI_INVOKE<MathsSettingsDto>("maths_settings"),
 	/**
 	 *  Turns reading maths from pictures on or off (the model stays until
@@ -549,7 +575,12 @@ export type AnnotationKind = "highlight" | "bookmark" |
  *  Photographed paper notes about a place: the locator's `capture` is
  *  the PDF in the profile's notes folder; `note` holds its text.
  */
-"capture";
+"capture" | 
+/**
+ *  A link to a web page, a video, a file on this computer or another
+ *  book, from selected text or a place: the locator's `link` holds it.
+ */
+"link";
 
 export type AppError = {
 	kind: AppErrorKind,
@@ -1372,6 +1403,9 @@ export type JobEventPayload = {
 	message: string | null,
 };
 
+/**  A video site Libreri knows how to embed without asking the site. */
+export type KnownVideo = { provider: "youtube"; id: string } | { provider: "vimeo"; id: string; hash: string | null };
+
 /**
  *  The books or folders changed (import, scan, rebuild). The interface
  *  refetches its lists.
@@ -1384,6 +1418,59 @@ export type LibrarySummary = {
 	path: string,
 	/**  `u32` is plenty for a book count and maps to a plain TypeScript number. */
 	bookCount: number,
+};
+
+/**  Details of a link. */
+export type LinkDetails = {
+	url: string,
+	kind: LinkKind,
+	site: string,
+	title: string | null,
+	/**  The channel or author. */
+	author: string | null,
+	description: string | null,
+	/**  Length in seconds, when the site says. */
+	duration: number | null,
+	/**  Where the video plays from (an https address for a frame). */
+	embed: string | null,
+	/**  YouTube or Vimeo: embedded by Libreri itself, with a start time. */
+	video: KnownVideo | null,
+	/**  A start time written in the address. */
+	start: number | null,
+};
+
+export type LinkFileDto = {
+	/**
+	 *  The path in the library when the file is inside it (so the link
+	 *  travels with the library), otherwise the full path.
+	 */
+	file: string,
+	name: string,
+	/**  "video" or "audio". */
+	media: string,
+	inLibrary: boolean,
+};
+
+/**  What a link points to. */
+export type LinkKind = 
+/**  A video that plays in the side panel. */
+"video" | 
+/**  A web page (opens in the browser; can be kept offline). */
+"web";
+
+export type LinkPreviewDto = {
+	details: LinkDetails,
+	/**  The picture as a data URL, to show before saving. */
+	picture: string | null,
+	/**  A web page whose readable part can be kept offline. */
+	canCopy: boolean,
+};
+
+export type LinkSavedDto = {
+	/**  The picture, in the profile's notes folder. */
+	picture: string | null,
+	/**  The offline copy of the page, in the profile's notes folder. */
+	copy: string | null,
 };
 
 export type LocateResult = "linked" | 
@@ -1608,6 +1695,13 @@ export type PictureDto = {
 	src: string,
 	width: number,
 	height: number,
+};
+
+export type PlayerDto = {
+	/**  The local page holding the site's player. */
+	page: string,
+	/**  The video's own page, for "Open in browser". */
+	watch: string,
 };
 
 /**  A profile as the picker and Settings show it. Never includes hashes. */

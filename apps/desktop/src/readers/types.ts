@@ -157,15 +157,17 @@ export function highlightFill(color: HighlightColor | null, dark: boolean): stri
   return (dark ? night : light)[color ?? "yellow"];
 }
 
-/** Annotations drawn on the text: highlights, and voice notes about
- * selected text (drawn with a dotted underline). */
+/** Annotations drawn on the text: highlights, and voice notes and links
+ * about selected text (drawn with dotted and dashed underlines). */
 export function isDrawn(a: Annotation): boolean {
-  return a.kind === "highlight" || (a.kind === "voice" && !!a.quote);
+  return a.kind === "highlight" || ((a.kind === "voice" || a.kind === "link") && !!a.quote);
 }
 
 /** Classes for a drawn annotation. */
 export function drawnClass(base: string, a: Annotation): string {
-  return `${base}${a.note && a.kind !== "voice" ? " lb-hl-note" : ""}${a.kind === "voice" ? " lb-hl-voice" : ""}`;
+  const own = a.kind === "voice" ? " lb-hl-voice" : a.kind === "link" ? " lb-hl-link" : "";
+  const note = a.note && a.kind === "highlight" ? " lb-hl-note" : "";
+  return `${base}${note}${own}`;
 }
 
 export function parseLocator(json: string | null | undefined): Locator | null {
@@ -179,3 +181,22 @@ export function parseLocator(json: string | null | undefined): Locator | null {
 }
 
 export type { Annotation };
+
+/** The drawn annotation (a `.lb-pdf-hl` box) under a point on the screen.
+ * Found by position: the boxes let clicks through to the text below (so it
+ * can be selected), which also hides them from `elementsFromPoint`. */
+export function highlightAt(root: HTMLElement, x: number, y: number): HTMLElement | null {
+  let best: HTMLElement | null = null;
+  let area = Infinity;
+  for (const el of root.querySelectorAll<HTMLElement>(".lb-pdf-hl")) {
+    const r = el.getBoundingClientRect();
+    // A little room below for underlines (voice notes and links).
+    if (x < r.left || x > r.right || y < r.top || y > r.bottom + 3) continue;
+    // The smallest box wins where highlights overlap.
+    if (r.width * r.height < area) {
+      area = r.width * r.height;
+      best = el;
+    }
+  }
+  return best;
+}
