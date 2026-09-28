@@ -5,6 +5,7 @@
 
 pub mod app;
 pub mod books;
+pub mod compare;
 pub mod details;
 pub mod edit;
 pub mod folders;

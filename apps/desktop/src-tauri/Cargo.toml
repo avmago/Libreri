@@ -16,6 +16,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 libreri-core = { workspace = true, features = ["specta"] }
+uuid.workspace = true
 libreri-library.workspace = true
 libreri-jobs.workspace = true
 libreri-metadata = { workspace = true, features = ["specta"] }

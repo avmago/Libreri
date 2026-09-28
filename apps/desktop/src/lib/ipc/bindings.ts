@@ -352,12 +352,24 @@ export const commands = {
 	startPhonePages: () => typedError<PhonePairingDto, AppError>(__TAURI_INVOKE("start_phone_pages")),
 	/**  How many pages a PDF file has (before taking pages from it). */
 	pdfPageCount: (path: string) => typedError<number, AppError>(__TAURI_INVOKE("pdf_page_count", { path })),
+	/**
+	 *  Opens both sides and starts comparing them; the result arrives as a
+	 *  `CompareFinished` event (progress as job events).
+	 */
+	startCompare: (a: CompareSourceDto, b: CompareSourceDto) => typedError<CompareStarted, AppError>(__TAURI_INVOKE("start_compare", { a, b })),
+	/**  A comparison's result (or that it is still running). */
+	getComparison: (id: string) => typedError<ComparisonDto, AppError>(__TAURI_INVOKE("get_comparison", { id })),
+	/**  Saves the comparison as a PDF report at `dest`. */
+	exportCompareReport: (id: string, dest: string) => typedError<null, AppError>(__TAURI_INVOKE("export_compare_report", { id, dest })),
+	/**  Forgets a comparison (its view closed). */
+	closeCompare: (id: string) => __TAURI_INVOKE<void>("close_compare", { id }),
 };
 
 /** Events */
 export const events = {
 	archiveImported: makeEvent<ArchiveImported>("archive-imported"),
 	backupFinished: makeEvent<BackupFinished>("backup-finished"),
+	compareFinished: makeEvent<CompareFinished>("compare-finished"),
 	detailsFilled: makeEvent<DetailsFilled>("details-filled"),
 	exportFinished: makeEvent<ExportFinished>("export-finished"),
 	foreignImported: makeEvent<ForeignImported>("foreign-imported"),
@@ -674,6 +686,26 @@ export type Candidate = {
 	score: number | null,
 };
 
+/**  One difference. `pair` is the index into the page pairs. */
+export type Change = {
+	kind: ChangeKind,
+	pair: number,
+	aRects: ([(number | null), (number | null), (number | null), (number | null)])[],
+	bRects: ([(number | null), (number | null), (number | null), (number | null)])[],
+	aText: string,
+	bText: string,
+};
+
+export type ChangeKind = 
+/**  Words only in the first document. */
+"removed" | 
+/**  Words only in the second. */
+"added" | 
+/**  Words replaced by others. */
+"changed" | 
+/**  Drawings or pictures look different. */
+"look" | "pageRemoved" | "pageAdded";
+
 /**  A formatted reference as plain text and as HTML (with italics). */
 export type Citation = {
 	text: string,
@@ -689,6 +721,42 @@ export type CollectionDto = {
 	id: string,
 	name: string,
 	query: BookQuery,
+};
+
+/**  A comparison finished (or failed: `error`). */
+export type CompareFinished = {
+	id: string,
+	error: string | null,
+};
+
+/**  One side of a comparison. */
+export type CompareSourceDto = 
+/**  A book as it is now. */
+{ kind: "book"; id: string } | 
+/**  An earlier version of a book. */
+{ kind: "version"; book: string; version: string } | 
+/**  A PDF or DjVu file on this computer. */
+{ kind: "file"; path: string };
+
+export type CompareStarted = {
+	id: string,
+	jobId: string,
+	aLabel: string,
+	bLabel: string,
+	aPages: number,
+	bPages: number,
+};
+
+export type ComparisonDto = {
+	aLabel: string,
+	bLabel: string,
+	aPages: number,
+	bPages: number,
+	/**  False while it is still running. */
+	done: boolean,
+	error: string | null,
+	pairs: PagePair[],
+	changes: Change[],
 };
 
 /**  What kind of document a book is. Chosen by the user; guessed on import. */
@@ -1174,6 +1242,15 @@ export type PageBookDto = {
 	rightToLeft: boolean,
 	outline: OutlineDto[],
 	hasText: boolean,
+};
+
+/**
+ *  Pages that belong together (1-based); `None` on one side means the page
+ *  was added or removed.
+ */
+export type PagePair = {
+	a: number | null,
+	b: number | null,
 };
 
 export type PageScaleDto = {

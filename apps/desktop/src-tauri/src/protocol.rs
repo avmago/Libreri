@@ -62,6 +62,10 @@ fn serve(app: &AppHandle, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
     if let Some(rest) = relative.strip_prefix(".pages/") {
         return serve_page(&state, &library, rest, request.uri().query().unwrap_or(""));
     }
+    // `.compare/<id>/<a|b>/<page>?w=<width>`: a page of a comparison.
+    if let Some(rest) = relative.strip_prefix(".compare/") {
+        return serve_compare(&state, rest, request.uri().query().unwrap_or(""));
+    }
     // Only books the signed-in profile may see, and covers.
     if !library.may_open(&relative) {
         return status(StatusCode::FORBIDDEN);
@@ -153,6 +157,42 @@ fn serve_page(
         Err(e) => base(StatusCode::UNPROCESSABLE_ENTITY)
             .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
             .body(e.to_string().into_bytes())
+            .unwrap_or_else(|_| status(StatusCode::INTERNAL_SERVER_ERROR)),
+    }
+}
+
+fn serve_compare(state: &AppState, rest: &str, query: &str) -> Response<Vec<u8>> {
+    let parts: Vec<&str> = rest.split('/').collect();
+    let [id, side, page] = parts[..] else {
+        return status(StatusCode::BAD_REQUEST);
+    };
+    let side = match side {
+        "a" => 0,
+        "b" => 1,
+        _ => return status(StatusCode::BAD_REQUEST),
+    };
+    let Ok(page) = page.parse::<u32>() else {
+        return status(StatusCode::BAD_REQUEST);
+    };
+    let width = query
+        .split('&')
+        .find_map(|kv| kv.strip_prefix("w="))
+        .and_then(|w| w.parse::<u32>().ok())
+        .unwrap_or(900)
+        .clamp(100, 2400);
+    let Some(session) = state.compare_session(id) else {
+        return status(StatusCode::NOT_FOUND);
+    };
+    match session.picture(side, page, width) {
+        Ok(jpeg) => base(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "image/jpeg")
+            .header(header::CACHE_CONTROL, "private, max-age=3600")
+            .header(header::CONTENT_LENGTH, jpeg.len())
+            .body(jpeg.to_vec())
+            .unwrap_or_else(|_| status(StatusCode::INTERNAL_SERVER_ERROR)),
+        Err(e) => base(StatusCode::UNPROCESSABLE_ENTITY)
+            .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
+            .body(e.into_bytes())
             .unwrap_or_else(|_| status(StatusCode::INTERNAL_SERVER_ERROR)),
     }
 }

@@ -3,8 +3,9 @@
 use crate::backup_store::{BackupSettings, BackupStore};
 use crate::error::{AppError, AppResult};
 use crate::events::{
-    ArchiveImported, BackupFinished, DetailsFilled, ExportFinished, ForeignImported,
-    ImportFinished, JobEventPayload, LibraryChanged, OcrFinished, SearchIndexProgress,
+    ArchiveImported, BackupFinished, CompareFinished, DetailsFilled, ExportFinished,
+    ForeignImported, ImportFinished, JobEventPayload, LibraryChanged, OcrFinished,
+    SearchIndexProgress,
 };
 use crate::online_store::OnlineStore;
 use crate::settings_store::SettingsStore;
@@ -49,6 +50,8 @@ pub struct AppState {
     pub http: Arc<dyn Http + Send>,
     /// The phone scanning page, while it is open.
     phone: Mutex<Option<libreri_scan::PhoneScanner>>,
+    /// Comparisons open in the interface (newest last, a few kept).
+    compares: Mutex<Vec<(String, Arc<CompareSession>)>>,
     library: Mutex<Option<Arc<Library>>>,
     watcher: Mutex<Option<LibraryWatcher>>,
     pub jobs: JobQueue,
@@ -74,6 +77,44 @@ pub fn start_scheduler(app: AppHandle) {
         })
         .expect("the scheduler thread starts");
 }
+
+/// Page pictures of a comparison: (side, page, width) → JPEG.
+type PictureCache = std::collections::HashMap<(u8, u32, u32), Arc<Vec<u8>>>;
+
+/// Two documents being compared, and the result once it is ready.
+pub struct CompareSession {
+    pub a: libreri_library::CompareDoc,
+    pub b: libreri_library::CompareDoc,
+    pub result: Mutex<Option<Result<libreri_library::Comparison, String>>>,
+    /// Page pictures already drawn: (side, page, width) → JPEG.
+    pub images: Mutex<PictureCache>,
+}
+
+impl CompareSession {
+    /// A page of one side as a JPEG (kept for the next time).
+    pub fn picture(&self, side: u8, page: u32, width: u32) -> Result<Arc<Vec<u8>>, String> {
+        let key = (side, page, width);
+        if let Some(hit) = lock(&self.images).get(&key) {
+            return Ok(Arc::clone(hit));
+        }
+        let doc = if side == 0 { &self.a } else { &self.b };
+        if page == 0 || page > doc.pages() {
+            return Err("no such page".into());
+        }
+        let (jpeg, _, _) = doc.jpeg(page, width).map_err(|e| e.to_string())?;
+        let jpeg = Arc::new(jpeg);
+        let mut images = lock(&self.images);
+        // About 200 pictures at most.
+        if images.len() > 200 {
+            images.clear();
+        }
+        images.insert(key, Arc::clone(&jpeg));
+        Ok(jpeg)
+    }
+}
+
+/// Comparisons kept for the interface (each holds two open documents).
+const COMPARES_KEPT: usize = 4;
 
 /// Adapts a job's context to the library's progress interface.
 struct JobProgress<'a>(&'a JobContext);
@@ -205,6 +246,7 @@ impl AppState {
             backup_running: Arc::default(),
             http: make_http(),
             phone: Mutex::new(None),
+            compares: Mutex::new(Vec::new()),
             library: Mutex::new(None),
             watcher: Mutex::new(None),
             jobs,
@@ -592,6 +634,69 @@ impl AppState {
 
     /// Reads scanned books with OCR, one after another; the result arrives
     /// as `OcrFinished`.
+    /// Opens both sides and compares them in the background; the result
+    /// arrives as a `CompareFinished` event. Returns the comparison id and
+    /// the job id.
+    pub fn start_compare(
+        &self,
+        a: libreri_library::CompareSource,
+        b: libreri_library::CompareSource,
+    ) -> AppResult<(String, JobId)> {
+        let library = self.library()?;
+        let session = Arc::new(CompareSession {
+            a: library.compare_doc(&a)?,
+            b: library.compare_doc(&b)?,
+            result: Mutex::new(None),
+            images: Mutex::default(),
+        });
+        let id = uuid::Uuid::new_v4().to_string();
+        {
+            let mut list = lock(&self.compares);
+            list.push((id.clone(), Arc::clone(&session)));
+            let extra = list.len().saturating_sub(COMPARES_KEPT);
+            list.drain(..extra);
+        }
+        let handle = self.app.clone();
+        let compare_id = id.clone();
+        let job = self.jobs.submit("Comparing".to_owned(), move |ctx| {
+            let result = library.compare(&session.a, &session.b, &JobProgress(ctx));
+            let (outcome, error) = match result {
+                Ok(r) => {
+                    *lock(&session.result) = Some(Ok(r));
+                    (Ok(()), None)
+                }
+                Err(libreri_library::Error::Cancelled) => (
+                    Err(JobError::Cancelled(libreri_jobs::Cancelled)),
+                    Some("cancelled".to_owned()),
+                ),
+                Err(e) => {
+                    *lock(&session.result) = Some(Err(e.to_string()));
+                    (Err(JobError::Failed(e.to_string())), Some(e.to_string()))
+                }
+            };
+            let _ = CompareFinished {
+                id: compare_id,
+                error,
+            }
+            .emit(&handle);
+            outcome
+        });
+        Ok((id, job))
+    }
+
+    /// A comparison started earlier.
+    pub fn compare_session(&self, id: &str) -> Option<Arc<CompareSession>> {
+        lock(&self.compares)
+            .iter()
+            .find(|(k, _)| k == id)
+            .map(|(_, s)| Arc::clone(s))
+    }
+
+    /// Forgets a comparison (its tab closed).
+    pub fn close_compare(&self, id: &str) {
+        lock(&self.compares).retain(|(k, _)| k != id);
+    }
+
     pub fn start_ocr(&self, ids: Vec<BookId>, options: OcrOptions) -> AppResult<JobId> {
         let library = self.library()?;
         let index = self.search_index().ok();

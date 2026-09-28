@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   Bookmark,
   BookmarkCheck,
+  GitCompare,
   History,
   NotebookPen,
   PanelLeft,
@@ -63,6 +64,8 @@ import {
 import { pickPicture } from "../markup/pickPicture";
 import { PageEditor } from "../edit/PageEditor";
 import { VersionsDialog } from "../edit/EditDialogs";
+import { CompareView } from "../compare/CompareView";
+import { CompareDialog } from "../compare/CompareDialog";
 import { pdfAnnots } from "@/readers";
 import { useQuery } from "@tanstack/react-query";
 import { unwrap } from "@/lib/ipc";
@@ -147,6 +150,9 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
   const [formDirty, setFormDirty] = useState(false);
   const [savingForm, setSavingForm] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const comparing = tab.compare;
+  const setCompare = useTabs((s) => s.setCompare);
   const pageInputRef = useRef<HTMLInputElement>(null);
 
   const theme = useMemo(() => {
@@ -796,6 +802,18 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
         >
           {bookmarkHere ? <BookmarkCheck className="fill-current" /> : <Bookmark />}
         </Button>
+        {(fileType === "pdf" || fileType === "djvu") && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Compare"
+            aria-pressed={Boolean(comparing)}
+            title="Compare with an earlier version, another book or a file"
+            onClick={() => (comparing ? setCompare(bookId, null) : setCompareOpen(true))}
+          >
+            <GitCompare />
+          </Button>
+        )}
         {fileType === "pdf" && (
           <Button
             variant="ghost"
@@ -819,7 +837,16 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
         </Button>
       </div>
 
-      {formDirty && !editing && (
+      {comparing && (
+        <CompareView
+          key={JSON.stringify(comparing)}
+          request={comparing}
+          title={book?.metadata.title ?? tab.title}
+          onSwap={() => setCompare(bookId, { a: comparing.b, b: comparing.a })}
+          onClose={() => setCompare(bookId, null)}
+        />
+      )}
+      {formDirty && !editing && !comparing && (
         <div className="flex h-10 shrink-0 items-center gap-3 border-b bg-primary/5 px-3 text-[13px]">
           <span className="flex-1">
             You filled in the form. Save it into the PDF, or undo your changes.
@@ -842,7 +869,7 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
         </div>
       )}
 
-      {markup.active && !focusMode && !editing && (
+      {markup.active && !focusMode && !editing && !comparing && (
         <MarkupToolbar
           m={markup}
           onPickImage={() => void pickImage()}
@@ -860,7 +887,7 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
         />
       )}
 
-      {editing && book && (
+      {editing && book && !comparing && (
         <PageEditor
           book={book}
           hasOcr={ocrPages.length > 0}
@@ -869,7 +896,7 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
           onSaved={fileChanged}
         />
       )}
-      <div className={cn("flex min-h-0 flex-1", editing && "hidden")}>
+      <div className={cn("flex min-h-0 flex-1", (editing || comparing) && "hidden")}>
         {left && !focusMode && (
           <ContentsPanel
             panel={left}
@@ -985,7 +1012,7 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
       <div
         className={cn(
           "flex h-7 shrink-0 items-center gap-3 border-t px-3 text-[11.5px] text-muted-foreground",
-          focusMode && "hidden",
+          (focusMode || comparing) && "hidden",
         )}
       >
         <span className="tabular-nums">{location?.label ?? ""}</span>
@@ -1105,8 +1132,27 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
             setVersionsOpen(false);
             fileChanged(b);
           }}
+          onCompare={(version) => {
+            setVersionsOpen(false);
+            setEditing(false);
+            setCompare(bookId, {
+              a: { kind: "version", book: bookId, version },
+              b: { kind: "book", id: bookId },
+            });
+          }}
         />
       )}
+      <CompareDialog
+        key={`compare-${compareOpen}`}
+        open={compareOpen}
+        bookId={bookId}
+        onClose={() => setCompareOpen(false)}
+        onCompare={(r) => {
+          setCompareOpen(false);
+          setEditing(false);
+          setCompare(bookId, r);
+        }}
+      />
     </div>
   );
 }

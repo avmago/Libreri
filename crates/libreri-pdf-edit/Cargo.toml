@@ -17,6 +17,7 @@ hayro = "0.7.1"
 kurbo = "0.13.0"
 # Only the desktop shell turns this on, to generate TypeScript types.
 specta = { version = "=2.0.0-rc.25", features = ["derive"], optional = true }
+similar = "2"
 
 [features]
 specta = ["dep:specta"]

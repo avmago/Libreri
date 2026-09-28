@@ -2,7 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ask, open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Camera, CheckCircle2, History, Loader2, RotateCcw, Save, Trash2 } from "lucide-react";
+import {
+  Camera,
+  CheckCircle2,
+  GitCompare,
+  History,
+  Loader2,
+  RotateCcw,
+  Save,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import {
@@ -551,6 +560,7 @@ export function VersionsDialog({
   canEdit,
   onClose,
   onRestored,
+  onCompare,
 }: {
   open: boolean;
   bookId: string;
@@ -558,6 +568,8 @@ export function VersionsDialog({
   canEdit: boolean;
   onClose: () => void;
   onRestored: (book: BookDto) => void;
+  /** Compare a version with the book as it is now. */
+  onCompare?: (version: string) => void;
 }) {
   const qc = useQueryClient();
   const key = ["lib", "versions", bookId];
@@ -637,6 +649,17 @@ export function VersionsDialog({
                 {when(v.savedAt)} · {formatSize(v.size ?? 0)}
               </span>
             </div>
+            {onCompare && (
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Compare with now"
+                title="Compare with the book as it is now"
+                onClick={() => onCompare(v.id)}
+              >
+                <GitCompare />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"

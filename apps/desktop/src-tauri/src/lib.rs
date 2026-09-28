@@ -153,6 +153,10 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::edit::delete_all_versions,
             commands::edit::start_phone_pages,
             commands::edit::pdf_page_count,
+            commands::compare::start_compare,
+            commands::compare::get_comparison,
+            commands::compare::export_compare_report,
+            commands::compare::close_compare,
         ])
         .events(tauri_specta::collect_events![
             events::JobEventPayload,
@@ -162,6 +166,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::DetailsFilled,
             events::PhoneScan,
             events::PhonePage,
+            events::CompareFinished,
             events::ExportFinished,
             events::ArchiveImported,
             events::BackupFinished,

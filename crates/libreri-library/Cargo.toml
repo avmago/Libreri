@@ -26,6 +26,7 @@ chrono.workspace = true
 gethostname = "1"
 blake3 = "1.8.7"
 walkdir = "2.5.0"
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "pnm"] }
 trash = "5.2.9"
 notify-debouncer-full = "0.7.0"
 

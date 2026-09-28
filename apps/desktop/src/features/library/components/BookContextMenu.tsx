@@ -7,6 +7,7 @@ import {
   ExternalLink,
   FolderInput,
   FolderSearch,
+  GitCompare,
   Globe,
   Heart,
   Info,
@@ -80,6 +81,25 @@ function MenuItems({ book, targets }: { book: BookView; targets: BookView[] }) {
           </ContextMenu.Item>
           <ContextMenu.Item className={menuItem} onSelect={() => setDetailsOpen(true)}>
             <Info /> Details <MenuShortcut>{keys("details.toggle")}</MenuShortcut>
+          </ContextMenu.Item>
+          <ContextMenu.Separator className={menuSeparator} />
+        </>
+      )}
+      {targets.length === 2 && scans.length === 2 && (
+        <>
+          <ContextMenu.Item
+            className={menuItem}
+            onSelect={() => {
+              const [a, b] = targets as [BookView, BookView];
+              useTabs.getState().open({
+                bookId: a.id,
+                title: a.metadata.title ?? "Book",
+                fileType: a.fileType,
+                compare: { a: { kind: "book", id: a.id }, b: { kind: "book", id: b.id } },
+              });
+            }}
+          >
+            <GitCompare /> Compare these two
           </ContextMenu.Item>
           <ContextMenu.Separator className={menuSeparator} />
         </>

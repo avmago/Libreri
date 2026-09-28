@@ -4,7 +4,7 @@
  * use it.
  */
 import { create } from "zustand";
-import type { FileType } from "@/lib/ipc";
+import type { CompareSourceDto, FileType } from "@/lib/ipc";
 
 export interface BookTab {
   /** One tab per book, so the book id is the tab id. */
@@ -15,6 +15,14 @@ export interface BookTab {
   jumpTo?: string;
   /** Words to find when the tab opens (from Search), used once. */
   findText?: FindRequest;
+  /** Show a comparison instead of the book (until it is closed). */
+  compare?: CompareRequest;
+}
+
+/** Two documents to compare: the first is shown on the left. */
+export interface CompareRequest {
+  a: CompareSourceDto;
+  b: CompareSourceDto;
 }
 
 /** Opening a book at a search match: the words and where they were found. */
@@ -57,6 +65,8 @@ interface TabsState {
   openBeside: (tab: BookTab) => void;
   /** Removes a tab without remembering it (it moved to another window). */
   detach: (bookId: string) => void;
+  /** Shows a comparison in a book's tab, or ends it (null). */
+  setCompare: (bookId: string, compare: CompareRequest | null) => void;
   /** A book's file changed (a new version): its id changed, the tab follows. */
   replaceBook: (oldId: string, newId: string) => void;
 }
@@ -79,10 +89,15 @@ export const useTabs = create<TabsState>((set, get) => ({
           active: tab.bookId,
           lastBook: tab.bookId,
           tabs:
-            tab.jumpTo || tab.findText
+            tab.jumpTo || tab.findText || tab.compare
               ? s.tabs.map((t) =>
                   t.bookId === tab.bookId
-                    ? { ...t, jumpTo: tab.jumpTo, findText: tab.findText }
+                    ? {
+                        ...t,
+                        jumpTo: tab.jumpTo,
+                        findText: tab.findText,
+                        compare: tab.compare ?? t.compare,
+                      }
                     : t,
                 )
               : s.tabs,
@@ -102,7 +117,12 @@ export const useTabs = create<TabsState>((set, get) => ({
         s.active !== bookId
           ? s.active
           : (partner ?? tabs[Math.min(i, tabs.length - 1)]?.bookId ?? null);
-      const closedTab: BookTab = { ...s.tabs[i]!, jumpTo: undefined, findText: undefined };
+      const closedTab: BookTab = {
+        ...s.tabs[i]!,
+        jumpTo: undefined,
+        findText: undefined,
+        compare: undefined,
+      };
       return {
         tabs,
         active,
@@ -169,6 +189,10 @@ export const useTabs = create<TabsState>((set, get) => ({
     get().open(tab);
     if (base && base !== tab.bookId) set({ split: { left: base, right: tab.bookId } });
   },
+  setCompare: (bookId, compare) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) => (t.bookId === bookId ? { ...t, compare: compare ?? undefined } : t)),
+    })),
   replaceBook: (oldId, newId) =>
     set((s) => {
       const swap = (id: string | null) => (id === oldId ? newId : id);

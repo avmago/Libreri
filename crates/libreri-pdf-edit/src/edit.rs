@@ -168,7 +168,7 @@ fn rect_path(b: &[f64; 4]) -> String {
 // ---------- text ----------
 
 /// Windows-1252 byte for a character, as the standard fonts are used.
-fn cp1252(c: char) -> Option<u8> {
+pub(crate) fn cp1252(c: char) -> Option<u8> {
     let u = c as u32;
     if (0x20..0x7F).contains(&u) || (0xA0..=0xFF).contains(&u) {
         return Some(u as u8);
@@ -213,7 +213,7 @@ fn std_font(font: &str) -> (&'static str, Option<&'static [(&'static str, u16)]>
     }
 }
 
-fn width_of(bytes: &[u8], table: Option<&[(&str, u16)]>) -> f64 {
+pub(crate) fn width_of(bytes: &[u8], table: Option<&[(&str, u16)]>) -> f64 {
     bytes
         .iter()
         .map(|&b| match table {
@@ -229,7 +229,12 @@ fn width_of(bytes: &[u8], table: Option<&[(&str, u16)]>) -> f64 {
 }
 
 /// Splits text into lines that fit `width` points.
-fn wrap(text: &str, size: f64, width: f64, table: Option<&[(&str, u16)]>) -> Vec<Vec<u8>> {
+pub(crate) fn wrap(
+    text: &str,
+    size: f64,
+    width: f64,
+    table: Option<&[(&str, u16)]>,
+) -> Vec<Vec<u8>> {
     let mut lines = Vec::new();
     for para in text.lines() {
         let mut line: Vec<u8> = Vec::new();
@@ -252,7 +257,7 @@ fn wrap(text: &str, size: f64, width: f64, table: Option<&[(&str, u16)]>) -> Vec
     lines
 }
 
-fn pdf_string(bytes: &[u8]) -> String {
+pub(crate) fn pdf_string(bytes: &[u8]) -> String {
     let mut s = String::from("(");
     for &b in bytes {
         match b {

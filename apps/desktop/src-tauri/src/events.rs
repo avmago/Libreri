@@ -178,6 +178,14 @@ pub struct PhonePage {
     pub picture: Option<String>,
 }
 
+/// A comparison finished (or failed: `error`).
+#[derive(Debug, Clone, Serialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct CompareFinished {
+    pub id: String,
+    pub error: Option<String>,
+}
+
 /// An export finished.
 #[derive(Debug, Clone, Serialize, Type, Event)]
 #[serde(rename_all = "camelCase")]

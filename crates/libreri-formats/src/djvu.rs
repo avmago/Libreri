@@ -302,6 +302,22 @@ pub fn page_words(path: &Path, page: u32) -> Result<Vec<Word>, String> {
     Ok(words_from(&parse_sexps(&out)))
 }
 
+/// The words of every page (`pages` of them), in one run of djvutxt.
+pub fn all_page_words(path: &Path, pages: usize) -> Result<Vec<Vec<Word>>, String> {
+    let out = run("djvutxt", &["--detail=word".as_ref(), path.as_os_str()])?;
+    let forms = parse_sexps(&out);
+    let per_page: Vec<Vec<Word>> = forms
+        .iter()
+        .filter(|f| f.head() == Some("page"))
+        .map(|f| words_from(std::slice::from_ref(f)))
+        .collect();
+    if per_page.len() == pages {
+        return Ok(per_page);
+    }
+    // Some files leave out pages without text: ask page by page.
+    (1..=pages as u32).map(|p| page_words(path, p)).collect()
+}
+
 fn words_from(forms: &[Sexp]) -> Vec<Word> {
     let mut words = Vec::new();
     for form in forms {

@@ -167,6 +167,51 @@ pub fn page_texts(path: &Path) -> Result<Vec<String>, String> {
     Ok(out)
 }
 
+/// Splits characters into words with their boxes, as fractions of a page
+/// `w` × `h` points (top-left origin).
+fn words_of(chars: &[Placed], w: f64, h: f64) -> Vec<crate::djvu::Word> {
+    let mut out = Vec::new();
+    let mut text = String::new();
+    let (mut x0, mut y0, mut x1, mut y1) = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
+    let mut flush = |text: &mut String, x0: &mut f64, y0: &mut f64, x1: &mut f64, y1: &mut f64| {
+        if !text.is_empty() && *x1 > *x0 {
+            out.push(crate::djvu::Word {
+                text: std::mem::take(text),
+                rect: [
+                    (*x0 / w).clamp(0.0, 1.0),
+                    (*y0 / h).clamp(0.0, 1.0),
+                    ((*x1 - *x0) / w).clamp(0.0, 1.0),
+                    ((*y1 - *y0) / h).clamp(0.0, 1.0),
+                ],
+            });
+        }
+        text.clear();
+        (*x0, *y0, *x1, *y1) = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
+    };
+    let mut prev: Option<Placed> = None;
+    for &c in chars {
+        if let Some(p) = prev {
+            let size = p.size.min(c.size);
+            let new_line = (c.y - p.y).abs() > size * 0.6 || c.x < p.x - size;
+            if new_line || c.x - p.end > size * 0.2 {
+                flush(&mut text, &mut x0, &mut y0, &mut x1, &mut y1);
+            }
+        }
+        prev = Some(c);
+        if c.ch.is_whitespace() {
+            flush(&mut text, &mut x0, &mut y0, &mut x1, &mut y1);
+            continue;
+        }
+        text.push(c.ch);
+        x0 = x0.min(c.x.min(c.end));
+        x1 = x1.max(c.end.max(c.x));
+        y0 = y0.min(c.y - c.size * 0.78);
+        y1 = y1.max(c.y + c.size * 0.22);
+    }
+    flush(&mut text, &mut x0, &mut y0, &mut x1, &mut y1);
+    out
+}
+
 /// A PDF opened once for rendering many pages (shared between threads).
 pub struct PdfDoc {
     pdf: Pdf,
@@ -179,6 +224,57 @@ impl PdfDoc {
 
     pub fn page_count(&self) -> u32 {
         self.pdf.pages().len() as u32
+    }
+
+    /// Page size as shown, in points.
+    pub fn page_size(&self, page: u32) -> Option<(f64, f64)> {
+        let pages = self.pdf.pages();
+        let p = pages.get(page.checked_sub(1)? as usize)?;
+        let (w, h) = p.render_dimensions();
+        Some((f64::from(w), f64::from(h)))
+    }
+
+    /// The words of one page (1-based) with their boxes.
+    pub fn words(&self, page: u32) -> Vec<crate::djvu::Word> {
+        let pages = self.pdf.pages();
+        let Some(p) = pages.get(page.saturating_sub(1) as usize) else {
+            return Vec::new();
+        };
+        let (w, h) = p.render_dimensions();
+        let cache = InterpreterCache::new();
+        let mut ctx = page_context(p, &cache);
+        let mut dev = TextDevice::default();
+        interpret_page(p, &mut ctx, &mut dev);
+        words_of(&dev.chars, f64::from(w), f64::from(h))
+    }
+
+    /// Renders one page (1-based) `width` pixels wide as RGB. Returns the
+    /// pixels, width and height.
+    pub fn render_rgb(&self, page: u32, width: u32) -> Result<(Vec<u8>, u32, u32), String> {
+        let pages = self.pdf.pages();
+        let p = pages
+            .get(page.saturating_sub(1) as usize)
+            .ok_or("the page does not exist")?;
+        let (w, h) = p.render_dimensions();
+        let mut scale = width.clamp(16, 4000) as f32 / w.max(1.0);
+        if h * scale > 6000.0 {
+            scale = 6000.0 / h;
+        }
+        let cache = hayro::RenderCache::new();
+        let settings = hayro::RenderSettings {
+            x_scale: scale,
+            y_scale: scale,
+            bg_color: hayro::vello_cpu::color::palette::css::WHITE,
+            ..Default::default()
+        };
+        let pixmap = hayro::render(p, &cache, &InterpreterSettings::default(), &settings);
+        let (pw, ph) = (pixmap.width() as u32, pixmap.height() as u32);
+        let rgb = pixmap
+            .data_as_u8_slice()
+            .chunks_exact(4)
+            .flat_map(|p| [p[0], p[1], p[2]])
+            .collect();
+        Ok((rgb, pw, ph))
     }
 
     /// Renders one page (1-based) as a grey PNG for OCR at about `dpi` dots
@@ -249,6 +345,24 @@ mod tests {
         assert_eq!(texts[0], "The lighthouse keeper\nwrote every night");
         assert_eq!(texts[1], "");
         assert_eq!(texts[2], "Secondhand news");
+    }
+
+    #[test]
+    fn finds_words_and_their_boxes() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("t.pdf");
+        crate::test_text_pdf(&path, &["The lighthouse keeper"]);
+        let doc = PdfDoc::open(&path).unwrap();
+        let words = doc.words(1);
+        let texts: Vec<&str> = words.iter().map(|w| w.text.as_str()).collect();
+        assert_eq!(texts, ["The", "lighthouse", "keeper"]);
+        // 72 pt from the left of a 612 pt page; the baseline 92 pt from the top.
+        let r = words[0].rect;
+        assert!((r[0] - 72.0 / 612.0).abs() < 0.002, "{r:?}");
+        assert!(r[1] < 92.0 / 792.0 && r[1] + r[3] > 92.0 / 792.0, "{r:?}");
+        assert!(words[1].rect[0] > r[0] + r[2]);
+        let (rgb, w, h) = doc.render_rgb(1, 300).unwrap();
+        assert_eq!((w, rgb.len() as u32), (300, 300 * h * 3));
     }
 
     #[test]
