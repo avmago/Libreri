@@ -6,9 +6,18 @@ export { PAGE_THEMES, pageTheme, type PageTheme, type PageThemeId } from "./them
 
 const PAGE_IMAGES: FileType[] = ["djvu", "cbz", "cbr", "cb7", "cbt", "cba"];
 
+const AUDIO: FileType[] = ["mp3", "m4b", "m4a", "aac", "ogg", "opus", "flac"];
+
 /** Formats Libreri's reader opens. The rest open in another app for now. */
 export function canRead(type: FileType): boolean {
-  return ["pdf", "epub", "mobi", "azw3", "fb2", "md", "txt", ...PAGE_IMAGES].includes(type);
+  return ["pdf", "epub", "mobi", "azw3", "fb2", "md", "txt", ...PAGE_IMAGES, ...AUDIO].includes(
+    type,
+  );
+}
+
+/** Audiobooks: opened in the player. */
+export function isAudio(type: FileType | undefined): boolean {
+  return type !== undefined && AUDIO.includes(type);
 }
 
 /** Books with real pages (zoom, fit, go to page): PDF, DjVu and comics. */
@@ -48,3 +57,5 @@ export * as markupModel from "./markup/model";
 export type { Mark, MarkupItem, ToolName, Scale, Unit, MeasureKind, Pt } from "./markup/model";
 export { drawList, pdfAnnots } from "./markup/export";
 export { loadPdfJs } from "./pdf/load";
+export type { SpeechPiece, SpeechSource } from "./speech/types";
+export { sentences, mathmlToSpeech, texToSpeech } from "./speech";

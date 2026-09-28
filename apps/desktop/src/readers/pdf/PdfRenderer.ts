@@ -12,6 +12,8 @@ import { commands, unwrap, type Annotation, type WordDto } from "@/lib/ipc";
 import type { MarkupLayer } from "../markup/MarkupLayer";
 import { findHits, matchRects, wordLayer } from "../ocrText";
 import { makeQuote } from "../quote";
+import { runWords, WordSpeech, type Box as SpeechBox, type PageWord } from "../speech/words";
+import type { SpeechSource } from "../speech/types";
 import type { PageTheme } from "../themes";
 import {
   highlightFill,
@@ -58,6 +60,8 @@ export class PdfRenderer implements Renderer {
   private ocrPages = new Set<number>();
   private ocrWords = new Map<number, WordDto[]>();
   private ocrTexts: string[] | null = null;
+  /** The sentence read aloud: its page and line boxes. */
+  private spoken: { page: number; rects: SpeechBox[] } | null = null;
   /** Finding in OCR text, when PDF.js finds nothing in the PDF's own text. */
   private ocrFind: { query: string; hits: { page: number; index: number }[]; at: number } | null =
     null;
@@ -378,6 +382,7 @@ export class PdfRenderer implements Renderer {
     if (!div) return;
     void this.drawOcr(pageNumber);
     this.markup?.mount(pageNumber, div);
+    this.drawSpoken(pageNumber);
     let layer = div.querySelector<HTMLElement>(".lb-pdf-hl-layer");
     if (!layer) {
       layer = document.createElement("div");
@@ -417,6 +422,87 @@ export class PdfRenderer implements Renderer {
         layer.append(r);
       }
     }
+  }
+
+  /** Draws the sentence being read aloud on its page. */
+  private drawSpoken(pageNumber: number) {
+    const div = this.viewer.getPageView(pageNumber - 1)?.div as HTMLElement | undefined;
+    if (!div) return;
+    div.querySelector(".lb-tts-layer")?.remove();
+    if (this.spoken?.page !== pageNumber) return;
+    const layer = document.createElement("div");
+    layer.className = "lb-tts-layer";
+    for (const [x, y, w, h] of this.spoken.rects) {
+      const r = document.createElement("div");
+      r.className = "lb-tts-mark";
+      r.style.cssText = `left:${x * 100}%;top:${y * 100}%;width:${w * 100}%;height:${h * 100}%`;
+      layer.append(r);
+    }
+    div.append(layer);
+  }
+
+  /** The words of a page: the PDF's text, or OCR words for scans. */
+  private async speechWords(page: number): Promise<PageWord[]> {
+    const p = await this.doc.getPage(page);
+    const vp = p.getViewport({ scale: 1 });
+    const content = await p.getTextContent();
+    const words: PageWord[] = [];
+    for (const it of content.items) {
+      if (!("str" in it) || !it.str.trim()) continue;
+      const [a, b, , , e, f] = it.transform as number[];
+      const h = Math.hypot(a!, b!) || it.height;
+      const [x1, y1] = vp.convertToViewportPoint(e!, f! - h * 0.22) as number[];
+      const [x2, y2] = vp.convertToViewportPoint(e! + it.width, f! + h * 0.9) as number[];
+      const box: SpeechBox = [
+        Math.min(x1!, x2!) / vp.width,
+        Math.min(y1!, y2!) / vp.height,
+        Math.abs(x2! - x1!) / vp.width,
+        Math.abs(y2! - y1!) / vp.height,
+      ];
+      words.push(...runWords(it.str, box));
+    }
+    if (words.length || !this.ocrPages.has(page)) return words;
+    return (await this.wordsOf(page)).map((w) => ({ text: w.text, rect: w.rect as SpeechBox }));
+  }
+
+  async readAloud(): Promise<SpeechSource | null> {
+    const loc = this.viewer.currentPageNumber;
+    const div = this.viewer.getPageView(loc - 1)?.div as HTMLElement | undefined;
+    let top = 0;
+    if (div) {
+      const r = div.getBoundingClientRect();
+      const c = this.container.getBoundingClientRect();
+      top = Math.min(1, Math.max(0, (c.top - r.top) / r.height));
+    }
+    return new WordSpeech(
+      loc,
+      top,
+      this.viewer.pagesCount,
+      (page) => this.speechWords(page),
+      (page, rects) => {
+        const before = this.spoken?.page;
+        this.spoken = page ? { page, rects } : null;
+        if (before && before !== page) this.drawSpoken(before);
+        if (page) this.drawSpoken(page);
+      },
+      (page, y) => {
+        const div = this.viewer.getPageView(page - 1)?.div as HTMLElement | undefined;
+        const c = this.container.getBoundingClientRect();
+        if (div) {
+          const r = div.getBoundingClientRect();
+          const at = r.top + r.height * y;
+          if (at > c.top + 40 && at < c.bottom - 80) return;
+        }
+        void this.goTo({ type: "pdf", page, top: Math.max(0, y - 0.15) });
+      },
+    );
+  }
+
+  async goToFraction(fraction: number) {
+    const pages = this.viewer.pagesCount;
+    const f = Math.max(0, Math.min(1, fraction)) * pages;
+    const page = Math.min(pages, Math.floor(f) + 1);
+    await this.goTo({ type: "pdf", page, top: f - (page - 1) });
   }
 
   attachMarkup(layer: MarkupLayer | null) {

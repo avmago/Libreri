@@ -46,6 +46,19 @@ export interface ProfilePrefs {
     width: number;
     snap: boolean;
   };
+  listening: {
+    /** Read-aloud speed, 0.5–3. */
+    speechRate: number;
+    /** Voice name (system voices) or eSpeak voice id; null = the default. */
+    voice: string | null;
+    /** Turn pages to follow what is being read. */
+    follow: boolean;
+    /** Audiobook speed, 0.5–3. */
+    audioRate: number;
+    /** Seconds the back and forward buttons skip. */
+    skipBack: number;
+    skipForward: number;
+  };
 }
 
 export const DEFAULT_PROFILE_PREFS: ProfilePrefs = {
@@ -57,6 +70,14 @@ export const DEFAULT_PROFILE_PREFS: ProfilePrefs = {
   reader: { brightness: 100, contrast: 100, fontScale: 100, lineHeight: 1.55, resume: true },
   notes: { defaultColor: "yellow", linkQuotes: true },
   markup: { signatures: [], stamps: [], color: "#dc2626", width: 0.0025, snap: true },
+  listening: {
+    speechRate: 1,
+    voice: null,
+    follow: true,
+    audioRate: 1,
+    skipBack: 15,
+    skipForward: 30,
+  },
 };
 
 function safeParse(json: string | null | undefined): Partial<ProfilePrefs> {
@@ -80,6 +101,7 @@ export function parsePrefs(json: string | null | undefined): ProfilePrefs {
     reader: { ...d.reader, ...raw.reader },
     notes: { ...d.notes, ...raw.notes },
     markup: { ...d.markup, ...raw.markup },
+    listening: { ...d.listening, ...raw.listening },
   };
 }
 
@@ -119,6 +141,7 @@ export const useProfilePrefs = create<PrefsState>((set, get) => ({
       reader: { ...cur.reader, ...change.reader },
       notes: { ...cur.notes, ...change.notes },
       markup: { ...cur.markup, ...change.markup } as ProfilePrefs["markup"],
+      listening: { ...cur.listening, ...change.listening },
     };
     set({ prefs: next });
     if (get().persist) save(next);

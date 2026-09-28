@@ -235,6 +235,11 @@ impl Library {
             if ocr.is_file() {
                 zip.add_file(&format!(".library-data/text/{id}.json"), &ocr)?;
             }
+            // An audiobook's link to its text and its sync points.
+            let link = crate::listening::link_path(self.layout(), id);
+            if link.is_file() {
+                zip.add_file(&format!(".library-data/audio-links/{id}.json"), &link)?;
+            }
             // Earlier versions are files too: they go where the books go.
             if opts.book_files {
                 for (name, file) in self.version_files(id) {
@@ -701,11 +706,15 @@ impl Library {
             .read(&format!(".library-data/covers/{}.jpg", ab.id))
             .ok();
         let ocr = zip.read(&format!(".library-data/text/{}.json", ab.id)).ok();
+        let audio_link = zip
+            .read(&format!(".library-data/audio-links/{}.json", ab.id))
+            .ok();
         match self.match_book(ab)? {
             Match::Exact(target) => {
                 report.linked += 1;
                 self.merge_details(&target, sc.as_ref(), ab, cover.as_deref(), report)?;
                 self.restore_ocr(&target, ocr.as_deref());
+                self.restore_audio_link(&target, audio_link.as_deref());
                 // Put the file back if it was missing here.
                 let here = self.record(&target)?;
                 if here.missing && ab.file_included {
@@ -783,6 +792,7 @@ impl Library {
                     }
                 }
                 self.restore_ocr(&id, ocr.as_deref());
+                self.restore_audio_link(&id, audio_link.as_deref());
                 let registered =
                     self.register(&dest, id.clone(), ab.file_type, &mut report.warnings);
                 if let Err(e) = registered {
@@ -815,6 +825,7 @@ impl Library {
                     book.has_cover = covers::store(self.layout(), &book.id, bytes).is_ok();
                 }
                 self.restore_ocr(&book.id, ocr.as_deref());
+                self.restore_audio_link(&book.id, audio_link.as_deref());
                 self.with_db(|db| {
                     db.insert_book(&book, 0)?;
                     for a in &ab.aliases {

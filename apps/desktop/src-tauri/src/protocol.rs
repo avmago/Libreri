@@ -258,6 +258,7 @@ fn content_type(path: &str) -> &'static str {
         "m4a" | "m4b" => "audio/mp4",
         "ogg" | "opus" => "audio/ogg",
         "flac" => "audio/flac",
+        "aac" => "audio/aac",
         _ => "application/octet-stream",
     }
 }

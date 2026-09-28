@@ -22,6 +22,7 @@ serde_json.workspace = true
 hayro = "0.7.1"
 kurbo = "0.13.0"
 png = "0.18.1"
+lofty = "0.25.4"
 
 [dev-dependencies]
 lopdf = { version = "0.45.0", default-features = false }

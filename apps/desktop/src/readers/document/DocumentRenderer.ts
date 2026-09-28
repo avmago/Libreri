@@ -8,6 +8,8 @@
 import { renderMarkdown, renderMermaid } from "@/lib/markdown";
 import type { Annotation } from "@/lib/ipc";
 import { findQuote, makeQuote } from "../quote";
+import { DomSpeech } from "../speech/dom";
+import type { SpeechSource } from "../speech/types";
 import type { PageTheme } from "../themes";
 import {
   highlightFill,
@@ -389,6 +391,47 @@ export class DocumentRenderer implements Renderer {
 
   zoom(): ZoomValue {
     return this.scale;
+  }
+
+  async readAloud(): Promise<SpeechSource | null> {
+    if (!this.article.textContent?.trim()) return null;
+    // Start at the first block that shows at the top.
+    const top = this.scroller.getBoundingClientRect().top;
+    const first = Array.from(
+      this.article.querySelectorAll<HTMLElement>(
+        "p, li, h1, h2, h3, h4, h5, h6, pre, blockquote, td",
+      ),
+    ).find((el) => el.getBoundingClientRect().bottom > top + 4);
+    const layer = document.createElement("div");
+    layer.className = "lb-tts-layer";
+    return new DomSpeech(
+      { root: this.article, from: first },
+      (range) => {
+        const r = range.getBoundingClientRect();
+        const box = this.scroller.getBoundingClientRect();
+        if (r.top < box.top + 40 || r.bottom > box.bottom - 60)
+          this.scroller.scrollBy({ top: r.top - box.top - box.height * 0.3, behavior: "smooth" });
+      },
+      async () => null,
+      (range) => {
+        // Web views without the highlight API: boxes over the text.
+        layer.replaceChildren();
+        if (!range) return layer.remove();
+        const base = this.article.getBoundingClientRect();
+        for (const r of Array.from(range.getClientRects())) {
+          const d = document.createElement("div");
+          d.style.cssText = `position:absolute;left:${r.left - base.left}px;top:${r.top - base.top}px;width:${r.width}px;height:${r.height}px;background:rgba(250,204,21,.4);pointer-events:none;border-radius:2px`;
+          layer.append(d);
+        }
+        this.article.style.position = "relative";
+        if (!layer.isConnected) this.article.append(layer);
+      },
+    );
+  }
+
+  async goToFraction(fraction: number) {
+    const max = this.scroller.scrollHeight - this.scroller.clientHeight;
+    this.scroller.scrollTop = Math.max(0, Math.min(1, fraction)) * max;
   }
 
   clearSelection() {

@@ -112,6 +112,7 @@ impl Library {
                 sidecar::rename(self.layout(), &rec.id, &id);
                 covers::rename(self.layout(), &rec.id, &id);
                 crate::text::rename(self.layout(), &rec.id, &id);
+                crate::listening::rename(self.layout(), &rec.id, &id);
                 self.rename_annotation_backups(&rec.id, &id);
                 if let Ok(book) = self.record(&id) {
                     sidecar::write(self, &book)?;

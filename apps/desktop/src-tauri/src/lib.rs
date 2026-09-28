@@ -157,6 +157,14 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::compare::get_comparison,
             commands::compare::export_compare_report,
             commands::compare::close_compare,
+            commands::listening::audio_info,
+            commands::listening::get_audio_link,
+            commands::listening::set_audio_link,
+            commands::listening::set_sync_points,
+            commands::listening::audiobooks_for,
+            commands::listening::system_voices,
+            commands::listening::system_speak,
+            commands::listening::system_stop_speaking,
         ])
         .events(tauri_specta::collect_events![
             events::JobEventPayload,

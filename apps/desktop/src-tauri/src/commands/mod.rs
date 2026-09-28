@@ -10,6 +10,7 @@ pub mod details;
 pub mod edit;
 pub mod folders;
 pub mod library;
+pub mod listening;
 pub mod notes;
 pub mod organize;
 pub mod pages;

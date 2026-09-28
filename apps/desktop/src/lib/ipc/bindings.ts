@@ -363,6 +363,22 @@ export const commands = {
 	exportCompareReport: (id: string, dest: string) => typedError<null, AppError>(__TAURI_INVOKE("export_compare_report", { id, dest })),
 	/**  Forgets a comparison (its view closed). */
 	closeCompare: (id: string) => __TAURI_INVOKE<void>("close_compare", { id }),
+	/**  Length and chapters of an audiobook. */
+	audioInfo: (id: string) => typedError<AudioInfoDto, AppError>(__TAURI_INVOKE("audio_info", { id })),
+	getAudioLink: (id: string) => typedError<AudioLinkDto, AppError>(__TAURI_INVOKE("get_audio_link", { id })),
+	/**  Links an audiobook to its book (or unlinks it with `None`). */
+	setAudioLink: (id: string, text: string | null) => typedError<AudioLinkDto, AppError>(__TAURI_INVOKE("set_audio_link", { id, text })),
+	setSyncPoints: (id: string, points: SyncPointDto[]) => typedError<AudioLinkDto, AppError>(__TAURI_INVOKE("set_sync_points", { id, points })),
+	/**  Audiobooks linked to a book. */
+	audiobooksFor: (id: string) => typedError<BookDto[], AppError>(__TAURI_INVOKE("audiobooks_for", { id })),
+	/**  eSpeak NG voices (none when it is not installed). */
+	systemVoices: () => typedError<Voice[], AppError>(__TAURI_INVOKE("system_voices")),
+	/**
+	 *  Speaks `text` with eSpeak NG; returns when done (true) or stopped
+	 *  (false).
+	 */
+	systemSpeak: (text: string, voice: string | null, rate: number | null) => typedError<boolean, AppError>(__TAURI_INVOKE("system_speak", { text, voice, rate })),
+	systemStopSpeaking: () => __TAURI_INVOKE<void>("system_stop_speaking"),
 };
 
 /** Events */
@@ -489,6 +505,17 @@ export type ArchiveSummaryDto = {
 	otherFile: number,
 	missing: number,
 	profiles: ArchiveProfileDto[],
+};
+
+export type AudioInfoDto = {
+	duration: number | null,
+	chapters: ChapterDto[],
+};
+
+export type AudioLinkDto = {
+	/**  The book the audiobook reads. */
+	text: BookDto | null,
+	points: SyncPointDto[],
 };
 
 /**  A file (BibTeX, CSL-JSON…) Libreri rewrites whenever the library changes. */
@@ -705,6 +732,11 @@ export type ChangeKind =
 "changed" | 
 /**  Drawings or pictures look different. */
 "look" | "pageRemoved" | "pageAdded";
+
+export type ChapterDto = {
+	title: string,
+	start: number | null,
+};
 
 /**  A formatted reference as plain text and as HTML (with italics). */
 export type Citation = {
@@ -1008,7 +1040,7 @@ export type HealthReportDto = {
 };
 
 /**  A helper program (or a set of programs from one package). */
-export type Helper = "djvulibre" | "tesseract" | "unar";
+export type Helper = "djvulibre" | "tesseract" | "unar" | "espeak";
 
 export type HelperInfo = {
 	name: string,
@@ -1462,6 +1494,14 @@ export type StorageDto = {
 	data: number | null,
 };
 
+export type SyncPointDto = {
+	t: number | null,
+	locator: string,
+	progress: number | null,
+	label: string | null,
+	auto?: boolean,
+};
+
 export type TagCountDto = {
 	name: string,
 	count: number,
@@ -1530,6 +1570,14 @@ export type VersionDto = {
 export type VersionsUsage = {
 	count: number,
 	bytes: number | null,
+};
+
+/**  A voice eSpeak NG offers. */
+export type Voice = {
+	/**  What to pass to `-v` (a language such as "en-gb"). */
+	id: string,
+	name: string,
+	lang: string,
 };
 
 export type WordDto = {

@@ -274,6 +274,11 @@ export const ACTIONS = {
     group: "Reader",
     keys: "Alt+M",
   },
+  "reader.readAloud": {
+    label: "Read aloud from here, or stop",
+    group: "Reader",
+    keys: "Mod+Shift+U",
+  },
 
   // Highlights and notes (in the reader)
   "reader.bookmark": { label: "Bookmark this page", group: "Highlights and notes", keys: "Mod+D" },

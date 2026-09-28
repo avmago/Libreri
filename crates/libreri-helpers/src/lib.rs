@@ -9,6 +9,7 @@
 //! (Homebrew, winget, apt, dnf, pacman, zypper). Libreri's own signed
 //! downloads replace the package managers in Phase 9 (user, 2026-09-28).
 
+pub mod speech;
 pub mod tessdata;
 
 use serde::{Deserialize, Serialize};
@@ -27,16 +28,24 @@ pub enum Helper {
     DjVuLibre,
     Tesseract,
     Unar,
+    #[serde(rename = "espeak")]
+    Espeak,
 }
 
 impl Helper {
-    pub const ALL: [Helper; 3] = [Helper::DjVuLibre, Helper::Tesseract, Helper::Unar];
+    pub const ALL: [Helper; 4] = [
+        Helper::DjVuLibre,
+        Helper::Tesseract,
+        Helper::Unar,
+        Helper::Espeak,
+    ];
 
     pub fn name(self) -> &'static str {
         match self {
             Self::DjVuLibre => "DjVuLibre",
             Self::Tesseract => "Tesseract",
             Self::Unar => "unar",
+            Self::Espeak => "eSpeak NG",
         }
     }
 
@@ -46,6 +55,9 @@ impl Helper {
             Self::DjVuLibre => "Opens DjVu books: pages, text and contents.",
             Self::Tesseract => "Reads the text of scanned books (OCR) so they can be searched.",
             Self::Unar => "Opens comics packed as ACE archives (.cba). Optional.",
+            Self::Espeak => {
+                "Reads books aloud where the system has no voices of its own (often on Linux). Optional."
+            }
         }
     }
 
@@ -54,6 +66,7 @@ impl Helper {
             Self::DjVuLibre => "GPL-2.0",
             Self::Tesseract => "Apache-2.0",
             Self::Unar => "LGPL-2.1",
+            Self::Espeak => "GPL-3.0",
         }
     }
 
@@ -63,6 +76,7 @@ impl Helper {
             Self::DjVuLibre => &["ddjvu", "djvutxt", "djvused"],
             Self::Tesseract => &["tesseract"],
             Self::Unar => &["unar", "lsar"],
+            Self::Espeak => &["espeak-ng"],
         }
     }
 }
@@ -82,6 +96,7 @@ fn extra_dirs() -> Vec<PathBuf> {
                 let base = PathBuf::from(base);
                 dirs.push(base.join("Tesseract-OCR"));
                 dirs.push(base.join("DjVuLibre"));
+                dirs.push(base.join("eSpeak NG"));
                 dirs.push(base.join("Programs").join("Tesseract-OCR"));
             }
         }
@@ -197,6 +212,7 @@ fn version_of(helper: Helper) -> Option<String> {
         Helper::Tesseract => ("tesseract", &["--version"]),
         Helper::DjVuLibre => ("ddjvu", &["--help"]),
         Helper::Unar => ("unar", &["-v"]),
+        Helper::Espeak => ("espeak-ng", &["--version"]),
     };
     let out = command(program)?.args(args).output().ok()?;
     let text = format!(
@@ -212,6 +228,9 @@ fn version_of(helper: Helper) -> Option<String> {
         }
         if let Some(i) = l.find("DjVuLibre-") {
             return Some(l[i + "DjVuLibre-".len()..].trim().to_owned());
+        }
+        if let Some(rest) = l.strip_prefix("eSpeak NG text-to-speech: ") {
+            return rest.split_whitespace().next().map(str::to_owned);
         }
         l.strip_prefix("unar v").map(str::to_owned)
     })
@@ -291,6 +310,8 @@ impl Installer {
             (Self::Zypper, Helper::DjVuLibre) => "djvulibre",
             (Self::Zypper, Helper::Tesseract) => "tesseract-ocr",
             (Self::Zypper, Helper::Unar) => "unar",
+            (Self::Winget, Helper::Espeak) => return None,
+            (_, Helper::Espeak) => "espeak-ng",
         })
     }
 }

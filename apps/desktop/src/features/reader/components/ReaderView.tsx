@@ -4,7 +4,9 @@ import {
   Bookmark,
   BookmarkCheck,
   GitCompare,
+  Headphones,
   History,
+  Volume2,
   NotebookPen,
   PanelLeft,
   Search,
@@ -21,6 +23,7 @@ import { useTabs, type BookTab } from "@/lib/tabs";
 import { cn } from "@/lib/utils";
 import {
   createRenderer,
+  isAudio,
   isPaged,
   PAGE_THEMES,
   pageTheme,
@@ -66,6 +69,11 @@ import { PageEditor } from "../edit/PageEditor";
 import { VersionsDialog } from "../edit/EditDialogs";
 import { CompareView } from "../compare/CompareView";
 import { CompareDialog } from "../compare/CompareDialog";
+import { useReadAloud } from "../speech/useReadAloud";
+import { AudiobookView } from "../listening/AudiobookView";
+import { useListening } from "../listening/store";
+import { timeAt } from "../listening/sync";
+import { ReadAloudBar } from "../speech/ReadAloudBar";
 import { pdfAnnots } from "@/readers";
 import { useQuery } from "@tanstack/react-query";
 import { unwrap } from "@/lib/ipc";
@@ -104,8 +112,17 @@ function countLabel(list: Annotation[]): string {
   return [part(h, "highlight"), part(b, "bookmark"), part(m, "mark")].filter(Boolean).join(" · ");
 }
 
-/** One open book: toolbar, contents and marks, the page, notebook. */
+/** One open book: the audiobook player, or the reader. */
 export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
+  return isAudio(tab.fileType) ? (
+    <AudiobookView tab={tab} active={active} />
+  ) : (
+    <BookReader tab={tab} active={active} />
+  );
+}
+
+/** One open book: toolbar, contents and marks, the page, notebook. */
+function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   const { bookId } = tab;
   const { data: book, error: bookError } = useBook(bookId);
   const position = usePosition(bookId);
@@ -227,6 +244,11 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
           {
             relocate: (loc) => {
               setLocation(loc);
+              useListening.getState().setPlace(bookId, {
+                locator: JSON.stringify(loc.locator),
+                progress: loc.progress,
+                label: loc.shortLabel,
+              });
               // Ignore the start page shown while the saved place is restored.
               if (!openedRef.current) return;
               pending.current = loc;
@@ -329,6 +351,39 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
 
   const r = () => rendererRef.current;
   const isPdf = isPaged(fileType);
+  const readAloud = useReadAloud(rendererRef);
+  const toggleReadAloud = () =>
+    readAloud.status === "off" ? void readAloud.start() : readAloud.stop();
+
+  // An audiobook of this book is playing: follow it.
+  const followTo = useListening((s) => s.follow[bookId]);
+  useEffect(() => {
+    if (!followTo || status !== "ready" || readAloud.status !== "off") return;
+    void rendererRef.current?.goToFraction?.(followTo.progress);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [followTo, status]);
+  const { data: audiobooks = [] } = useQuery({
+    queryKey: ["lib", "reader", bookId, "audiobooks"],
+    queryFn: () => unwrap(commands.audiobooksFor(bookId)),
+    enabled: status === "ready",
+  });
+  /** Opens the linked audiobook at the place being read. */
+  const listenHere = async () => {
+    const audio = audiobooks[0];
+    if (!audio) return;
+    const [link, info] = await Promise.all([
+      unwrap(commands.getAudioLink(audio.id)),
+      unwrap(commands.audioInfo(audio.id)),
+    ]).catch(() => [null, null] as const);
+    const pts = (link?.points ?? []).map((p) => ({ t: p.t ?? 0, progress: p.progress ?? 0 }));
+    const t = info?.duration ? timeAt(pts, location?.progress ?? 0, info.duration) : 0;
+    useListening.getState().requestPlay(audio.id, t);
+    useTabs.getState().openBeside({
+      bookId: audio.id,
+      title: audio.metadata.title ?? "Audiobook",
+      fileType: audio.fileType,
+    });
+  };
 
   // Markup mode (fixed pages): drawings kept like highlights.
   const markup = useMarkup({
@@ -644,6 +699,7 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
   useShortcut("reader.pdfModeNext", cyclePdfMode);
   useShortcut("reader.focusMode", () => setFocusMode((f) => !f));
   useShortcut("reader.markup", () => markup.available && markup.setActive(!markup.active));
+  useShortcut("reader.readAloud", toggleReadAloud);
   useShortcut("reader.details", () => {
     useTabs.getState().activate(null);
     useLibraryView.getState().setSelection([bookId]);
@@ -775,6 +831,31 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
             })}
           </div>
         )}
+        {status === "ready" &&
+          fileType &&
+          !["cbz", "cbr", "cb7", "cbt", "cba"].includes(fileType) && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Read aloud"
+              aria-pressed={readAloud.status !== "off"}
+              title={`Read aloud from here (${keys("reader.readAloud")})`}
+              onClick={toggleReadAloud}
+            >
+              <Volume2 />
+            </Button>
+          )}
+        {audiobooks.length > 0 && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Listen from here"
+            title={`Listen from here: ${audiobooks[0]!.metadata.title}`}
+            onClick={() => void listenHere()}
+          >
+            <Headphones />
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon"
@@ -837,6 +918,9 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
         </Button>
       </div>
 
+      {!focusMode && !comparing && !editing && (
+        <ReadAloudBar r={readAloud} lang={book?.metadata.language ?? undefined} />
+      )}
       {comparing && (
         <CompareView
           key={JSON.stringify(comparing)}

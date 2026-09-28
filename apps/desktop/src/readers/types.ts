@@ -7,6 +7,7 @@
 import type { Annotation, HighlightColor, TextQuote } from "@/lib/ipc";
 import type { MarkupLayer } from "./markup/MarkupLayer";
 import type { PageTheme } from "./themes";
+import type { SpeechSource } from "./speech/types";
 
 /** A place in a book. Stored as JSON (`locator` in the database). */
 export type Locator =
@@ -14,7 +15,8 @@ export type Locator =
   | { type: "pdf-highlight"; page: number; rects: Rect[] }
   | { type: "cfi"; cfi: string }
   | { type: "text"; start: number; end?: number }
-  | { type: "scroll"; fraction: number };
+  | { type: "scroll"; fraction: number }
+  | { type: "audio"; t: number };
 
 /** A rectangle as fractions (0–1) of the page, so it fits any zoom. */
 export type Rect = [x: number, y: number, w: number, h: number];
@@ -111,6 +113,11 @@ export interface Renderer {
   setLayout?(layout: Partial<PageLayout>): void;
   /** PDF forms: the PDF with the fields as filled in. */
   saveForm?(): Promise<Uint8Array>;
+  /** Read aloud: the text from the place shown, a sentence at a time
+   * (null when the book has no text to read). */
+  readAloud?(): Promise<SpeechSource | null>;
+  /** Goes to a place given as 0–1 through the book (audiobook sync). */
+  goToFraction?(fraction: number): Promise<void>;
 }
 
 /** How comic pages are shown. */

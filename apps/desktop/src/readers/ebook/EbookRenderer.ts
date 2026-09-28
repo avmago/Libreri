@@ -9,6 +9,8 @@
  */
 import type { Annotation, HighlightColor } from "@/lib/ipc";
 import type { PageTheme } from "../themes";
+import { DomSpeech } from "../speech/dom";
+import type { SpeechSource } from "../speech/types";
 import type {
   FindResult,
   Locator,
@@ -38,8 +40,10 @@ interface FoliateView extends HTMLElement {
   renderer: HTMLElement & {
     setStyles?(css: string): void;
     getContents(): { doc: Document; index: number }[];
+    nextSection(): Promise<void>;
+    scrollToAnchor(anchor: Range, select?: boolean): Promise<void>;
   };
-  lastLocation: FoliateLocation | null;
+  lastLocation: (FoliateLocation & { range?: Range }) | null;
   open(book: string | Blob): Promise<void>;
   init(opts: { lastLocation?: string; showTextStart?: boolean }): Promise<void>;
   close(): void;
@@ -374,6 +378,28 @@ export class EbookRenderer implements Renderer {
 
   zoom(): ZoomValue {
     return this.scale;
+  }
+
+  async readAloud(): Promise<SpeechSource | null> {
+    const current = this.view.renderer.getContents()[0];
+    if (!current?.doc.body) return null;
+    const range = this.view.lastLocation?.range;
+    const renderer = this.view.renderer;
+    return new DomSpeech(
+      { root: current.doc.body, from: range?.startContainer },
+      (r) => void renderer.scrollToAnchor(r, false),
+      async () => {
+        // The next chapter, until the end of the book.
+        const before = renderer.getContents()[0]?.index;
+        await renderer.nextSection();
+        const next = renderer.getContents()[0];
+        return next && next.index !== before ? next.doc.body : null;
+      },
+    );
+  }
+
+  async goToFraction(fraction: number) {
+    await this.view.goToFraction(Math.max(0, Math.min(1, fraction)));
   }
 
   clearSelection() {

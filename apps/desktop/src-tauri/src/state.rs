@@ -50,6 +50,8 @@ pub struct AppState {
     pub http: Arc<dyn Http + Send>,
     /// The phone scanning page, while it is open.
     phone: Mutex<Option<libreri_scan::PhoneScanner>>,
+    /// Speaking with eSpeak NG (read aloud where the system has no voices).
+    pub speaker: Arc<libreri_helpers::speech::Speaker>,
     /// Comparisons open in the interface (newest last, a few kept).
     compares: Mutex<Vec<(String, Arc<CompareSession>)>>,
     library: Mutex<Option<Arc<Library>>>,
@@ -247,6 +249,7 @@ impl AppState {
             http: make_http(),
             phone: Mutex::new(None),
             compares: Mutex::new(Vec::new()),
+            speaker: Arc::default(),
             library: Mutex::new(None),
             watcher: Mutex::new(None),
             jobs,

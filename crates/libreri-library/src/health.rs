@@ -334,6 +334,7 @@ impl Library {
             sidecar::rename(self.layout(), &book.id, &new_id);
             covers::rename(self.layout(), &book.id, &new_id);
             crate::text::rename(self.layout(), &book.id, &new_id);
+            crate::listening::rename(self.layout(), &book.id, &new_id);
             self.rename_annotation_backups(&book.id, &new_id);
             sidecar::write(self, &self.record(&new_id)?)?;
         }

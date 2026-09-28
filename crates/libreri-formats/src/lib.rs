@@ -4,6 +4,7 @@
 //! (from its file name) and whatever else could be read, plus warnings.
 //! Nothing here writes to disk.
 
+pub mod audio;
 mod comic;
 pub mod djvu;
 mod epub;
@@ -51,6 +52,7 @@ pub fn extract(path: &Path, file_type: FileType) -> Extracted {
         FileType::Cbz | FileType::Cbr | FileType::Cb7 | FileType::Cbt | FileType::Cba => {
             comic::read(path, file_type, &mut out)
         }
+        t if t.is_audio() => audio::read(path, &mut out),
         _ => Ok(()),
     };
     if let Err(e) = result {

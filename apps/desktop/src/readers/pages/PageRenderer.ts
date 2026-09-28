@@ -28,6 +28,8 @@ import {
   type TocItem,
   type ZoomValue,
 } from "../types";
+import { WordSpeech, type Box as SpeechBox } from "../speech/words";
+import type { SpeechSource } from "../speech/types";
 
 const LAYOUT_KEY = (id: string) => `libreri.pages.${id}`;
 const WIDTHS = [480, 800, 1200, 1600, 2000, 2600, 3200];
@@ -77,6 +79,8 @@ export class PageRenderer implements Renderer {
   private findState: { query: string; hits: { page: number; index: number }[]; at: number } | null =
     null;
   private observer: IntersectionObserver | null = null;
+  /** The sentence read aloud: its page and line boxes. */
+  private spoken: { page: number; rects: SpeechBox[] } | null = null;
   private cleanup: (() => void)[] = [];
   private destroyed = false;
 
@@ -457,7 +461,58 @@ export class PageRenderer implements Renderer {
         layer.append(r);
       }
     }
+    if (this.spoken?.page === page) {
+      for (const [x, y, w, h] of this.spoken.rects) {
+        const r = document.createElement("div");
+        r.className = "lb-tts-mark";
+        r.style.cssText = `left:${x * 100}%;top:${y * 100}%;width:${w * 100}%;height:${h * 100}%`;
+        layer.append(r);
+      }
+    }
     if (s.div.clientWidth > 0) this.markup?.mount(page, s.div);
+  }
+
+  async readAloud(): Promise<SpeechSource | null> {
+    if (this.kind !== "djvu" && !this.hasText) return null;
+    const page = this.visiblePage();
+    let top = 0;
+    if (this.layoutValue.mode === "scroll") {
+      const r = this.slots[page - 1]!.div.getBoundingClientRect();
+      const c = this.scroller.getBoundingClientRect();
+      top = Math.min(1, Math.max(0, (c.top - r.top) / r.height));
+    }
+    return new WordSpeech(
+      page,
+      top,
+      this.slots.length,
+      async (p) =>
+        (await this.wordsOf(p)).map((w) => ({ text: w.text, rect: w.rect as SpeechBox })),
+      (p, rects) => {
+        const before = this.spoken?.page;
+        this.spoken = p ? { page: p, rects } : null;
+        if (before && before !== p) this.drawPage(before);
+        if (p) this.drawPage(p);
+      },
+      (p, y) => {
+        const s = this.slots[p - 1];
+        if (!s) return;
+        if (this.layoutValue.mode !== "scroll") {
+          if (!this.group(this.current).includes(p)) void this.showPage(p);
+          return;
+        }
+        const r = s.div.getBoundingClientRect();
+        const c = this.scroller.getBoundingClientRect();
+        const at = r.top + r.height * y;
+        if (at < c.top + 40 || at > c.bottom - 80) void this.showPage(p, Math.max(0, y - 0.15));
+      },
+    );
+  }
+
+  async goToFraction(fraction: number) {
+    const pages = this.slots.length;
+    const f = Math.max(0, Math.min(1, fraction)) * pages;
+    const page = Math.min(pages, Math.floor(f) + 1);
+    await this.showPage(page, f - (page - 1));
   }
 
   attachMarkup(layer: MarkupLayer | null) {

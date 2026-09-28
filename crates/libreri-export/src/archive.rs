@@ -9,6 +9,7 @@
 //! .library-data/covers/<book>.jpg
 //! .library-data/text/<book>.json         OCR text (Phase 5)
 //! .library-data/versions/<book>/…        earlier versions, with book files (Phase 6b)
+//! .library-data/audio-links/<book>.json  an audiobook's link and sync points (Phase 7a)
 //! Notes/<profile name>/…                 notebooks and notes, as Markdown
 //! Books/…                                book files, when included
 //! database/library.db                    a copy of the catalogue, for reference
@@ -38,6 +39,7 @@ const ALLOWED: &[&str] = &[
     ".library-data/covers/",
     ".library-data/text/",
     ".library-data/versions/",
+    ".library-data/audio-links/",
     "Notes/",
     "Books/",
     "database/",
