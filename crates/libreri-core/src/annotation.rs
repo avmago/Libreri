@@ -16,6 +16,9 @@ use serde::{Deserialize, Serialize};
 pub enum AnnotationKind {
     Highlight,
     Bookmark,
+    /// A drawing, shape, text box, sticky note, stamp, image or measurement
+    /// on a page (markup mode). The locator holds the whole item.
+    Markup,
 }
 
 impl AnnotationKind {
@@ -23,6 +26,7 @@ impl AnnotationKind {
         match self {
             Self::Highlight => "highlight",
             Self::Bookmark => "bookmark",
+            Self::Markup => "markup",
         }
     }
 
@@ -30,6 +34,7 @@ impl AnnotationKind {
         match s {
             "highlight" => Some(Self::Highlight),
             "bookmark" => Some(Self::Bookmark),
+            "markup" => Some(Self::Markup),
             _ => None,
         }
     }
@@ -106,7 +111,14 @@ pub enum AnnotationError {
     BadLocator,
     #[error("a highlight needs the highlighted text")]
     EmptyHighlight,
+    #[error("the markup item is not valid")]
+    BadMarkup,
+    #[error("the markup item is too large (pictures are limited to about 2 MB)")]
+    MarkupTooLarge,
 }
+
+/// Largest markup item (pictures and signatures are stored inside it).
+pub const MAX_MARKUP_BYTES: usize = 3 * 1024 * 1024;
 
 impl Annotation {
     /// Checks the fields and tidies text.
@@ -128,6 +140,21 @@ impl Annotation {
             .note
             .map(|n| n.trim().to_owned())
             .filter(|n| !n.is_empty());
+        if self.kind == AnnotationKind::Markup {
+            let v: serde_json::Value =
+                serde_json::from_str(&self.locator).map_err(|_| AnnotationError::BadLocator)?;
+            let ok = v.get("type").and_then(|t| t.as_str()) == Some("markup")
+                && v.get("page")
+                    .and_then(|p| p.as_u64())
+                    .is_some_and(|p| p >= 1)
+                && v.get("item").is_some_and(|i| i.is_object());
+            if !ok {
+                return Err(AnnotationError::BadMarkup);
+            }
+            if self.locator.len() > MAX_MARKUP_BYTES {
+                return Err(AnnotationError::MarkupTooLarge);
+            }
+        }
         self.position = self.position.clamp(0.0, 1.0);
         Ok(self)
     }
@@ -192,5 +219,13 @@ mod tests {
         bookmark.kind = AnnotationKind::Bookmark;
         bookmark.quote = None;
         assert!(bookmark.validated().is_ok());
+
+        let mut ink = highlight();
+        ink.kind = AnnotationKind::Markup;
+        ink.quote = None;
+        ink.locator = r#"{"type":"markup","page":2,"item":{"tool":"pen","points":[]}}"#.into();
+        assert!(ink.clone().validated().is_ok());
+        ink.locator = r#"{"type":"markup","page":0,"item":{}}"#.into();
+        assert_eq!(ink.validated(), Err(AnnotationError::BadMarkup));
     }
 }

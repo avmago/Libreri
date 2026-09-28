@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { useState } from "react";
 import { Bookmark, ChevronRight, Highlighter, MessageSquare, Trash2 } from "lucide-react";
 import type { Annotation } from "@/lib/ipc";
@@ -131,7 +132,7 @@ function MarkRow({
   );
 }
 
-export type LeftPanel = "contents" | "marks";
+export type LeftPanel = "contents" | "marks" | "markup";
 
 /** Left side of the reader: table of contents, and bookmarks + highlights. */
 export function ContentsPanel({
@@ -143,6 +144,7 @@ export function ContentsPanel({
   onGo,
   onShow,
   onDelete,
+  markup,
 }: {
   panel: LeftPanel;
   setPanel: (p: LeftPanel) => void;
@@ -152,7 +154,11 @@ export function ContentsPanel({
   onGo: (target: string) => void;
   onShow: (a: Annotation) => void;
   onDelete: (a: Annotation) => void;
+  /** Fixed-page books: the markup tab's content. */
+  markup?: React.ReactNode;
 }) {
+  const marks = annotations.filter((a) => a.kind !== "markup");
+  const markupCount = annotations.length - marks.length;
   const bookmarks = annotations.filter((a) => a.kind === "bookmark");
   const highlights = annotations.filter((a) => a.kind === "highlight");
   return (
@@ -164,7 +170,10 @@ export function ContentsPanel({
         {(
           [
             ["contents", "Contents"],
-            ["marks", `Marks${annotations.length ? ` (${annotations.length})` : ""}`],
+            ["marks", `Marks${marks.length ? ` (${marks.length})` : ""}`],
+            ...(markup
+              ? ([["markup", `Markup${markupCount ? ` (${markupCount})` : ""}`]] as const)
+              : []),
           ] as const
         ).map(([id, label]) => (
           <button
@@ -184,49 +193,53 @@ export function ContentsPanel({
           </button>
         ))}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-1.5 py-2">
-        {panel === "contents" ? (
-          toc.length ? (
-            <TocTree items={toc} depth={0} current={section} onGo={onGo} />
+      {panel === "markup" && markup ? (
+        markup
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto px-1.5 py-2">
+          {panel === "contents" ? (
+            toc.length ? (
+              <TocTree items={toc} depth={0} current={section} onGo={onGo} />
+            ) : (
+              <p className="px-3 py-6 text-center text-muted-foreground">
+                This book has no table of contents.
+              </p>
+            )
+          ) : marks.length ? (
+            <div className="flex flex-col gap-3">
+              {bookmarks.length > 0 && (
+                <section>
+                  <h3 className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground">
+                    BOOKMARKS
+                  </h3>
+                  <ul>
+                    {bookmarks.map((a) => (
+                      <MarkRow key={a.id} a={a} onGo={onShow} onDelete={onDelete} />
+                    ))}
+                  </ul>
+                </section>
+              )}
+              {highlights.length > 0 && (
+                <section>
+                  <h3 className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground">
+                    HIGHLIGHTS
+                  </h3>
+                  <ul>
+                    {highlights.map((a) => (
+                      <MarkRow key={a.id} a={a} onGo={onShow} onDelete={onDelete} />
+                    ))}
+                  </ul>
+                </section>
+              )}
+            </div>
           ) : (
-            <p className="px-3 py-6 text-center text-muted-foreground">
-              This book has no table of contents.
-            </p>
-          )
-        ) : annotations.length ? (
-          <div className="flex flex-col gap-3">
-            {bookmarks.length > 0 && (
-              <section>
-                <h3 className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground">
-                  BOOKMARKS
-                </h3>
-                <ul>
-                  {bookmarks.map((a) => (
-                    <MarkRow key={a.id} a={a} onGo={onShow} onDelete={onDelete} />
-                  ))}
-                </ul>
-              </section>
-            )}
-            {highlights.length > 0 && (
-              <section>
-                <h3 className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground">
-                  HIGHLIGHTS
-                </h3>
-                <ul>
-                  {highlights.map((a) => (
-                    <MarkRow key={a.id} a={a} onGo={onShow} onDelete={onDelete} />
-                  ))}
-                </ul>
-              </section>
-            )}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-2 px-4 py-8 text-center text-muted-foreground">
-            <Highlighter className="size-5" aria-hidden />
-            <p>Select text to highlight it, or add a bookmark from the toolbar.</p>
-          </div>
-        )}
-      </div>
+            <div className="flex flex-col items-center gap-2 px-4 py-8 text-center text-muted-foreground">
+              <Highlighter className="size-5" aria-hidden />
+              <p>Select text to highlight it, or add a bookmark from the toolbar.</p>
+            </div>
+          )}
+        </div>
+      )}
     </aside>
   );
 }

@@ -9,6 +9,7 @@
  */
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { commands, unwrap, type Annotation, type WordDto } from "@/lib/ipc";
+import type { MarkupLayer } from "../markup/MarkupLayer";
 import { findHits, matchRects, wordLayer } from "../ocrText";
 import { makeQuote } from "../quote";
 import type { PageTheme } from "../themes";
@@ -25,26 +26,34 @@ import {
 } from "../types";
 import { PDF_ASSETS } from "./assets";
 
-type ViewerModule = typeof import("pdfjs-dist/web/pdf_viewer.mjs");
+type ViewerModule = typeof import("pdfjs-dist/legacy/web/pdf_viewer.mjs");
 type PdfViewer = InstanceType<ViewerModule["PDFViewer"]>;
 type EventBus = InstanceType<ViewerModule["EventBus"]>;
 type FindController = InstanceType<ViewerModule["PDFFindController"]>;
 type LinkService = InstanceType<ViewerModule["PDFLinkService"]>;
 
-let loaded: Promise<{ pdfjs: typeof import("pdfjs-dist"); viewer: ViewerModule }> | null = null;
+let loaded: Promise<{
+  pdfjs: typeof import("pdfjs-dist/legacy/build/pdf.mjs");
+  viewer: ViewerModule;
+}> | null = null;
 
-/** PDF.js is big; load it the first time a PDF opens. */
+/**
+ * PDF.js is big; load it the first time a PDF opens. The "legacy" build is
+ * used because the standard one needs the newest JavaScript (such as
+ * `Map.prototype.getOrInsertComputed`), which the system web views on older
+ * macOS versions and on Linux (WebKitGTK) do not have yet.
+ */
 function loadPdfJs() {
   loaded ??= (async () => {
-    const pdfjs = await import("pdfjs-dist");
+    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
     if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-      const worker = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
+      const worker = await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url");
       pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
     }
     // The viewer expects the library on globalThis.
     (globalThis as { pdfjsLib?: unknown }).pdfjsLib = pdfjs;
-    await import("pdfjs-dist/web/pdf_viewer.css");
-    const viewer = await import("pdfjs-dist/web/pdf_viewer.mjs");
+    await import("pdfjs-dist/legacy/web/pdf_viewer.css");
+    const viewer = await import("pdfjs-dist/legacy/web/pdf_viewer.mjs");
     return { pdfjs, viewer };
   })();
   return loaded;
@@ -70,6 +79,7 @@ export class PdfRenderer implements Renderer {
   private lastQuery = "";
   private zoomValue: ZoomValue = "auto";
   private cleanup: (() => void)[] = [];
+  private markup: MarkupLayer | null = null;
   /** Pages read with OCR (scans): they get a hidden text layer. */
   private ocrPages = new Set<number>();
   private ocrWords = new Map<number, WordDto[]>();
@@ -386,6 +396,7 @@ export class PdfRenderer implements Renderer {
     const div = view?.div as HTMLElement | undefined;
     if (!div) return;
     void this.drawOcr(pageNumber);
+    this.markup?.mount(pageNumber, div);
     let layer = div.querySelector<HTMLElement>(".lb-pdf-hl-layer");
     if (!layer) {
       layer = document.createElement("div");
@@ -425,6 +436,24 @@ export class PdfRenderer implements Renderer {
         layer.append(r);
       }
     }
+  }
+
+  attachMarkup(layer: MarkupLayer | null) {
+    this.markup = layer;
+    this.root?.classList.toggle("lb-has-markup", !!layer);
+    for (let p = 1; p <= (this.viewer?.pagesCount ?? 0); p++) {
+      const div = this.viewer.getPageView(p - 1)?.div as HTMLElement | undefined;
+      if (div?.querySelector("canvas")) layer?.mount(p, div);
+    }
+  }
+
+  pageSize(page: number): { size: [number, number]; points: boolean } | null {
+    const vp = this.viewer?.getPageView(page - 1)?.viewport as
+      { width: number; height: number; scale: number } | undefined;
+    if (!vp?.scale) return null;
+    // PDF.js scales CSS pixels by 96/72; the viewport scale includes it.
+    const k = vp.scale / (96 / 72);
+    return { size: [vp.width / (96 / 72) / k, vp.height / (96 / 72) / k], points: true };
   }
 
   setAnnotations(list: Annotation[]) {

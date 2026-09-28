@@ -236,6 +236,39 @@ impl Library {
         Ok(self.ocr_words(&id, page))
     }
 
+    /// Writes a new PDF of the book with markup drawn on it. PDFs keep
+    /// their pages; DjVu and comic pages become pictures in the PDF. The
+    /// book itself is not changed.
+    pub fn export_marked_up(
+        &self,
+        id: &BookId,
+        pages: &[libreri_pdf_edit::DrawPage],
+        dest: &Path,
+        cache: &Path,
+    ) -> Result<()> {
+        let (path, kind) = self.page_source(id)?;
+        let err = |e: libreri_pdf_edit::Error| Error::InvalidInput(e.to_string());
+        if kind == FileType::Pdf {
+            return libreri_pdf_edit::mark_up(&path, pages, dest).map_err(err);
+        }
+        let book = self.open_pages(id, cache)?;
+        let mut images = Vec::with_capacity(book.pages as usize);
+        for n in 1..=book.pages {
+            let (bytes, _) = self.page_image(id, n, 1600, cache)?;
+            images.push(libreri_pdf_edit::PageImage { bytes });
+        }
+        libreri_pdf_edit::pages_to_pdf(images, 612.0, pages, dest).map_err(err)
+    }
+
+    /// Pages of a PDF that carry their own measuring scale.
+    pub fn measure_scales(&self, id: &BookId) -> Result<Vec<libreri_formats::PageScale>> {
+        let (path, kind) = self.page_source(id)?;
+        if kind != FileType::Pdf {
+            return Ok(Vec::new());
+        }
+        Ok(libreri_formats::measure_scales(&path))
+    }
+
     /// Pages of a PDF that have saved OCR text (the reader adds a hidden
     /// text layer to them).
     pub fn ocr_pages(&self, id: &BookId) -> Result<Vec<u32>> {

@@ -56,6 +56,9 @@ Requirement (user, 2026-09-27): when the database, metadata and every kind of no
 - The full-text search index lives in the app cache (`search/<libraryId>.sqlite`) and rebuilds itself on any computer; it is never exported.
 - OCR text is saved in the library (`.library-data/text/<bookId>.json`: each page's text and word boxes), included in backups and Libreri archives and restored with the book. OCR language files are per computer (app data `tessdata/`). See `docs/adr/0017-full-text-search-and-ocr.md`.
 
+## Markup (Phase 6a)
+- Drawings, text boxes, sticky notes, stamps, signatures, pictures and measurements are annotations of kind `markup`: per profile, in the profile's JSON backups, backups and Libreri archives, and restored with the book like highlights. Pictures and signatures are stored inside the mark. The book file is never changed; *Export marked-up copy* makes a separate PDF. Saved signatures and your own stamps are in your profile's preferences. See `docs/adr/0018-markup-mode.md`.
+
 ## Edited PDFs (versions)
 - Page edits create a new version with a **page map** (old page → new page). Anchors are migrated through the map; text-quote fallback catches the rest. Exports include the version history so links to older versions still resolve.
 

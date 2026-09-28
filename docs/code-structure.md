@@ -36,7 +36,7 @@ libreri/
 │  ├─ libreri-profiles    6-digit PIN rules, Argon2 hashing, lockout, recovery codes
 │  ├─ libreri-search      full-text index (SQLite FTS5, per computer): pieces, stamps, queries, snippets
 │  ├─ libreri-export      formats: CSV/XLSX/JSON, BibTeX/RIS/CSL-JSON, citation styles, Obsidian notes, Calibre OPF, Libreri archives (zip + manifest); importers from other apps (4c)
-│  ├─ libreri-pdf-edit    page ops, redaction, compare, versions
+│  ├─ libreri-pdf-edit    marked-up copies (6a: draw markup onto PDF pages, pictures to PDF); page ops, redaction, compare, versions (6b, 6c)
 │  ├─ libreri-speech      TTS, dictation, transcription
 │  ├─ libreri-recognition OCR, handwriting, maths (optional cargo features)
 │  ├─ libreri-models      optional model downloads, checksums
@@ -52,6 +52,7 @@ libreri/
 - **Import:** drop → `api.importFiles` → `commands/library.rs::import_files` → `libreri-jobs` queue → BLAKE3 hash → duplicate check (skip/replace/keep both) → move/copy into `Books/` → `libreri-formats` extract → `libreri-thumbs` → `libreri-db` insert → JSON sidecar → optional online lookup. Progress + books-changed events update the UI.
 - **Page images (5a):** `PageRenderer` asks `open_pages` for page count, sizes and outline → images load from `book://…/.pages/<bookId>/<page>?w=` → `libreri-library::pages` (CBZ read directly; CBR/CB7/CBT/CBA unpacked once; DjVu rendered by `ddjvu` at width steps) → per-computer page cache. DjVu text comes from `page_words` / `page_texts` (`djvutxt`).
 - **Search (5b):** after each scan the indexer thread (`state.rs`) calls `Library::update_index` → `libreri-formats::text` per changed book (+ saved OCR text) → `libreri-search`. The search screen calls `search_text` / `search_in_book`; a result opens a tab with `findText`, and the reader goes to the page or chapter (`prepareFind`) and runs Find. *Make searchable* queues a job: `Library::make_searchable` renders pages (hayro / ddjvu), runs Tesseract, saves `.library-data/text/<id>.json` and re-indexes.
+- **Markup (6a):** `readers/markup/` (model, SVG rendering, `MarkupLayer` controller mounted by the PDF and page renderers on each page, export draw list) + `features/reader/markup/` (useMarkup, toolbar, panel, dialogs). Marks are saved with `save_annotation` (kind `markup`); *Export marked-up copy* sends the draw list to `export_marked_up` → `Library::export_marked_up` → `libreri-pdf-edit`.
 
 ## Where things go
 | Adding… | Put it in | Not in |

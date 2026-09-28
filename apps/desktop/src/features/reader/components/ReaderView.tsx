@@ -12,7 +12,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useBook, useLibraryView } from "@/features/library";
 import { useHelperDialog } from "@/features/helpers";
-import { useProfilePrefs } from "@/features/profiles";
+import { usePermissions, useProfilePrefs } from "@/features/profiles";
 import { bookUrl, commands, type Annotation, type HighlightColor } from "@/lib/ipc";
 import { keysLabel, platform, shortcutFor, useShortcut, type ActionId } from "@/lib/shortcuts";
 import { useTabs, type BookTab } from "@/lib/tabs";
@@ -47,6 +47,19 @@ import { ContentsPanel, type LeftPanel } from "./ContentsPanel";
 import { FindBar } from "./FindBar";
 import { NotebookPanel } from "./NotebookPanel";
 import { AnnotationMenu, SelectionMenu } from "./Popovers";
+import { save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { drawList, markupModel } from "@/readers";
+import { useMarkup } from "../markup/useMarkup";
+import { MarkupToolbar } from "../markup/MarkupToolbar";
+import { MarkupPanel } from "../markup/MarkupPanel";
+import {
+  CalibrateDialog,
+  ExportMarkupDialog,
+  NewStampDialog,
+  NotePopover,
+  SignatureDialog,
+} from "../markup/MarkupDialogs";
+import { pickPicture } from "../markup/pickPicture";
 import "@/readers/reader.css";
 import "katex/dist/katex.min.css";
 
@@ -76,9 +89,10 @@ const newId = () => crypto.randomUUID();
 
 function countLabel(list: Annotation[]): string {
   const h = list.filter((a) => a.kind === "highlight").length;
-  const b = list.length - h;
+  const b = list.filter((a) => a.kind === "bookmark").length;
+  const m = list.filter((a) => a.kind === "markup").length;
   const part = (n: number, one: string) => (n ? `${n} ${one}${n === 1 ? "" : "s"}` : "");
-  return [part(h, "highlight"), part(b, "bookmark")].filter(Boolean).join(" · ");
+  return [part(h, "highlight"), part(b, "bookmark"), part(m, "mark")].filter(Boolean).join(" · ");
 }
 
 /** One open book: toolbar, contents and marks, the page, notebook. */
@@ -297,6 +311,68 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
 
   const r = () => rendererRef.current;
   const isPdf = isPaged(fileType);
+
+  // Markup mode (fixed pages): drawings kept like highlights.
+  const markup = useMarkup({
+    bookId,
+    enabled: isPdf,
+    ready: status === "ready",
+    isPdf: fileType === "pdf",
+    renderer: rendererRef,
+    annotations,
+    pages: location?.pages ?? 0,
+    save: (a) =>
+      saveAnnotation.mutate(a, {
+        onError: (e) => toast.error("Could not save the markup", { description: String(e) }),
+      }),
+    remove: (id) => deleteAnnotation.mutate(id),
+  });
+  const [signatureOpen, setSignatureOpen] = useState(false);
+  const [stampOpen, setStampOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const updateProfilePrefs = useProfilePrefs((s) => s.update);
+  const { editLibrary } = usePermissions();
+  const markupPrefs = useProfilePrefs((s) => s.prefs.markup);
+  const pickImage = async () => {
+    const p = await pickPicture();
+    if (!p) return;
+    markup.setStyle({ image: { ...p, signature: false } });
+    markup.setTool("image");
+    toast("Click the page to place the picture");
+  };
+  const { needImage, clearNeedImage } = markup;
+  useEffect(() => {
+    if (!needImage) return;
+    clearNeedImage();
+    void pickImage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needImage]);
+  const exportMarkedUp = async (addToLibrary: boolean) => {
+    const title = (book?.metadata.title ?? tab.title).replace(/[\\/:*?"<>|]+/g, " ").trim();
+    const dest = await saveDialog({
+      defaultPath: `${title} (marked up).pdf`,
+      filters: [{ name: "PDF", extensions: ["pdf"] }],
+    });
+    if (!dest) return;
+    setExporting(true);
+    try {
+      const pages = drawList(markup.visibleMarks(), markup.pageAspect);
+      const r = await commands.exportMarkedUp(bookId, dest, pages, addToLibrary);
+      if (r.status === "error") throw new Error(r.error.message);
+      setExportOpen(false);
+      toast.success("Marked-up copy saved", {
+        description: dest,
+        action: { label: "Show", onClick: () => void commands.revealPath(dest) },
+      });
+    } catch (e) {
+      toast.error("The copy could not be made", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
   const changeLayout = (change: Partial<PageLayout>) => {
     r()?.setLayout?.(change);
     setPageLayout(r()?.layoutOptions?.() ?? null);
@@ -498,6 +574,7 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
   useShortcut("reader.themeNext", cycleTheme);
   useShortcut("reader.pdfModeNext", cyclePdfMode);
   useShortcut("reader.focusMode", () => setFocusMode((f) => !f));
+  useShortcut("reader.markup", () => markup.available && markup.setActive(!markup.active));
   useShortcut("reader.details", () => {
     useTabs.getState().activate(null);
     useLibraryView.getState().setSelection([bookId]);
@@ -581,6 +658,35 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
             <span className="tabular-nums">/ {location.pages}</span>
           </form>
         ) : null}
+        {markup.available && (
+          <div className="mr-1 flex rounded-md border p-0.5" role="radiogroup" aria-label="Mode">
+            {(
+              [
+                [false, "Read"],
+                [true, "Markup"],
+              ] as const
+            ).map(([on, label]) => (
+              <button
+                key={label}
+                type="button"
+                role="radio"
+                aria-checked={markup.active === on}
+                title={
+                  on ? `Markup: draw and write on the pages (${keys("reader.markup")})` : "Read"
+                }
+                onClick={() => markup.setActive(on)}
+                className={cn(
+                  "h-6 rounded px-2.5 text-[12.5px]",
+                  markup.active === on
+                    ? "bg-muted font-medium text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         <Button
           variant="ghost"
           size="icon"
@@ -620,6 +726,24 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
         </Button>
       </div>
 
+      {markup.active && !focusMode && (
+        <MarkupToolbar
+          m={markup}
+          onPickImage={() => void pickImage()}
+          onNewSignature={() => setSignatureOpen(true)}
+          onNewStamp={() => setStampOpen(true)}
+          onExport={() => setExportOpen(true)}
+          layersOpen={left === "markup"}
+          onLayers={() => {
+            if (left === "markup") setLeft(null);
+            else {
+              setLeft("markup");
+              setLastLeft("markup");
+            }
+          }}
+        />
+      )}
+
       <div className="flex min-h-0 flex-1">
         {left && !focusMode && (
           <ContentsPanel
@@ -634,6 +758,23 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
             onGo={(target) => jump(() => r()?.goTo(target))}
             onShow={(a) => jump(() => r()?.showAnnotation(a))}
             onDelete={(a) => deleteAnnotation.mutate(a.id)}
+            markup={
+              markup.available ? (
+                <MarkupPanel
+                  m={markup}
+                  onShow={(mk) =>
+                    jump(async () => {
+                      await r()?.goTo({
+                        type: "pdf",
+                        page: mk.page,
+                        top: Math.max(0, markupModel.bounds(mk.item)[1] - 0.1),
+                      });
+                      markup.selectMark(mk.id);
+                    })
+                  }
+                />
+              ) : undefined
+            }
           />
         )}
 
@@ -774,6 +915,58 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
           onClose={() => setMenu(null)}
         />
       )}
+      {markup.noteEdit && (
+        <NotePopover
+          key={markup.noteEdit.mark.id}
+          mark={markup.noteEdit.mark}
+          rect={markup.noteEdit.rect}
+          onSave={(text) => markup.saveNote(markup.noteEdit!.mark, text)}
+          onDelete={() => {
+            markup.deleteMark(markup.noteEdit!.mark.id);
+            markup.closeNote();
+          }}
+          onClose={markup.closeNote}
+        />
+      )}
+      <CalibrateDialog calibration={markup.calibration} onDone={markup.finishCalibration} />
+      <SignatureDialog
+        open={signatureOpen}
+        onClose={() => setSignatureOpen(false)}
+        onSaved={(sig) => {
+          setSignatureOpen(false);
+          updateProfilePrefs({
+            markup: {
+              signatures: [{ id: crypto.randomUUID(), ...sig }, ...markupPrefs.signatures].slice(
+                0,
+                5,
+              ),
+            },
+          });
+          markup.setStyle({ image: { ...sig, signature: true } });
+          markup.setTool("image");
+          toast("Click the page to place your signature");
+        }}
+      />
+      <NewStampDialog
+        open={stampOpen}
+        onClose={() => setStampOpen(false)}
+        onSaved={(text) => {
+          setStampOpen(false);
+          updateProfilePrefs({
+            markup: { stamps: [...markupPrefs.stamps.filter((t) => t !== text), text].slice(-10) },
+          });
+          markup.setStyle({ stamp: text });
+          markup.setTool("stamp");
+        }}
+      />
+      <ExportMarkupDialog
+        open={exportOpen}
+        count={exportOpen ? markup.visibleMarks().length : 0}
+        canAdd={editLibrary}
+        busy={exporting}
+        onClose={() => setExportOpen(false)}
+        onExport={(add) => void exportMarkedUp(add)}
+      />
     </div>
   );
 }

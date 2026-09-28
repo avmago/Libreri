@@ -248,6 +248,18 @@ export const commands = {
 	backUpNow: () => typedError<string | null, AppError>(__TAURI_INVOKE("back_up_now")),
 	/**  Shows a file (an export or a backup) in the system file manager. */
 	revealPath: (path: string) => typedError<null, AppError>(__TAURI_INVOKE("reveal_path", { path })),
+	/**  Pages of a PDF that say how to measure them (CAD and map exports). */
+	measureScales: (id: string) => typedError<PageScaleDto[], AppError>(__TAURI_INVOKE("measure_scales", { id })),
+	/**
+	 *  Reads a picture file for the markup picture and signature tools, made
+	 *  smaller when it is large.
+	 */
+	readPicture: (path: string) => typedError<PictureDto, AppError>(__TAURI_INVOKE("read_picture", { path })),
+	/**
+	 *  Saves a copy of the book with its markup drawn in, as a PDF at `dest`.
+	 *  With `add_to_library`, the copy is also imported next to the book.
+	 */
+	exportMarkedUp: (id: string, dest: string, pages: DrawPage[], addToLibrary: boolean) => typedError<null, AppError>(__TAURI_INVOKE("export_marked_up", { id, dest, pages, addToLibrary })),
 	/**  Books whose text matches `query` (words, "a phrase", -left-out). */
 	searchText: (query: string, limit: number) => typedError<TextMatchDto[], AppError>(__TAURI_INVOKE("search_text", { query, limit })),
 	/**  Every match in one book, in reading order. */
@@ -345,7 +357,12 @@ export type Annotation = {
 	modifiedAt: string,
 };
 
-export type AnnotationKind = "highlight" | "bookmark";
+export type AnnotationKind = "highlight" | "bookmark" | 
+/**
+ *  A drawing, shape, text box, sticky note, stamp, image or measurement
+ *  on a page (markup mode). The locator holds the whole item.
+ */
+"markup";
 
 export type AppError = {
 	kind: AppErrorKind,
@@ -659,6 +676,26 @@ export type DetailsFilled = {
 	unsure: string[],
 	unchanged: number,
 	failed: FailedFileDto[],
+};
+
+/**
+ *  One thing to draw. Paths use SVG path data (absolute M, L, Q, C, Z) in
+ *  fractions of the page as shown (top-left origin); widths and dashes are
+ *  fractions of the page width.
+ */
+export type DrawOp = { type: "fill"; d: string; color: string; opacity: number | null; 
+/**  Mixes like a highlighter (darkens, never covers). */
+multiply?: boolean } | { type: "stroke"; d: string; color: string; opacity: number | null; width: number | null; dash?: (number | null)[] } | 
+/**
+ *  A picture (PNG or JPEG data URL): text boxes, stamps, notes and
+ *  signatures are sent as pictures so every font and script survives.
+ */
+{ type: "image"; rect: [(number | null), (number | null), (number | null), (number | null)]; src: string };
+
+/**  What to draw on one page (1-based). */
+export type DrawPage = {
+	page: number,
+	ops: DrawOp[],
 };
 
 export type DuplicateDto = {
@@ -1044,6 +1081,12 @@ export type PageBookDto = {
 	hasText: boolean,
 };
 
+export type PageScaleDto = {
+	page: number,
+	unit: string,
+	perPoint: number | null,
+};
+
 export type PhonePairingDto = {
 	url: string,
 	qrSvg: string,
@@ -1055,6 +1098,13 @@ export type PhoneScan = {
 	/**  "opened" | "scanned" */
 	kind: string,
 	scanned: ScannedDto | null,
+};
+
+export type PictureDto = {
+	/**  A data URL, ready to place on a page. */
+	src: string,
+	width: number,
+	height: number,
 };
 
 /**  A profile as the picker and Settings show it. Never includes hashes. */

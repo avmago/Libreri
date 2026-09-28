@@ -170,6 +170,76 @@ pub fn page_boxes(path: &Path) -> Option<Vec<PageBox>> {
     Some(out)
 }
 
+/// A page's own scale for measuring, from its viewport measure
+/// dictionary (/VP … /Measure, common in CAD and map exports).
+#[derive(Debug, Clone, PartialEq)]
+pub struct PageScale {
+    pub page: u32,
+    /// "mm", "cm", "m", "in" or "ft".
+    pub unit: String,
+    /// Real length per PDF point.
+    pub per_point: f64,
+}
+
+fn text_of(doc: &lopdf::Document, o: &lopdf::Object) -> Option<String> {
+    match o {
+        lopdf::Object::String(b, _) => Some(String::from_utf8_lossy(b).trim().to_owned()),
+        lopdf::Object::Reference(r) => text_of(doc, doc.get_object(*r).ok()?),
+        _ => None,
+    }
+}
+
+fn dict<'a>(doc: &'a lopdf::Document, o: &'a lopdf::Object) -> Option<&'a lopdf::Dictionary> {
+    match o {
+        lopdf::Object::Dictionary(d) => Some(d),
+        lopdf::Object::Reference(r) => dict(doc, doc.get_object(*r).ok()?),
+        _ => None,
+    }
+}
+
+fn array<'a>(doc: &'a lopdf::Document, o: &'a lopdf::Object) -> Option<&'a Vec<lopdf::Object>> {
+    match o {
+        lopdf::Object::Array(a) => Some(a),
+        lopdf::Object::Reference(r) => array(doc, doc.get_object(*r).ok()?),
+        _ => None,
+    }
+}
+
+/// Pages that say how to measure them.
+pub fn measure_scales(path: &Path) -> Vec<PageScale> {
+    let Ok(doc) = lopdf::Document::load(path) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for (n, id) in doc.get_pages() {
+        let Ok(page) = doc.get_dictionary(id) else {
+            continue;
+        };
+        let Some(vps) = page.get(b"VP").ok().and_then(|o| array(&doc, o)) else {
+            continue;
+        };
+        let found = vps.iter().find_map(|vp| {
+            let m = dict(&doc, dict(&doc, vp)?.get(b"Measure").ok()?)?;
+            let x = array(&doc, m.get(b"X").ok()?)?;
+            let first = dict(&doc, x.first()?)?;
+            let unit = text_of(&doc, first.get(b"U").ok()?)?.to_lowercase();
+            let factor = number(&doc, first.get(b"C").ok()?)?;
+            let unit = match unit.as_str() {
+                "mm" | "cm" | "m" | "ft" => unit,
+                "in" | "inch" | "inches" | "\"" => "in".to_owned(),
+                _ => return None,
+            };
+            (factor > 0.0).then_some(PageScale {
+                page: n,
+                unit,
+                per_point: factor,
+            })
+        });
+        out.extend(found);
+    }
+    out
+}
+
 /// Writes a blank PDF of `pages` US Letter pages, for other crates' tests.
 #[doc(hidden)]
 pub fn test_pdf(path: &Path, pages: u32) {
@@ -297,6 +367,28 @@ mod tests {
 
     fn text_pdf(path: &std::path::Path, text: &str) {
         crate::test_text_pdf(path, &[text]);
+    }
+
+    #[test]
+    fn reads_viewport_measure_scales() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("plan.pdf");
+        crate::test_pdf(&p, 1);
+        let mut doc = Document::load(&p).unwrap();
+        let page_id = *doc.get_pages().get(&1).unwrap();
+        let measure = dictionary! {
+            "Type" => "Measure", "Subtype" => "RL", "R" => Object::string_literal("1 in = 10 ft"),
+            "X" => vec![Object::Dictionary(dictionary! { "U" => Object::string_literal("ft"), "C" => 0.1389 })],
+        };
+        let vp = dictionary! { "Type" => "Viewport", "BBox" => vec![0.into(), 0.into(), 612.into(), 792.into()], "Measure" => measure };
+        doc.get_dictionary_mut(page_id)
+            .unwrap()
+            .set("VP", vec![Object::Dictionary(vp)]);
+        doc.save(&p).unwrap();
+        let scales = crate::measure_scales(&p);
+        assert_eq!(scales.len(), 1);
+        assert_eq!(scales[0].unit, "ft");
+        assert!((scales[0].per_point - 0.1389).abs() < 1e-4);
     }
 
     #[test]

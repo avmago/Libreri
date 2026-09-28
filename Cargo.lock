@@ -2757,6 +2757,7 @@ dependencies = [
  "libreri-jobs",
  "libreri-library",
  "libreri-metadata",
+ "libreri-pdf-edit",
  "libreri-scan",
  "libreri-search",
  "libreri-thumbs",
@@ -2847,6 +2848,7 @@ dependencies = [
  "libreri-formats",
  "libreri-helpers",
  "libreri-metadata",
+ "libreri-pdf-edit",
  "libreri-profiles",
  "libreri-search",
  "libreri-thumbs",
@@ -2871,6 +2873,21 @@ dependencies = [
  "serde_json",
  "specta",
  "ureq",
+]
+
+[[package]]
+name = "libreri-pdf-edit"
+version = "0.1.0"
+dependencies = [
+ "base64 0.23.1",
+ "image",
+ "libreri-formats",
+ "lopdf",
+ "serde",
+ "serde_json",
+ "specta",
+ "tempfile",
+ "thiserror 2.0.21",
 ]
 
 [[package]]

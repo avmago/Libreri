@@ -37,6 +37,15 @@ export interface ProfilePrefs {
     /** Add a link back to the page when quoting into the notebook. */
     linkQuotes: boolean;
   };
+  markup: {
+    /** Saved signatures (PNG data URLs, trimmed) with width / height. */
+    signatures: { id: string; src: string; aspect: number }[];
+    /** Stamps you made, shown after the built-in ones. */
+    stamps: string[];
+    color: string;
+    width: number;
+    snap: boolean;
+  };
 }
 
 export const DEFAULT_PROFILE_PREFS: ProfilePrefs = {
@@ -47,6 +56,7 @@ export const DEFAULT_PROFILE_PREFS: ProfilePrefs = {
   library: { view: "grid", sidebarCollapsed: false, confirmTrash: true },
   reader: { brightness: 100, contrast: 100, fontScale: 100, lineHeight: 1.55, resume: true },
   notes: { defaultColor: "yellow", linkQuotes: true },
+  markup: { signatures: [], stamps: [], color: "#dc2626", width: 0.0025, snap: true },
 };
 
 function safeParse(json: string | null | undefined): Partial<ProfilePrefs> {
@@ -69,6 +79,7 @@ export function parsePrefs(json: string | null | undefined): ProfilePrefs {
     library: { ...d.library, ...raw.library },
     reader: { ...d.reader, ...raw.reader },
     notes: { ...d.notes, ...raw.notes },
+    markup: { ...d.markup, ...raw.markup },
   };
 }
 
@@ -107,6 +118,7 @@ export const useProfilePrefs = create<PrefsState>((set, get) => ({
       library: { ...cur.library, ...change.library },
       reader: { ...cur.reader, ...change.reader },
       notes: { ...cur.notes, ...change.notes },
+      markup: { ...cur.markup, ...change.markup } as ProfilePrefs["markup"],
     };
     set({ prefs: next });
     if (get().persist) save(next);

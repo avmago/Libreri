@@ -21,6 +21,7 @@ libreri-jobs.workspace = true
 libreri-metadata = { workspace = true, features = ["specta"] }
 libreri-scan.workspace = true
 libreri-helpers = { workspace = true, features = ["specta"] }
+libreri-pdf-edit = { workspace = true, features = ["specta"] }
 libreri-search = { workspace = true, features = ["specta"] }
 libreri-formats.workspace = true
 libreri-thumbs.workspace = true

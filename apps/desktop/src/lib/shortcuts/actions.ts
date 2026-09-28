@@ -269,6 +269,11 @@ export const ACTIONS = {
     keys: "Mod+Shift+F",
   },
   "reader.details": { label: "Book details", group: "Reader", keys: "Mod+I" },
+  "reader.markup": {
+    label: "Markup mode: draw and write on the pages (PDF, DjVu, comics)",
+    group: "Reader",
+    keys: "Alt+M",
+  },
 
   // Highlights and notes (in the reader)
   "reader.bookmark": { label: "Bookmark this page", group: "Highlights and notes", keys: "Mod+D" },

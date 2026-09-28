@@ -5,6 +5,7 @@
  * and Markdown share the same toolbar, panels, highlights and notebook.
  */
 import type { Annotation, HighlightColor, TextQuote } from "@/lib/ipc";
+import type { MarkupLayer } from "./markup/MarkupLayer";
 import type { PageTheme } from "./themes";
 
 /** A place in a book. Stored as JSON (`locator` in the database). */
@@ -99,6 +100,10 @@ export interface Renderer {
   readonly paged: boolean;
   /** Comics read right to left: the arrow keys turn the other way. */
   readonly rightToLeft?: boolean;
+  /** Fixed pages: draws markup on each page (null detaches it). */
+  attachMarkup?(layer: MarkupLayer | null): void;
+  /** Page size in points (PDF) or pixels (images), for measuring. */
+  pageSize?(page: number): { size: [number, number]; points: boolean } | null;
   /** Comics: how pages are laid out (null for other books). */
   layoutOptions?(): PageLayout | null;
   setLayout?(layout: Partial<PageLayout>): void;

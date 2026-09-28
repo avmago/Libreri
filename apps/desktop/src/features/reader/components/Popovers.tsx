@@ -14,7 +14,7 @@ const COLOR_NAME: Record<HighlightColor, string> = {
 };
 
 /** A small card next to a rectangle on screen, kept inside the window. */
-function Floating({
+export function Floating({
   rect,
   children,
   onClose,

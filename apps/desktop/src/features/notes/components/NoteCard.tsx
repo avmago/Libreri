@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { ArrowUpRight, Bookmark, Copy, MessageSquareText, Trash2 } from "lucide-react";
+import { ArrowUpRight, Bookmark, Copy, MessageSquareText, Trash2, StickyNote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import type { HighlightColor, NoteDto } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
 import { HIGHLIGHT_COLORS } from "@/readers";
-import { relativeDate } from "../model";
+import { markupText, relativeDate } from "../model";
 
 const SWATCH: Record<HighlightColor, string> = {
   yellow: "#facc15",
@@ -32,6 +32,8 @@ export function NoteCard({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(a.note ?? "");
   const bookmark = a.kind === "bookmark";
+  const markup = a.kind === "markup";
+  const drawn = markup ? (markupText(a) ?? "Sticky note") : null;
 
   return (
     <article
@@ -44,7 +46,11 @@ export function NoteCard({
         style={{ background: bookmark ? "var(--muted-foreground)" : SWATCH[a.color ?? "yellow"] }}
       />
       <div className="flex min-w-0 flex-1 flex-col gap-2">
-        {bookmark ? (
+        {markup ? (
+          <p className="flex items-center gap-2 font-medium">
+            <StickyNote className="size-4 text-muted-foreground" aria-hidden /> {drawn}
+          </p>
+        ) : bookmark ? (
           <p className="flex items-center gap-2 font-medium">
             <Bookmark className="size-4 text-muted-foreground" aria-hidden /> Bookmark
           </p>

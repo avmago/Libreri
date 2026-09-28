@@ -101,3 +101,107 @@ pub fn get_session(state: State<'_, AppState>) -> AppResult<Option<String>> {
 pub fn save_session(state: State<'_, AppState>, session: String) -> AppResult<()> {
     Ok(state.library()?.save_session(&session)?)
 }
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PageScaleDto {
+    pub page: u32,
+    pub unit: String,
+    pub per_point: f64,
+}
+
+/// Pages of a PDF that say how to measure them (CAD and map exports).
+#[tauri::command]
+#[specta::specta]
+pub async fn measure_scales(
+    state: State<'_, AppState>,
+    id: String,
+) -> AppResult<Vec<PageScaleDto>> {
+    let library = state.library()?;
+    let id = book_id(&id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        Ok(library
+            .measure_scales(&id)?
+            .into_iter()
+            .map(|s| PageScaleDto {
+                page: s.page,
+                unit: s.unit,
+                per_point: s.per_point,
+            })
+            .collect())
+    })
+    .await
+    .map_err(|e| AppError::invalid(e.to_string()))?
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PictureDto {
+    /// A data URL, ready to place on a page.
+    pub src: String,
+    pub width: u32,
+    pub height: u32,
+}
+
+/// Reads a picture file for the markup picture and signature tools, made
+/// smaller when it is large.
+#[tauri::command]
+#[specta::specta]
+pub async fn read_picture(path: String) -> AppResult<PictureDto> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let meta = std::fs::metadata(&path).map_err(|e| AppError::invalid(e.to_string()))?;
+        if meta.len() > 60 * 1024 * 1024 {
+            return Err(AppError::invalid("the picture is too large"));
+        }
+        let bytes = std::fs::read(&path).map_err(|e| AppError::invalid(e.to_string()))?;
+        let (out, mime, width, height) =
+            libreri_thumbs::picture(&bytes, 1600).map_err(|e| AppError::invalid(e.to_string()))?;
+        use base64::Engine;
+        let b64 = base64::engine::general_purpose::STANDARD.encode(out);
+        Ok(PictureDto {
+            src: format!("data:{mime};base64,{b64}"),
+            width,
+            height,
+        })
+    })
+    .await
+    .map_err(|e| AppError::invalid(e.to_string()))?
+}
+
+/// Saves a copy of the book with its markup drawn in, as a PDF at `dest`.
+/// With `add_to_library`, the copy is also imported next to the book.
+#[tauri::command]
+#[specta::specta]
+pub async fn export_marked_up(
+    state: State<'_, AppState>,
+    id: String,
+    dest: String,
+    pages: Vec<libreri_pdf_edit::DrawPage>,
+    add_to_library: bool,
+) -> AppResult<()> {
+    let library = state.library()?;
+    let cache = state.page_cache.clone();
+    let book = book_id(&id)?;
+    let folder = library.book(&book)?.rel_path;
+    let dest_path = std::path::PathBuf::from(&dest);
+    let out = dest_path.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        library.export_marked_up(&book, &pages, &out, &cache)
+    })
+    .await
+    .map_err(|e| AppError::invalid(e.to_string()))??;
+    if add_to_library {
+        // Next to the book, in its folder under Books/.
+        let folder = std::path::Path::new(&folder)
+            .parent()
+            .and_then(|p| p.strip_prefix("Books").ok())
+            .map(|p| p.to_string_lossy().replace('\\', "/"))
+            .unwrap_or_default();
+        state.start_import(libreri_library::ImportRequest {
+            sources: vec![dest_path],
+            folder,
+            mode: libreri_library::ImportMode::Copy,
+        })?;
+    }
+    Ok(())
+}

@@ -13,6 +13,7 @@
  * exports treat both alike.
  */
 import { bookUrl, commands, unwrap, type Annotation, type WordDto } from "@/lib/ipc";
+import type { MarkupLayer } from "../markup/MarkupLayer";
 import { makeQuote } from "../quote";
 import type { PageTheme } from "../themes";
 import {
@@ -55,6 +56,8 @@ interface PageSlot {
 
 export class PageRenderer implements Renderer {
   readonly paged = true;
+  private markup: MarkupLayer | null = null;
+  private pixelSizes: [number, number][] = [];
   private root!: HTMLDivElement;
   private scroller!: HTMLDivElement;
   private stage!: HTMLDivElement;
@@ -120,6 +123,7 @@ export class PageRenderer implements Renderer {
     this.root.append(this.scroller);
     host.append(this.root);
 
+    this.pixelSizes = info.sizes.map(([w, h]) => [w ?? 0, h ?? 0] as [number, number]);
     for (let i = 1; i <= info.pages; i++) {
       const size = info.sizes[i - 1];
       const div = document.createElement("div");
@@ -394,6 +398,8 @@ export class PageRenderer implements Renderer {
   }
 
   private onClick(e: MouseEvent) {
+    // Drawing with a markup tool is not a page turn.
+    if ((e.target as Element | null)?.closest?.("svg.lb-markup-active")) return;
     const hit = document
       .elementsFromPoint(e.clientX, e.clientY)
       .find((el): el is HTMLElement => el.classList.contains("lb-pdf-hl"));
@@ -451,6 +457,20 @@ export class PageRenderer implements Renderer {
         layer.append(r);
       }
     }
+    if (s.div.clientWidth > 0) this.markup?.mount(page, s.div);
+  }
+
+  attachMarkup(layer: MarkupLayer | null) {
+    this.markup = layer;
+    this.drawAll();
+  }
+
+  pageSize(page: number): { size: [number, number]; points: boolean } | null {
+    const known = this.pixelSizes[page - 1];
+    if (known) return { size: known, points: false };
+    const img = this.slots[page - 1]?.img;
+    if (img?.naturalWidth) return { size: [img.naturalWidth, img.naturalHeight], points: false };
+    return null;
   }
 
   private drawAll() {

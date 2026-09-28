@@ -352,3 +352,56 @@ mark.lb-find-current {
 .lb-pdf .lb-page-find {
   z-index: 1;
 }
+
+/* Markup: drawings over fixed pages. Clicks go through except in markup mode. */
+svg.lb-markup {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 4;
+  pointer-events: none;
+  overflow: visible;
+}
+svg.lb-markup.lb-markup-active {
+  pointer-events: auto;
+  touch-action: none;
+  cursor: crosshair;
+}
+svg.lb-markup[data-tool="select"] {
+  cursor: default;
+}
+svg.lb-markup[data-tool="text"] {
+  cursor: text;
+}
+svg.lb-markup[data-tool="eraser"] {
+  cursor: cell;
+}
+.lb-markup-text {
+  width: 100%;
+  height: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+  padding: 2px 3px;
+  box-sizing: border-box;
+}
+.lb-markup-editor {
+  position: absolute;
+  z-index: 5;
+  resize: none;
+  overflow: hidden;
+  line-height: 1.25;
+  padding: 2px 3px;
+  box-sizing: border-box;
+  border: 1.5px dashed #2563eb;
+  background: rgba(255, 255, 255, 0.85);
+  outline: none;
+}
+.lb-markup-handle {
+  cursor: nwse-resize;
+}
+svg.lb-markup .lb-markup-note {
+  pointer-events: auto;
+  cursor: pointer;
+}

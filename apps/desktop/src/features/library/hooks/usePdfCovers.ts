@@ -15,9 +15,9 @@ let running = false;
 const queue: BookView[] = [];
 
 async function renderFirstPage(book: BookView): Promise<string> {
-  const pdfjs = await import("pdfjs-dist");
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-    const worker = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
+    const worker = await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url");
     pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
   }
   const response = await fetch(bookUrl(book.relPath));

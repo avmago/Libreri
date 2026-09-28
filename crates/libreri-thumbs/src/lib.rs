@@ -108,6 +108,31 @@ pub fn make_covers(bytes: &[u8]) -> Result<Covers, Error> {
     })
 }
 
+/// A picture's bytes, media type, width and height.
+pub type Picture = (Vec<u8>, &'static str, u32, u32);
+
+/// A picture made ready to place on a page: at most `max` pixels on its
+/// longest side, PNG when it has transparency, JPEG otherwise. Returns the
+/// bytes, their media type, and the width and height.
+pub fn picture(bytes: &[u8], max: u32) -> Result<Picture, Error> {
+    let img = image::load_from_memory(bytes)?;
+    let img = if img.width().max(img.height()) > max {
+        img.resize(max, max, image::imageops::FilterType::Lanczos3)
+    } else {
+        img
+    };
+    let (w, h) = (img.width(), img.height());
+    let mut out = std::io::Cursor::new(Vec::new());
+    if img.color().has_alpha() {
+        img.write_to(&mut out, image::ImageFormat::Png)?;
+        Ok((out.into_inner(), "image/png", w, h))
+    } else {
+        let rgb = img.to_rgb8();
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, 85).encode_image(&rgb)?;
+        Ok((out.into_inner(), "image/jpeg", w, h))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -173,5 +198,16 @@ mod tests {
     #[test]
     fn rejects_garbage() {
         assert!(make_covers(b"not an image").is_err());
+    }
+
+    #[test]
+    fn pictures_are_made_smaller_and_keep_transparency() {
+        let mut out = std::io::Cursor::new(Vec::new());
+        image::RgbaImage::from_pixel(3000, 1000, image::Rgba([0, 0, 0, 0]))
+            .write_to(&mut out, image::ImageFormat::Png)
+            .unwrap();
+        let (bytes, mime, w, h) = super::picture(&out.into_inner(), 1600).unwrap();
+        assert_eq!((mime, w, h), ("image/png", 1600, 533));
+        assert!(bytes.starts_with(b"\x89PNG"));
     }
 }

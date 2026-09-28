@@ -15,7 +15,7 @@ mod pdf;
 pub mod pdftext;
 pub mod text;
 pub use comic::{extract_pages, list_pages, read_zip_page, ComicPages};
-pub use pdf::{page_boxes, PageBox};
+pub use pdf::{measure_scales, page_boxes, PageBox, PageScale};
 #[doc(hidden)]
 pub use pdf::{test_pdf, test_text_pdf};
 pub mod xml;

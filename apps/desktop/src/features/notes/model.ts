@@ -1,3 +1,4 @@
+import { markupModel } from "@/readers";
 import type { HighlightColor, NoteDto } from "@/lib/ipc";
 
 export type NoteKind = "all" | "highlights" | "comments" | "bookmarks";
@@ -9,10 +10,22 @@ export interface NoteFilter {
   bookId: string | null;
 }
 
+/** The words in a text box or stamp drawn on a page, if any. */
+export function markupText(a: { kind: string; locator: string }): string | null {
+  if (a.kind !== "markup") return null;
+  const loc = markupModel.parseLocator(a.locator);
+  const item = loc?.item;
+  return item && (item.tool === "text" || item.tool === "stamp") && item.text.trim()
+    ? item.text
+    : null;
+}
+
 export function filterNotes(notes: NoteDto[], f: NoteFilter): NoteDto[] {
   const q = f.search.trim().toLowerCase();
   return notes.filter(({ annotation: a, bookTitle }) => {
     if (f.bookId && a.bookId !== f.bookId) return false;
+    // Drawings are listed in the reader; sticky notes and text boxes are notes.
+    if (a.kind === "markup" && !a.note?.trim() && !markupText(a)) return false;
     if (f.kind === "highlights" && a.kind !== "highlight") return false;
     if (f.kind === "bookmarks" && a.kind !== "bookmark") return false;
     if (f.kind === "comments" && !a.note?.trim()) return false;
@@ -20,7 +33,9 @@ export function filterNotes(notes: NoteDto[], f: NoteFilter): NoteDto[] {
       return false;
     }
     if (!q) return true;
-    return [a.quote?.exact, a.note, a.label, bookTitle].some((t) => t?.toLowerCase().includes(q));
+    return [a.quote?.exact ?? markupText(a), a.note, a.label, bookTitle].some((t) =>
+      t?.toLowerCase().includes(q),
+    );
   });
 }
 
@@ -50,6 +65,14 @@ export function notesToMarkdown(notes: NoteDto[]): string {
       const link = `libreri://book/${a.bookId}#annotation=${a.id}`;
       if (a.kind === "bookmark") {
         out.push(`- Bookmark: [${a.label ?? "page"}](${link})`);
+        continue;
+      }
+      if (a.kind === "markup") {
+        const words = markupText(a);
+        out.push(
+          `- ${words ? `“${words.replace(/\s+/g, " ")}”` : "Note"} on [${a.label ?? "page"}](${link})${a.note?.trim() ? `: ${a.note.trim()}` : ""}`,
+          "",
+        );
         continue;
       }
       const text = (a.quote?.exact ?? "").replace(/\s+/g, " ").trim();
