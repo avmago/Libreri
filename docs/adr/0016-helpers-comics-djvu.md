@@ -16,7 +16,7 @@ Some formats need open-source programs Libreri runs as separate processes, never
 
 - `libreri-helpers` finds them on `PATH` and in the usual install folders (Homebrew, `/usr/local`, Program Files), reports version and missing programs, and runs them without a console window on Windows.
 - **Install…** (Settings › Helper programs, and the reader's error panel when a book needs one) shows the exact command and runs it with the computer's package manager: Homebrew on macOS, winget on Windows, apt/dnf/pacman/zypper through `pkexec` on Linux. Output streams into the dialog. Without a package manager the dialog says where to get the program.
-- Phase 9 replaces this with signed downloads built by Libreri, so no package manager is needed.
+- Phase 10 (release) replaces this with signed downloads built by Libreri, so no package manager is needed.
 - Helpers are per computer; nothing about them goes into the library or backups.
 
 ## Comics
