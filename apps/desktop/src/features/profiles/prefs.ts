@@ -59,6 +59,20 @@ export interface ProfilePrefs {
     skipBack: number;
     skipForward: number;
   };
+  writing: {
+    /** Libreri's spell check in notes, comments and text boxes. */
+    spellCheck: boolean;
+    /** Dictionaries used together ("en-US", "fr", …). */
+    languages: string[];
+    /** Offer ways to finish the word being typed (Tab takes one). */
+    complete: boolean;
+  };
+}
+
+/** English as the system prefers it. */
+function defaultEnglish(): string {
+  const l = typeof navigator === "undefined" ? "" : navigator.language;
+  return /^en-(GB|IE|IN|NZ)/i.test(l) ? "en-GB" : "en-US";
 }
 
 export const DEFAULT_PROFILE_PREFS: ProfilePrefs = {
@@ -78,6 +92,7 @@ export const DEFAULT_PROFILE_PREFS: ProfilePrefs = {
     skipBack: 15,
     skipForward: 30,
   },
+  writing: { spellCheck: true, languages: [defaultEnglish()], complete: true },
 };
 
 function safeParse(json: string | null | undefined): Partial<ProfilePrefs> {
@@ -102,6 +117,7 @@ export function parsePrefs(json: string | null | undefined): ProfilePrefs {
     notes: { ...d.notes, ...raw.notes },
     markup: { ...d.markup, ...raw.markup },
     listening: { ...d.listening, ...raw.listening },
+    writing: { ...d.writing, ...raw.writing },
   };
 }
 
@@ -142,6 +158,7 @@ export const useProfilePrefs = create<PrefsState>((set, get) => ({
       notes: { ...cur.notes, ...change.notes },
       markup: { ...cur.markup, ...change.markup } as ProfilePrefs["markup"],
       listening: { ...cur.listening, ...change.listening },
+      writing: { ...cur.writing, ...change.writing } as ProfilePrefs["writing"],
     };
     set({ prefs: next });
     if (get().persist) save(next);

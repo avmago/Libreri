@@ -410,6 +410,31 @@ export const commands = {
 	 *  Returns the job id.
 	 */
 	autoSyncAudiobook: (id: string) => typedError<string, AppError>(__TAURI_INVOKE("auto_sync_audiobook", { id })),
+	spellDictionaries: () => __TAURI_INVOKE<DictionaryInfo[]>("spell_dictionaries"),
+	/**  Downloads a dictionary; progress arrives as `DictionaryDownload`. */
+	downloadDictionary: (code: string) => typedError<DictionaryInfo[], AppError>(__TAURI_INVOKE("download_dictionary", { code })),
+	cancelDictionaryDownload: (code: string) => __TAURI_INVOKE<void>("cancel_dictionary_download", { code }),
+	removeDictionary: (code: string) => typedError<DictionaryInfo[], AppError>(__TAURI_INVOKE("remove_dictionary", { code })),
+	/**
+	 *  The words of `text` that look misspelt, in the chosen languages. The
+	 *  open book's names and terms (`book`) are accepted once they are learned.
+	 */
+	spellCheck: (text: string, languages: string[], book: string | null) => typedError<Miss[], AppError>(__TAURI_INVOKE("spell_check", { text, languages, book })),
+	/**  Corrections for a word. */
+	spellSuggest: (word: string, languages: string[], book: string | null) => typedError<string[], AppError>(__TAURI_INVOKE("spell_suggest", { word, languages, book })),
+	/**
+	 *  Ways to finish a word being typed: the person's own words, then the
+	 *  open book's, their notes' and the dictionaries'.
+	 */
+	spellComplete: (prefix: string, languages: string[], book: string | null) => typedError<string[], AppError>(__TAURI_INVOKE("spell_complete", { prefix, languages, book })),
+	/**
+	 *  Starts learning a book's words (when it opens), so checking and
+	 *  completing know its names and terms.
+	 */
+	spellLearnBook: (book: string) => __TAURI_INVOKE<void>("spell_learn_book", { book }),
+	ownWords: () => typedError<string[], AppError>(__TAURI_INVOKE("own_words")),
+	addOwnWord: (word: string) => typedError<string[], AppError>(__TAURI_INVOKE("add_own_word", { word })),
+	removeOwnWord: (word: string) => typedError<string[], AppError>(__TAURI_INVOKE("remove_own_word", { word })),
 };
 
 /** Events */
@@ -419,6 +444,7 @@ export const events = {
 	backupFinished: makeEvent<BackupFinished>("backup-finished"),
 	compareFinished: makeEvent<CompareFinished>("compare-finished"),
 	detailsFilled: makeEvent<DetailsFilled>("details-filled"),
+	dictionaryDownload: makeEvent<DictionaryDownload>("dictionary-download"),
 	exportFinished: makeEvent<ExportFinished>("export-finished"),
 	foreignImported: makeEvent<ForeignImported>("foreign-imported"),
 	helperInstall: makeEvent<HelperInstall>("helper-install"),
@@ -885,6 +911,26 @@ export type DetailsFilled = {
 	failed: FailedFileDto[],
 };
 
+/**  Progress of downloading a spelling dictionary. */
+export type DictionaryDownload = {
+	code: string,
+	done: number | null,
+	total: number | null,
+	finished: boolean,
+	error: string | null,
+};
+
+/**  A dictionary Libreri offers. */
+export type DictionaryInfo = {
+	/**  "en-US", "fr", "hi-IN". */
+	code: string,
+	name: string,
+	/**  About how big the download is, in KB. */
+	sizeKb: number,
+	builtIn: boolean,
+	downloaded: boolean,
+};
+
 /**
  *  One thing to draw. Paths use SVG path data (absolute M, L, Q, C, Z) in
  *  fractions of the page as shown (top-left origin); widths and dashes are
@@ -1213,6 +1259,13 @@ export type Lookup = {
 	/**  Best first. */
 	candidates: Candidate[],
 	errors: SourceError[],
+};
+
+/**  A word that looks misspelt (UTF-16 offsets, end exclusive). */
+export type Miss = {
+	start: number,
+	end: number,
+	word: string,
 };
 
 /**  A model Libreri offers. */

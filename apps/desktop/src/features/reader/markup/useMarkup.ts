@@ -4,6 +4,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useProfilePrefs } from "@/features/profiles";
+import { attachSpell } from "@/features/spell";
 import { commands, unwrap, type Annotation } from "@/lib/ipc";
 import {
   DEFAULT_STYLE,
@@ -160,6 +161,7 @@ export function useMarkup(opts: {
         onNeedImage: () => setNeedImage(true),
         onCalibrate: (from, to, page, size) => setCalibration({ from, to, page, size }),
         onHistory: (u, rd) => setHistory({ undo: u, redo: rd }),
+        onEditorOpen: (area) => attachSpell(area, () => ({ bookId })),
       },
       (page) => r.pageSize?.(page) ?? null,
     );

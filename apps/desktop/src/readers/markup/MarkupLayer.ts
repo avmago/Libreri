@@ -72,6 +72,9 @@ export interface MarkupEvents {
   onCalibrate(from: Pt, to: Pt, page: number, size: [number, number]): void;
   /** Undo or redo became possible or impossible. */
   onHistory(canUndo: boolean, canRedo: boolean): void;
+  /** A text box is being typed in (spell check attaches here). Returns
+   * what to do when it closes. */
+  onEditorOpen?(area: HTMLTextAreaElement): (() => void) | void;
 }
 
 interface PageView {
@@ -112,7 +115,12 @@ export class MarkupLayer {
   private gesture: Gesture | null = null;
   /** A measurement being drawn point by point. */
   private measuring: { page: number; points: Pt[]; preview: SVGGElement } | null = null;
-  private editor: { id: string; area: HTMLTextAreaElement; isNew: boolean } | null = null;
+  private editor: {
+    id: string;
+    area: HTMLTextAreaElement;
+    isNew: boolean;
+    detach?: (() => void) | void;
+  } | null = null;
   /** Next drag with the measure tool calibrates instead. */
   private calibrating = false;
   layer = DEFAULT_LAYER;
@@ -876,7 +884,10 @@ export class MarkupLayer {
     v.div.append(area);
     this.editor = { id: mark.id, area, isNew };
     this.draw(mark.page);
-    requestAnimationFrame(() => area.focus());
+    requestAnimationFrame(() => {
+      area.focus();
+      if (this.editor?.area === area) this.editor.detach = this.events.onEditorOpen?.(area);
+    });
   }
 
   private closeEditor(save: boolean) {
@@ -884,6 +895,7 @@ export class MarkupLayer {
     if (!ed) return;
     this.editor = null;
     const mark = this.marks.get(ed.id);
+    ed.detach?.();
     ed.area.remove();
     if (!mark || mark.item.tool !== "text") return;
     const text = ed.area.value.replace(/\s+$/, "");

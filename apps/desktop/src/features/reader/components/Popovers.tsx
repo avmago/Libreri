@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Copy, MessageSquarePlus, Mic, NotebookPen, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/input";
 import { DictateButton, VoicePlayer, voiceOf } from "@/features/speech";
+import { SpellTextarea } from "@/features/spell";
 import type { Annotation, HighlightColor } from "@/lib/ipc";
 import { HIGHLIGHT_COLORS, highlightFill } from "@/readers";
 import { cn } from "@/lib/utils";
@@ -233,8 +233,9 @@ export function AnnotationMenu({
       {voice && <VoicePlayer path={voice} className="mt-1 w-64" />}
       {editing && (
         <div className="flex w-64 flex-col gap-1.5 px-0.5 pb-0.5">
-          <Textarea
+          <SpellTextarea
             ref={box}
+            bookId={annotation.bookId}
             autoFocus={!voice && (startEditing || !annotation.note)}
             rows={3}
             aria-label={voice ? "What was said" : "Comment"}

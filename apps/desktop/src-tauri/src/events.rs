@@ -383,3 +383,14 @@ pub struct AutoSyncFinished {
     pub tried: u32,
     pub error: Option<String>,
 }
+
+/// Progress of downloading a spelling dictionary.
+#[derive(Debug, Clone, Serialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct DictionaryDownload {
+    pub code: String,
+    pub done: f64,
+    pub total: Option<f64>,
+    pub finished: bool,
+    pub error: Option<String>,
+}

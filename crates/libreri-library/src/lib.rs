@@ -29,6 +29,7 @@ mod listening;
 mod lock;
 mod notes;
 mod organize;
+mod own_words;
 mod pages;
 mod paths;
 mod profiles;

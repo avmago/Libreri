@@ -10,6 +10,7 @@ import {
   voiceMarkdown,
   type RecordedVoice,
 } from "@/features/speech";
+import { useSpell } from "@/features/spell";
 import { renderMarkdown } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
 import { useNoteFile, useWriteNote } from "../api";
@@ -64,6 +65,7 @@ export function NoteEditor({
   const editor = useRef<HTMLTextAreaElement>(null);
   // Links to recordings play in place.
   useEffect(() => attachVoicePlayers(preview.current, relPath), [html, relPath]);
+  useSpell(editor, {}, mode === "edit" && content !== undefined);
   const voice = useVoiceNote();
   const addVoice = (r: RecordedVoice) =>
     change(`${value.replace(/\s*$/, "")}\n\n${voiceMarkdown(relPath, r)}\n`);
@@ -126,7 +128,6 @@ export function NoteEditor({
             aria-label="Note (Markdown)"
             value={value}
             onChange={(e) => change(e.target.value)}
-            spellCheck
             autoFocus
             className="size-full resize-none bg-transparent px-6 py-5 font-mono text-[13px] leading-relaxed outline-none"
           />

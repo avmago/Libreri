@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SpellTextarea } from "@/features/spell";
 import type { Correction } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
 import type { Box } from "./model";
@@ -431,7 +432,8 @@ export function PageDetail({
             <label className="font-medium" htmlFor="lb-fix-text">
               New text
             </label>
-            <textarea
+            <SpellTextarea
+              plain
               id="lb-fix-text"
               autoFocus
               rows={3}

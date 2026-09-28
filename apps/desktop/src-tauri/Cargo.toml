@@ -23,6 +23,7 @@ libreri-metadata = { workspace = true, features = ["specta"] }
 libreri-scan.workspace = true
 libreri-helpers = { workspace = true, features = ["specta"] }
 libreri-speech = { workspace = true, features = ["specta"] }
+libreri-spell = { workspace = true, features = ["specta"] }
 libreri-pdf-edit = { workspace = true, features = ["specta"] }
 libreri-search = { workspace = true, features = ["specta"] }
 libreri-formats.workspace = true

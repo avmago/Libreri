@@ -3,7 +3,7 @@ import { Trash2 } from "lucide-react";
 import { getStroke } from "perfect-freehand";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/input";
+import { SpellTextarea } from "@/features/spell";
 import { cn } from "@/lib/utils";
 import { markupModel, type Mark, type Pt, type Scale, type Unit } from "@/readers";
 import { Floating } from "../components/Popovers";
@@ -27,7 +27,7 @@ export function NotePopover({
   return (
     <Floating rect={rect} onClose={() => (text !== (mark.note ?? "") ? onSave(text) : onClose())}>
       <div className="flex w-72 flex-col gap-2 p-1">
-        <Textarea
+        <SpellTextarea
           autoFocus
           value={text}
           onChange={(e) => setText(e.target.value)}

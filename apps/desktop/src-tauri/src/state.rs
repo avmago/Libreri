@@ -46,6 +46,9 @@ pub struct AppState {
     pub tessdata: std::path::PathBuf,
     /// Speech models downloaded by Libreri (this computer only).
     pub whisper_dir: std::path::PathBuf,
+    /// Spell check: dictionaries (downloaded into app data `dictionaries/`)
+    /// and words learned from books and notes.
+    pub spell: Arc<crate::spell_cache::SpellCache>,
     /// The speech model in use, loaded once.
     transcriber: Mutex<Option<Arc<libreri_speech::Transcriber>>>,
     /// Model downloads running, to cancel them.
@@ -225,6 +228,7 @@ impl AppState {
         let search_dir = app.path().app_cache_dir()?.join("search");
         let tessdata = app.path().app_data_dir()?.join("tessdata");
         let whisper_dir = app.path().app_data_dir()?.join("whisper");
+        let dictionaries = app.path().app_data_dir()?.join("dictionaries");
         // Keep the page cache under 2 GB (least recently read books go first).
         let cache = page_cache.clone();
         std::thread::spawn(move || {
@@ -253,6 +257,7 @@ impl AppState {
             index_running: Arc::default(),
             tessdata,
             whisper_dir,
+            spell: Arc::new(crate::spell_cache::SpellCache::new(dictionaries)),
             transcriber: Mutex::new(None),
             model_downloads: Mutex::default(),
             backup_running: Arc::default(),

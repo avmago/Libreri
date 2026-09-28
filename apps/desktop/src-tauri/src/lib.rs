@@ -13,6 +13,7 @@ mod events;
 mod online_store;
 mod protocol;
 mod settings_store;
+mod spell_cache;
 mod state;
 
 use state::AppState;
@@ -174,6 +175,17 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::speech::save_voice_note,
             commands::speech::transcribe_voice_note,
             commands::speech::auto_sync_audiobook,
+            commands::spell::spell_dictionaries,
+            commands::spell::download_dictionary,
+            commands::spell::cancel_dictionary_download,
+            commands::spell::remove_dictionary,
+            commands::spell::spell_check,
+            commands::spell::spell_suggest,
+            commands::spell::spell_complete,
+            commands::spell::spell_learn_book,
+            commands::spell::own_words,
+            commands::spell::add_own_word,
+            commands::spell::remove_own_word,
         ])
         .events(tauri_specta::collect_events![
             events::JobEventPayload,
@@ -194,6 +206,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::OcrLanguageDownload,
             events::SpeechModelDownload,
             events::AutoSyncFinished,
+            events::DictionaryDownload,
         ])
 }
 

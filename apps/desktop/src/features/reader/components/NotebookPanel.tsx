@@ -9,6 +9,7 @@ import {
   useVoiceNote,
   voiceMarkdown,
 } from "@/features/speech";
+import { useSpell } from "@/features/spell";
 import { renderMarkdown } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
 import { useNotebook, useSaveNotebook } from "../api";
@@ -85,6 +86,7 @@ export function NotebookPanel({
     if (relPath) attachVoicePlayers(preview.current, relPath);
   }, [html, relPath]);
 
+  useSpell(editor, { bookId }, mode === "edit" && !!notebook);
   const voice = useVoiceNote(lang);
   const addVoice = (r: Parameters<typeof voiceMarkdown>[1]) => {
     if (!relPath) return;
@@ -169,7 +171,6 @@ export function NotebookPanel({
             aria-label="Notebook (Markdown)"
             value={value}
             onChange={(e) => scheduleSave(e.target.value)}
-            spellCheck
             className="size-full resize-none bg-transparent px-3 py-3 font-mono text-[12.5px] leading-relaxed outline-none"
           />
         ) : (

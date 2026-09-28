@@ -7,6 +7,7 @@ import {
   HardDrive,
   Keyboard,
   Mic,
+  PenLine,
   NotebookPen,
   Puzzle,
   Palette,
@@ -28,6 +29,7 @@ import { HelperSettings } from "./sections/Helpers";
 import { OnlineDetailsSettings } from "./sections/OnlineDetails";
 import { ShortcutSettings } from "./sections/Shortcuts";
 import { SpeechSettings } from "./sections/Speech";
+import { WritingSettings } from "./sections/Writing";
 
 export type SettingsSection =
   | "general"
@@ -37,6 +39,7 @@ export type SettingsSection =
   | "appearance"
   | "reader"
   | "notes"
+  | "writing"
   | "speech"
   | "online"
   | "helpers"
@@ -50,6 +53,7 @@ const SECTIONS: { id: SettingsSection; label: string; Icon: LucideIcon }[] = [
   { id: "appearance", label: "Appearance", Icon: Palette },
   { id: "reader", label: "Reader", Icon: BookOpen },
   { id: "notes", label: "Notes", Icon: NotebookPen },
+  { id: "writing", label: "Writing", Icon: PenLine },
   { id: "speech", label: "Speech", Icon: Mic },
   { id: "online", label: "Online details", Icon: Globe },
   { id: "helpers", label: "Helper programs", Icon: Puzzle },
@@ -119,6 +123,7 @@ export function SettingsPage({
           {section === "appearance" && <AppearanceSettings />}
           {section === "reader" && <ReaderSettings />}
           {section === "notes" && <NotesSettings session={session} library={library} />}
+          {section === "writing" && <WritingSettings />}
           {section === "speech" && <SpeechSettings />}
           {section === "online" && <OnlineDetailsSettings />}
           {section === "helpers" && <HelperSettings />}

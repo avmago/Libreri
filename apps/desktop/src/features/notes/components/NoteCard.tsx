@@ -9,8 +9,8 @@ import {
   StickyNote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/input";
 import { DictateButton, VoicePlayer, voiceOf } from "@/features/speech";
+import { SpellTextarea } from "@/features/spell";
 import type { HighlightColor, NoteDto } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
 import { HIGHLIGHT_COLORS } from "@/readers";
@@ -100,8 +100,9 @@ export function NoteCard({
               setEditing(false);
             }}
           >
-            <Textarea
+            <SpellTextarea
               ref={box}
+              bookId={a.bookId}
               autoFocus
               value={draft}
               onChange={(e) => setDraft(e.target.value)}

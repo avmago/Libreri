@@ -66,6 +66,7 @@ Requirement (user, 2026-09-27): when the database, metadata and every kind of no
   - **In a book:** an annotation of kind `voice`. Its locator is an ordinary reader locator (a PDF page or highlight rectangles, an EPUB CFI, a text range, or a scroll fraction) plus `"audio": "Notes/<profile>/Voice notes/<file>.flac"` and `"duration"`. The quote is the selected text, if any; `note` is the transcript.
   - **In a notebook:** a relative Markdown link to the file (`[0:42](<Voice notes/<file>.flac>)`), which also works in other editors.
   - Speech models are per computer (app data `whisper/`) and never exported. See `docs/adr/0022-voice-notes-dictation-and-sync.md`.
+- The personal spelling dictionary is `Notes/<profile>/Dictionary.txt` (one word per line), so it travels with the notes folder. Writing settings (spell check, completion, languages) are profile preferences; downloaded dictionaries are per computer (app data `dictionaries/`) and never exported. See `docs/adr/0023-spell-check-and-word-suggestions.md`.
 
 ## Edited PDFs (versions)
 - Page edits create a new version with a **page map** (old page → new page). Anchors are migrated through the map; text-quote fallback catches the rest. Exports include the version history so links to older versions still resolve.

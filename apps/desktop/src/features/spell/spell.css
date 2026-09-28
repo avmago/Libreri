@@ -1,0 +1,69 @@
+/* Libreri's spell check (Phase 7c): the layer over a text box that marks
+   misspelt words, and the lists of corrections and completions. */
+.lb-spell-overlay {
+  position: absolute;
+  z-index: 1;
+  box-sizing: content-box;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: transparent;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+.lb-spell-overlay .lb-miss {
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: #dc2626;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 2px;
+  text-decoration-skip-ink: none;
+}
+.lb-spell-popup {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  min-width: 10rem;
+  max-width: 22rem;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow:
+    0 4px 12px -2px rgb(0 0 0 / 0.14),
+    0 2px 4px rgb(0 0 0 / 0.08);
+  font-size: 13px;
+  font-family: inherit;
+}
+.lb-spell-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  text-align: left;
+  cursor: default;
+}
+.lb-spell-item:hover,
+.lb-spell-item.lb-spell-active {
+  background: var(--muted);
+}
+.lb-spell-hint {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.lb-spell-menu .lb-spell-item:nth-last-child(-n + 2) {
+  color: var(--muted-foreground);
+}
+.lb-spell-menu .lb-spell-item:nth-last-child(2) {
+  margin-top: 3px;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 5px 5px;
+  padding-top: 7px;
+}
