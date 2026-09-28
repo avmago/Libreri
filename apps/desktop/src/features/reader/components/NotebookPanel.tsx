@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { Eye, NotebookPen, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DictateButton,
+  VoiceNoteBar,
+  VoiceNoteButton,
+  attachVoicePlayers,
+  useVoiceNote,
+  voiceMarkdown,
+} from "@/features/speech";
 import { renderMarkdown } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
 import { useNotebook, useSaveNotebook } from "../api";
@@ -15,8 +23,11 @@ export function NotebookPanel({
   onInserted,
   onLink,
   onClose,
+  lang,
 }: {
   bookId: string;
+  /** The book's language, for writing down speech. */
+  lang?: string | null;
   /** Text to append (from "Add to notebook"). */
   insert: string | null;
   onInserted: () => void;
@@ -66,6 +77,20 @@ export function NotebookPanel({
   }, [insert, notebook]);
 
   const html = useMemo(() => (mode === "preview" ? renderMarkdown(value) : ""), [mode, value]);
+  const preview = useRef<HTMLDivElement>(null);
+  const editor = useRef<HTMLTextAreaElement>(null);
+  const relPath = notebook?.relPath;
+  // Links to recordings play in place.
+  useEffect(() => {
+    if (relPath) attachVoicePlayers(preview.current, relPath);
+  }, [html, relPath]);
+
+  const voice = useVoiceNote(lang);
+  const addVoice = (r: Parameters<typeof voiceMarkdown>[1]) => {
+    if (!relPath) return;
+    const base = value.replace(/\s*$/, "");
+    scheduleSave(`${base}\n\n${voiceMarkdown(relPath, r)}\n`);
+  };
 
   const onPreviewClick = (e: MouseEvent) => {
     const a = (e.target as HTMLElement).closest("a[href]");
@@ -82,6 +107,16 @@ export function NotebookPanel({
         <span className="text-[11px] text-muted-foreground" aria-live="polite">
           {save.isPending || dirty ? "Saving…" : notebook ? "Saved" : ""}
         </span>
+        {notebook && (
+          <VoiceNoteButton
+            v={voice}
+            className="size-7"
+            label="Record a voice note in the notebook"
+          />
+        )}
+        {mode === "edit" && notebook && (
+          <DictateButton target={editor} lang={lang} className="size-7" />
+        )}
         <div className="ml-1 flex rounded-md border p-0.5">
           <Button
             variant="ghost"
@@ -114,6 +149,7 @@ export function NotebookPanel({
           <X />
         </Button>
       </div>
+      <VoiceNoteBar v={voice} onDone={addVoice} className="border-b px-3 py-1.5" />
       {notebook && (
         <p
           className="truncate border-b px-3 py-1.5 font-mono text-[10.5px] text-muted-foreground"
@@ -129,6 +165,7 @@ export function NotebookPanel({
           <p className="p-4 text-destructive">{String(error)}</p>
         ) : mode === "edit" ? (
           <textarea
+            ref={editor}
             aria-label="Notebook (Markdown)"
             value={value}
             onChange={(e) => scheduleSave(e.target.value)}
@@ -137,6 +174,7 @@ export function NotebookPanel({
           />
         ) : (
           <div
+            ref={preview}
             className="lb-doc lb-notebook size-full overflow-y-auto !px-4 !pt-3 !pb-10"
             onClick={onPreviewClick}
             onDoubleClick={() => setMode("edit")}

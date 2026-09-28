@@ -20,6 +20,8 @@ import {
   type RendererEvents,
   type TocItem,
   type ZoomValue,
+  drawnClass,
+  isDrawn,
 } from "../types";
 
 const BASE_FONT = 17;
@@ -298,13 +300,13 @@ export class DocumentRenderer implements Renderer {
     this.clearFind();
     unwrap(this.article.querySelectorAll("mark[data-annotation]"));
     for (const a of list) {
-      if (a.kind !== "highlight") continue;
+      if (!isDrawn(a)) continue;
       const r = this.resolve(a);
       if (!r) continue;
       wrapRange(this.article, r[0], r[1], () => {
         const m = document.createElement("mark");
         m.dataset.annotation = a.id;
-        m.className = `lb-hl${a.note ? " lb-hl-note" : ""}`;
+        m.className = drawnClass("lb-hl", a);
         m.style.background = highlightFill(a.color, this.dark);
         return m;
       });

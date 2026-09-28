@@ -1,7 +1,7 @@
 import { markupModel } from "@/readers";
 import type { HighlightColor, NoteDto } from "@/lib/ipc";
 
-export type NoteKind = "all" | "highlights" | "comments" | "bookmarks";
+export type NoteKind = "all" | "highlights" | "comments" | "voice" | "bookmarks";
 
 export interface NoteFilter {
   search: string;
@@ -28,7 +28,8 @@ export function filterNotes(notes: NoteDto[], f: NoteFilter): NoteDto[] {
     if (a.kind === "markup" && !a.note?.trim() && !markupText(a)) return false;
     if (f.kind === "highlights" && a.kind !== "highlight") return false;
     if (f.kind === "bookmarks" && a.kind !== "bookmark") return false;
-    if (f.kind === "comments" && !a.note?.trim()) return false;
+    if (f.kind === "voice" && a.kind !== "voice") return false;
+    if (f.kind === "comments" && (a.kind === "voice" || !a.note?.trim())) return false;
     if (f.colors.length && (a.kind !== "highlight" || !f.colors.includes(a.color ?? "yellow"))) {
       return false;
     }
@@ -73,6 +74,12 @@ export function notesToMarkdown(notes: NoteDto[]): string {
           `- ${words ? `“${words.replace(/\s+/g, " ")}”` : "Note"} on [${a.label ?? "page"}](${link})${a.note?.trim() ? `: ${a.note.trim()}` : ""}`,
           "",
         );
+        continue;
+      }
+      if (a.kind === "voice") {
+        const said = a.note?.trim() ? `: “${a.note.trim().replace(/\s+/g, " ")}”` : "";
+        const about = a.quote?.exact ? ` about “${a.quote.exact.replace(/\s+/g, " ").trim()}”` : "";
+        out.push(`- Voice note${about} on [${a.label || "page"}](${link})${said}`, "");
         continue;
       }
       const text = (a.quote?.exact ?? "").replace(/\s+/g, " ").trim();

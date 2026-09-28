@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  AudioLines,
   BookOpen,
   Bookmark,
   ChevronFirst,
@@ -25,9 +26,11 @@ import { Dialog } from "@/components/ui/dialog";
 import { DropdownMenu, menuContent, menuItem } from "@/components/ui/menu";
 import { useBook } from "@/features/library";
 import { usePermissions, useProfilePrefs } from "@/features/profiles";
+import { openSpeechSettings, useSpeechSettings } from "@/features/speech";
 import {
   bookUrl,
   commands,
+  events,
   unwrap,
   type Annotation,
   type AudioLinkDto,
@@ -101,6 +104,56 @@ export function AudiobookView({ tab, active }: { tab: BookTab; active: boolean }
   const [now, setNow] = useState(() => Date.now());
   const [follow, setFollow] = useState(true);
   const [linking, setLinking] = useState(false);
+
+  // Finding sync points by listening (a background job).
+  const { data: speech } = useSpeechSettings();
+  const [autoSync, setAutoSync] = useState<{
+    job: string;
+    done: number;
+    total: number;
+    message: string;
+  } | null>(null);
+  useEffect(() => {
+    const offJob = events.jobEventPayload.listen(({ payload: e }) =>
+      setAutoSync((s) =>
+        s && e.id === s.job && e.kind === "progress"
+          ? { ...s, done: e.done ?? 0, total: e.total ?? 0, message: e.message ?? "" }
+          : s,
+      ),
+    );
+    const offDone = events.autoSyncFinished.listen(({ payload: p }) => {
+      if (p.audioId !== bookId) return;
+      setAutoSync(null);
+      void qc.invalidateQueries({ queryKey: ["lib", "reader", bookId, "audio-link"] });
+      if (p.error === "cancelled") return;
+      if (p.error) toast.error("Could not find sync points", { description: p.error });
+      else if (p.found)
+        toast.success(
+          `Found ${p.found} sync point${p.found === 1 ? "" : "s"} (listened at ${p.tried} places)`,
+        );
+      else
+        toast("No places could be matched", {
+          description:
+            "The recording may read another edition or a translation, or the language may need setting in Settings › Speech.",
+        });
+    });
+    return () => {
+      void offJob.then((f) => f());
+      void offDone.then((f) => f());
+    };
+  }, [bookId, qc]);
+  const findPoints = () => {
+    if (!speech?.model) {
+      toast("Finding sync points needs a speech model", {
+        description: "Download one in Settings › Speech.",
+        action: { label: "Settings", onClick: openSpeechSettings },
+      });
+      return;
+    }
+    unwrap(commands.autoSyncAudiobook(bookId))
+      .then((job) => setAutoSync({ job, done: 0, total: 0, message: "" }))
+      .catch((e: unknown) => toast.error(String(e)));
+  };
 
   const chapters = useMemo(
     () => (info?.chapters ?? []).map((c) => ({ title: c.title, start: c.start ?? 0 })),
@@ -683,6 +736,33 @@ export function AudiobookView({ tab, active }: { tab: BookTab; active: boolean }
                           {textPlace ? textPlace.label || "the open place" : "…"}
                         </Button>
                       )}
+                      {editLibrary &&
+                        (autoSync ? (
+                          <div className="flex items-center gap-2 text-[12px]" aria-live="polite">
+                            <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
+                            <span className="min-w-0 flex-1 truncate">
+                              {autoSync.message || "Getting ready to listen…"}
+                              {autoSync.total > 1 && ` (${autoSync.done + 1} of ${autoSync.total})`}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => void commands.cancelJob(autoSync.job)}
+                            >
+                              Stop
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="self-start"
+                            onClick={findPoints}
+                            title="Libreri listens to short stretches of the audiobook and finds them in the book's text"
+                          >
+                            <AudioLines /> Find sync points by listening
+                          </Button>
+                        ))}
                       <ul className="flex flex-col">
                         {syncPoints.map((p, i) => (
                           <li key={i} className="group flex items-center gap-2 py-0.5">
@@ -695,6 +775,7 @@ export function AudiobookView({ tab, active }: { tab: BookTab; active: boolean }
                               <span className="text-muted-foreground">
                                 {" "}
                                 → {p.label || `${Math.round(p.progress * 100)}%`}
+                                {p.auto && " · found"}
                               </span>
                             </button>
                             {editLibrary && (

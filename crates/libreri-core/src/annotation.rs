@@ -19,6 +19,10 @@ pub enum AnnotationKind {
     /// A drawing, shape, text box, sticky note, stamp, image or measurement
     /// on a page (markup mode). The locator holds the whole item.
     Markup,
+    /// A spoken note: on selected text (with a quote) or at a place. The
+    /// locator's `audio` is the recording in the profile's notes folder;
+    /// `note` holds its transcript.
+    Voice,
 }
 
 impl AnnotationKind {
@@ -27,6 +31,7 @@ impl AnnotationKind {
             Self::Highlight => "highlight",
             Self::Bookmark => "bookmark",
             Self::Markup => "markup",
+            Self::Voice => "voice",
         }
     }
 
@@ -35,6 +40,7 @@ impl AnnotationKind {
             "highlight" => Some(Self::Highlight),
             "bookmark" => Some(Self::Bookmark),
             "markup" => Some(Self::Markup),
+            "voice" => Some(Self::Voice),
             _ => None,
         }
     }
@@ -113,6 +119,8 @@ pub enum AnnotationError {
     EmptyHighlight,
     #[error("the markup item is not valid")]
     BadMarkup,
+    #[error("the voice note's recording is missing")]
+    BadVoice,
     #[error("the markup item is too large (pictures are limited to about 2 MB)")]
     MarkupTooLarge,
 }
@@ -153,6 +161,20 @@ impl Annotation {
             }
             if self.locator.len() > MAX_MARKUP_BYTES {
                 return Err(AnnotationError::MarkupTooLarge);
+            }
+        }
+        if self.kind == AnnotationKind::Voice {
+            let v: serde_json::Value =
+                serde_json::from_str(&self.locator).map_err(|_| AnnotationError::BadLocator)?;
+            let ok = v.get("audio").and_then(|a| a.as_str()).is_some_and(|a| {
+                a.starts_with("Notes/")
+                    && !a.split('/').any(|p| p == ".." || p.is_empty())
+                    && [".flac", ".wav", ".ogg", ".opus", ".m4a", ".mp3", ".webm"]
+                        .iter()
+                        .any(|e| a.to_ascii_lowercase().ends_with(e))
+            });
+            if !ok {
+                return Err(AnnotationError::BadVoice);
             }
         }
         self.position = self.position.clamp(0.0, 1.0);
@@ -226,6 +248,14 @@ mod tests {
         ink.locator = r#"{"type":"markup","page":2,"item":{"tool":"pen","points":[]}}"#.into();
         assert!(ink.clone().validated().is_ok());
         ink.locator = r#"{"type":"markup","page":0,"item":{}}"#.into();
-        assert_eq!(ink.validated(), Err(AnnotationError::BadMarkup));
+        assert_eq!(ink.clone().validated(), Err(AnnotationError::BadMarkup));
+        let mut voice = ink;
+        voice.kind = AnnotationKind::Voice;
+        voice.locator = r#"{"type":"pdf","page":2,"audio":"Notes/Me/Voice notes/a.flac"}"#.into();
+        assert!(voice.clone().validated().is_ok());
+        voice.locator = r#"{"type":"pdf","page":2,"audio":"Notes/../secret.flac"}"#.into();
+        assert_eq!(voice.clone().validated(), Err(AnnotationError::BadVoice));
+        voice.locator = r#"{"type":"pdf","page":2}"#.into();
+        assert_eq!(voice.validated(), Err(AnnotationError::BadVoice));
     }
 }

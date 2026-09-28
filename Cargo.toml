@@ -15,6 +15,7 @@ members = [
   "crates/libreri-helpers",
   "crates/libreri-search",
   "crates/libreri-pdf-edit",
+  "crates/libreri-speech",
 ]
 
 [workspace.package]
@@ -39,6 +40,7 @@ libreri-export = { path = "crates/libreri-export" }
 libreri-helpers = { path = "crates/libreri-helpers" }
 libreri-search = { path = "crates/libreri-search" }
 libreri-pdf-edit = { path = "crates/libreri-pdf-edit" }
+libreri-speech = { path = "crates/libreri-speech" }
 
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

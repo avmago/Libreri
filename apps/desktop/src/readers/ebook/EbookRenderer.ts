@@ -20,6 +20,7 @@ import type {
   TocItem,
   ZoomValue,
 } from "../types";
+import { isDrawn } from "../types";
 
 interface FoliateTocItem {
   label: string;
@@ -73,7 +74,7 @@ const OPAQUE: Record<HighlightColor, string> = {
 };
 
 let loaded: Promise<unknown> | null = null;
-let overlayer: Promise<{ Overlayer: { highlight: unknown } }> | null = null;
+let overlayer: Promise<{ Overlayer: { highlight: unknown; underline: unknown } }> | null = null;
 
 export class EbookRenderer implements Renderer {
   readonly paged = false;
@@ -96,7 +97,7 @@ export class EbookRenderer implements Renderer {
   async open(container: HTMLElement, url: string, initial: Locator | null) {
     loaded ??= import("foliate-js/view.js");
     overlayer ??= import("foliate-js/overlayer.js") as Promise<{
-      Overlayer: { highlight: unknown };
+      Overlayer: { highlight: unknown; underline: unknown };
     }>;
     await loaded;
     const { Overlayer } = await overlayer;
@@ -153,7 +154,9 @@ export class EbookRenderer implements Renderer {
       "draw-annotation",
       ({ draw, annotation }) => {
         const a = this.annotations.get(annotation.value);
-        draw(Overlayer.highlight, { color: OPAQUE[a?.color ?? "yellow"] });
+        draw(a?.kind === "voice" ? Overlayer.underline : Overlayer.highlight, {
+          color: OPAQUE[a?.color ?? "yellow"],
+        });
       },
     );
 
@@ -275,7 +278,7 @@ export class EbookRenderer implements Renderer {
   setAnnotations(list: Annotation[]) {
     const next = new Map<string, Annotation>();
     for (const a of list) {
-      if (a.kind !== "highlight") continue;
+      if (!isDrawn(a)) continue;
       try {
         const loc = JSON.parse(a.locator) as Locator;
         if (loc.type === "cfi") next.set(loc.cfi, a);

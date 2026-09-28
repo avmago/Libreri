@@ -27,6 +27,8 @@ import {
   type RendererEvents,
   type TocItem,
   type ZoomValue,
+  drawnClass,
+  isDrawn,
 } from "../types";
 import { WordSpeech, type Box as SpeechBox } from "../speech/words";
 import type { SpeechSource } from "../speech/types";
@@ -435,7 +437,7 @@ export class PageRenderer implements Renderer {
     layer.replaceChildren();
     const dark = !!(this.theme?.dark && this.mode !== "off");
     for (const a of this.annotations) {
-      if (a.kind !== "highlight") continue;
+      if (!isDrawn(a)) continue;
       let loc: Locator;
       try {
         loc = JSON.parse(a.locator) as Locator;
@@ -445,7 +447,7 @@ export class PageRenderer implements Renderer {
       if (loc.type !== "pdf-highlight" || loc.page !== page) continue;
       for (const [x, y, w, h] of loc.rects) {
         const r = document.createElement("div");
-        r.className = `lb-pdf-hl${a.note ? " lb-hl-note" : ""}`;
+        r.className = drawnClass("lb-pdf-hl", a);
         r.dataset.annotation = a.id;
         r.style.cssText = `left:${x * 100}%;top:${y * 100}%;width:${w * 100}%;height:${h * 100}%;background:${highlightFill(a.color, dark)}`;
         layer.append(r);

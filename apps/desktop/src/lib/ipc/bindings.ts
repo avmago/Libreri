@@ -379,11 +379,43 @@ export const commands = {
 	 */
 	systemSpeak: (text: string, voice: string | null, rate: number | null) => typedError<boolean, AppError>(__TAURI_INVOKE("system_speak", { text, voice, rate })),
 	systemStopSpeaking: () => __TAURI_INVOKE<void>("system_stop_speaking"),
+	speechSettings: () => __TAURI_INVOKE<SpeechSettingsDto>("speech_settings"),
+	/**
+	 *  Chooses the model (only a downloaded one), the language spoken and
+	 *  whether voice notes are written down.
+	 */
+	setSpeechSettings: (model: string | null, language: string | null, transcribeNotes: boolean) => typedError<SpeechSettingsDto, AppError>(__TAURI_INVOKE("set_speech_settings", { model, language, transcribeNotes })),
+	/**
+	 *  Downloads a model; progress arrives as `SpeechModelDownload`. The
+	 *  first model downloaded becomes the one used.
+	 */
+	downloadSpeechModel: (id: string) => typedError<SpeechSettingsDto, AppError>(__TAURI_INVOKE("download_speech_model", { id })),
+	cancelSpeechModelDownload: (id: string) => __TAURI_INVOKE<void>("cancel_speech_model_download", { id }),
+	/**
+	 *  Removes a downloaded model. If it was the one used, another downloaded
+	 *  model (if any) takes its place.
+	 */
+	removeSpeechModel: (id: string) => typedError<SpeechSettingsDto, AppError>(__TAURI_INVOKE("remove_speech_model", { id })),
+	/**
+	 *  Writes down a stretch of speech (dictation). `lang` is a hint (the
+	 *  book's language) used when Settings do not name one.
+	 */
+	transcribePcm: (pcmBase64: string, lang: string | null) => typedError<string, AppError>(__TAURI_INVOKE("transcribe_pcm", { pcmBase64, lang })),
+	/**  Saves a recording as FLAC in the profile's voice notes. */
+	saveVoiceNote: (pcmBase64: string) => typedError<VoiceNoteDto, AppError>(__TAURI_INVOKE("save_voice_note", { pcmBase64 })),
+	/**  Writes down what is said in a saved recording. */
+	transcribeVoiceNote: (path: string, lang: string | null) => typedError<string, AppError>(__TAURI_INVOKE("transcribe_voice_note", { path, lang })),
+	/**
+	 *  Starts finding sync points by listening; ends with `AutoSyncFinished`.
+	 *  Returns the job id.
+	 */
+	autoSyncAudiobook: (id: string) => typedError<string, AppError>(__TAURI_INVOKE("auto_sync_audiobook", { id })),
 };
 
 /** Events */
 export const events = {
 	archiveImported: makeEvent<ArchiveImported>("archive-imported"),
+	autoSyncFinished: makeEvent<AutoSyncFinished>("auto-sync-finished"),
 	backupFinished: makeEvent<BackupFinished>("backup-finished"),
 	compareFinished: makeEvent<CompareFinished>("compare-finished"),
 	detailsFilled: makeEvent<DetailsFilled>("details-filled"),
@@ -399,6 +431,7 @@ export const events = {
 	phoneScan: makeEvent<PhoneScan>("phone-scan"),
 	searchIndexProgress: makeEvent<SearchIndexProgress>("search-index-progress"),
 	sessionChanged: makeEvent<SessionChanged>("session-changed"),
+	speechModelDownload: makeEvent<SpeechModelDownload>("speech-model-download"),
 };
 
 /* Types */
@@ -426,7 +459,13 @@ export type AnnotationKind = "highlight" | "bookmark" |
  *  A drawing, shape, text box, sticky note, stamp, image or measurement
  *  on a page (markup mode). The locator holds the whole item.
  */
-"markup";
+"markup" | 
+/**
+ *  A spoken note: on selected text (with a quote) or at a place. The
+ *  locator's `audio` is the recording in the profile's notes folder;
+ *  `note` holds its transcript.
+ */
+"voice";
 
 export type AppError = {
 	kind: AppErrorKind,
@@ -522,6 +561,16 @@ export type AudioLinkDto = {
 export type AutoExport = {
 	format: ExportFormat,
 	path: string,
+};
+
+/**  Finding sync points by listening finished. */
+export type AutoSyncFinished = {
+	audioId: string,
+	/**  Sync points found (0 when none could be placed). */
+	found: number,
+	/**  Stretches listened to. */
+	tried: number,
+	error: string | null,
 };
 
 export type BackupFileDto = {
@@ -1166,6 +1215,18 @@ export type Lookup = {
 	errors: SourceError[],
 };
 
+/**  A model Libreri offers. */
+export type ModelInfo = {
+	id: string,
+	name: string,
+	/**  About how big the download is, in MB. */
+	sizeMb: number,
+	description: string,
+	/**  Offered first; the bigger ones are in "More models". */
+	recommended: boolean,
+	downloaded: boolean,
+};
+
 export type NewProfile = {
 	name: string,
 	colour: string,
@@ -1488,6 +1549,23 @@ export type SourceInfo = {
 	keyHint: string | null,
 };
 
+/**  Progress of downloading a speech model. */
+export type SpeechModelDownload = {
+	id: string,
+	done: number | null,
+	total: number | null,
+	finished: boolean,
+	error: string | null,
+};
+
+export type SpeechSettingsDto = {
+	models: ModelInfo[],
+	/**  The model in use: the one chosen, or the first downloaded. */
+	model: string | null,
+	language: string | null,
+	transcribeNotes: boolean,
+};
+
 export type StorageDto = {
 	books: number | null,
 	notes: number | null,
@@ -1578,6 +1656,13 @@ export type Voice = {
 	id: string,
 	name: string,
 	lang: string,
+};
+
+export type VoiceNoteDto = {
+	/**  The recording, in the library (`Notes/<profile>/Voice notes/…`). */
+	path: string,
+	/**  Seconds. */
+	duration: number | null,
 };
 
 export type WordDto = {

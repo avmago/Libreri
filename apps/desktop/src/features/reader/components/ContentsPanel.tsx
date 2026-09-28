@@ -1,6 +1,7 @@
 import type * as React from "react";
 import { useState } from "react";
-import { Bookmark, ChevronRight, Highlighter, MessageSquare, Trash2 } from "lucide-react";
+import { Bookmark, ChevronRight, Highlighter, MessageSquare, Mic, Trash2 } from "lucide-react";
+import { VoicePlayer, voiceOf } from "@/features/speech";
 import type { Annotation } from "@/lib/ipc";
 import { highlightFill, type TocItem } from "@/readers";
 import { cn } from "@/lib/utils";
@@ -93,6 +94,7 @@ function MarkRow({
   onDelete: (a: Annotation) => void;
 }) {
   const isBookmark = a.kind === "bookmark";
+  const voice = a.kind === "voice" ? voiceOf(a.locator) : null;
   return (
     <li className="group relative">
       <button
@@ -103,6 +105,8 @@ function MarkRow({
         <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
           {isBookmark ? (
             <Bookmark className="size-3" aria-hidden />
+          ) : voice ? (
+            <Mic className="size-3" aria-hidden />
           ) : (
             <span
               className="size-2.5 rounded-full border border-black/10"
@@ -110,16 +114,23 @@ function MarkRow({
               aria-hidden
             />
           )}
-          {a.label || (isBookmark ? "Bookmark" : "Highlight")}
+          {a.label || (isBookmark ? "Bookmark" : voice ? "Voice note" : "Highlight")}
         </span>
         {a.quote?.exact && <span className="line-clamp-3 leading-snug">{a.quote.exact}</span>}
         {a.note && (
           <span className="flex gap-1.5 text-[12px] text-muted-foreground">
-            <MessageSquare className="mt-0.5 size-3 shrink-0" aria-hidden />
-            <span className="line-clamp-3">{a.note}</span>
+            {voice ? (
+              <span className="line-clamp-4 italic">“{a.note}”</span>
+            ) : (
+              <>
+                <MessageSquare className="mt-0.5 size-3 shrink-0" aria-hidden />
+                <span className="line-clamp-3">{a.note}</span>
+              </>
+            )}
           </span>
         )}
       </button>
+      {voice && <VoicePlayer path={voice} className="mb-1.5 px-1.5" />}
       <button
         type="button"
         aria-label="Delete"
@@ -161,6 +172,7 @@ export function ContentsPanel({
   const markupCount = annotations.length - marks.length;
   const bookmarks = annotations.filter((a) => a.kind === "bookmark");
   const highlights = annotations.filter((a) => a.kind === "highlight");
+  const voices = annotations.filter((a) => a.kind === "voice");
   return (
     <aside
       aria-label="Contents and marks"
@@ -219,6 +231,18 @@ export function ContentsPanel({
                   </ul>
                 </section>
               )}
+              {voices.length > 0 && (
+                <section>
+                  <h3 className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground">
+                    VOICE NOTES
+                  </h3>
+                  <ul>
+                    {voices.map((a) => (
+                      <MarkRow key={a.id} a={a} onGo={onShow} onDelete={onDelete} />
+                    ))}
+                  </ul>
+                </section>
+              )}
               {highlights.length > 0 && (
                 <section>
                   <h3 className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground">
@@ -235,7 +259,9 @@ export function ContentsPanel({
           ) : (
             <div className="flex flex-col items-center gap-2 px-4 py-8 text-center text-muted-foreground">
               <Highlighter className="size-5" aria-hidden />
-              <p>Select text to highlight it, or add a bookmark from the toolbar.</p>
+              <p>
+                Select text to highlight it, or add a bookmark or a voice note from the toolbar.
+              </p>
             </div>
           )}
         </div>

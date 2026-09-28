@@ -34,6 +34,30 @@ pub struct AppSettings {
     /// Languages OCR reads when a book does not say its own (Tesseract
     /// codes); empty means English.
     pub ocr_languages: Vec<String>,
+    /// Speech recognition (whisper models are per computer).
+    pub speech: SpeechSettings,
+}
+
+/// Speech recognition: which downloaded model to use and how.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SpeechSettings {
+    /// The model used (only a downloaded one can be chosen).
+    pub model: Option<String>,
+    /// The language spoken ("en"); `None` lets the model tell.
+    pub language: Option<String>,
+    /// Write down what is said in voice notes when they are recorded.
+    pub transcribe_notes: bool,
+}
+
+impl Default for SpeechSettings {
+    fn default() -> Self {
+        Self {
+            model: None,
+            language: None,
+            transcribe_notes: true,
+        }
+    }
 }
 
 /// How many libraries the Welcome screen remembers.

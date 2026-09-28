@@ -37,6 +37,7 @@ mod scan;
 mod sidecar;
 mod text;
 mod versions;
+pub mod voice;
 mod watcher;
 
 use libreri_core::{LibraryInfo, LibraryLayout, ProfileId, LIBRARY_FORMAT_VERSION};
@@ -344,6 +345,10 @@ impl Library {
             || rel_path.starts_with(&format!("{data}/thumbnails/"))
         {
             return true;
+        }
+        if rel_path.starts_with(&format!("{}/", libreri_core::layout::NOTES_DIR)) {
+            // Only the signed-in profile's own recordings and notes.
+            return self.is_own_note(rel_path);
         }
         if !rel_path.starts_with("Books/") {
             return false;

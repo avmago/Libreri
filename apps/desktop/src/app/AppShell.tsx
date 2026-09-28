@@ -56,6 +56,7 @@ import { FindDetailsDialog, useDetailsEvents } from "@/features/details";
 import { HelperDialog } from "@/features/helpers";
 import { NotesHub } from "@/features/notes";
 import { OcrDialog, SearchView, useSearchEvents } from "@/features/search";
+import { setSpeechSettingsOpener } from "@/features/speech";
 import {
   CitationDialog,
   ExportDialog,
@@ -211,6 +212,9 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
     ui.closeSettings();
     setNav({ kind: "missing" });
   }, [showMissingRequest]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // "Settings" in the speech feature's messages (e.g. no model yet).
+  useEffect(() => setSpeechSettingsOpener(() => useUi.getState().openSettings("speech")), []);
 
   useShortcut("palette.open", () => ui.setPaletteOpen(true));
   useShortcut("settings.open", () => ui.openSettings());

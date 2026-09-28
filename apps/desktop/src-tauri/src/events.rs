@@ -360,3 +360,26 @@ pub struct OcrLanguageDownload {
     pub finished: bool,
     pub error: Option<String>,
 }
+
+/// Progress of downloading a speech model.
+#[derive(Debug, Clone, Serialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct SpeechModelDownload {
+    pub id: String,
+    pub done: f64,
+    pub total: Option<f64>,
+    pub finished: bool,
+    pub error: Option<String>,
+}
+
+/// Finding sync points by listening finished.
+#[derive(Debug, Clone, Serialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoSyncFinished {
+    pub audio_id: String,
+    /// Sync points found (0 when none could be placed).
+    pub found: u32,
+    /// Stretches listened to.
+    pub tried: u32,
+    pub error: Option<String>,
+}

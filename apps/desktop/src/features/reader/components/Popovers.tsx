@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { Copy, MessageSquarePlus, NotebookPen, Trash2 } from "lucide-react";
+import { Copy, MessageSquarePlus, Mic, NotebookPen, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
+import { DictateButton, VoicePlayer, voiceOf } from "@/features/speech";
 import type { Annotation, HighlightColor } from "@/lib/ipc";
 import { HIGHLIGHT_COLORS, highlightFill } from "@/readers";
 import { cn } from "@/lib/utils";
@@ -98,6 +99,7 @@ export function SelectionMenu({
   onHighlight,
   onComment,
   onNotebook,
+  onVoice,
   onCopy,
   onClose,
 }: {
@@ -105,6 +107,7 @@ export function SelectionMenu({
   onHighlight: (c: HighlightColor) => void;
   onComment: () => void;
   onNotebook: () => void;
+  onVoice: () => void;
   onCopy: () => void;
   onClose: () => void;
 }) {
@@ -142,6 +145,15 @@ export function SelectionMenu({
         >
           <NotebookPen />
         </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Record a voice note about this"
+          title="Voice note"
+          onClick={onVoice}
+        >
+          <Mic />
+        </Button>
         <Button variant="ghost" size="icon" aria-label="Copy" title="Copy" onClick={onCopy}>
           <Copy />
         </Button>
@@ -159,17 +171,23 @@ export function AnnotationMenu({
   onNotebook,
   onDelete,
   onClose,
+  lang,
 }: {
   annotation: Annotation;
   rect: DOMRect;
   startEditing: boolean;
+  lang?: string | null;
   onChange: (a: Annotation) => void;
   onNotebook: (a: Annotation) => void;
   onDelete: (a: Annotation) => void;
   onClose: () => void;
 }) {
   const [note, setNote] = useState(annotation.note ?? "");
-  const [editing, setEditing] = useState(startEditing || Boolean(annotation.note));
+  const voice = annotation.kind === "voice" ? voiceOf(annotation.locator) : null;
+  const [editing, setEditing] = useState(
+    startEditing || Boolean(annotation.note) || annotation.kind === "voice",
+  );
+  const box = useRef<HTMLTextAreaElement>(null);
   const commit = () => {
     if ((annotation.note ?? "") !== note.trim())
       onChange({ ...annotation, note: note.trim() || null });
@@ -205,19 +223,22 @@ export function AnnotationMenu({
         <Button
           variant="ghost"
           size="icon"
-          aria-label="Delete highlight"
+          aria-label={voice ? "Delete voice note" : "Delete highlight"}
           className="text-destructive"
           onClick={() => onDelete(annotation)}
         >
           <Trash2 />
         </Button>
       </div>
+      {voice && <VoicePlayer path={voice} className="mt-1 w-64" />}
       {editing && (
         <div className="flex w-64 flex-col gap-1.5 px-0.5 pb-0.5">
           <Textarea
-            autoFocus={startEditing || !annotation.note}
+            ref={box}
+            autoFocus={!voice && (startEditing || !annotation.note)}
             rows={3}
-            placeholder="Write a comment…"
+            aria-label={voice ? "What was said" : "Comment"}
+            placeholder={voice ? "What was said (not written down)" : "Write a comment…"}
             value={note}
             onChange={(e) => setNote(e.target.value)}
             onKeyDown={(e) => {
@@ -228,7 +249,8 @@ export function AnnotationMenu({
             }}
             className="min-h-16 text-[13px]"
           />
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between">
+            <DictateButton target={box} lang={lang} className="size-7" />
             <Button
               size="sm"
               onClick={() => {

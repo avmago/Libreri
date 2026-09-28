@@ -165,6 +165,15 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::listening::system_voices,
             commands::listening::system_speak,
             commands::listening::system_stop_speaking,
+            commands::speech::speech_settings,
+            commands::speech::set_speech_settings,
+            commands::speech::download_speech_model,
+            commands::speech::cancel_speech_model_download,
+            commands::speech::remove_speech_model,
+            commands::speech::transcribe_pcm,
+            commands::speech::save_voice_note,
+            commands::speech::transcribe_voice_note,
+            commands::speech::auto_sync_audiobook,
         ])
         .events(tauri_specta::collect_events![
             events::JobEventPayload,
@@ -183,6 +192,8 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::SearchIndexProgress,
             events::OcrFinished,
             events::OcrLanguageDownload,
+            events::SpeechModelDownload,
+            events::AutoSyncFinished,
         ])
 }
 

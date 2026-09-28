@@ -423,3 +423,23 @@ svg.lb-markup .lb-markup-note {
   mix-blend-mode: normal;
   background: rgba(250, 204, 21, 0.3);
 }
+
+/* ---- Voice notes on selected text ------------------------------------- */
+mark.lb-hl.lb-hl-voice {
+  background: none !important;
+  border-bottom: 2px dotted color-mix(in srgb, currentColor 55%, transparent);
+  border-radius: 0;
+}
+.lb-pdf-hl.lb-hl-voice {
+  background: none !important;
+  border-bottom: 2px dotted rgba(37, 99, 235, 0.8);
+  border-radius: 0;
+  mix-blend-mode: normal;
+}
+.lb-notebook .lb-voice-player {
+  display: block;
+  width: 100%;
+  max-width: 28rem;
+  height: 36px;
+  margin: 0.35rem 0;
+}

@@ -61,6 +61,11 @@ Requirement (user, 2026-09-27): when the database, metadata and every kind of no
 
 ## Audiobooks (Phase 7a)
 - An audiobook's link to the book it reads, and its sync points, are in `.library-data/audio-links/<audiobook id>.json`. Each point has a time in seconds, a reader locator, a 0–1 place in the text and a label. The file follows the audiobook when its id changes, and is included in backups and Libreri archives and restored with the book. Positions and bookmarks in audiobooks are ordinary reading data, with `{"type":"audio","t":…}` locators. Read-aloud settings are profile preferences. See `docs/adr/0021-read-aloud-and-audiobooks.md`.
+- Sync points found by listening (Phase 7b) are the same sync points with `"auto": true`.
+- Voice notes are FLAC files in `Notes/<profile>/Voice notes/`, so they are copied, backed up and archived with the rest of the profile's notes folder.
+  - **In a book:** an annotation of kind `voice`. Its locator is an ordinary reader locator (a PDF page or highlight rectangles, an EPUB CFI, a text range, or a scroll fraction) plus `"audio": "Notes/<profile>/Voice notes/<file>.flac"` and `"duration"`. The quote is the selected text, if any; `note` is the transcript.
+  - **In a notebook:** a relative Markdown link to the file (`[0:42](<Voice notes/<file>.flac>)`), which also works in other editors.
+  - Speech models are per computer (app data `whisper/`) and never exported. See `docs/adr/0022-voice-notes-dictation-and-sync.md`.
 
 ## Edited PDFs (versions)
 - Page edits create a new version with a **page map** (old page → new page). Anchors are migrated through the map; text-quote fallback catches the rest. Exports include the version history so links to older versions still resolve.

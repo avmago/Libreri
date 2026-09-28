@@ -147,6 +147,17 @@ export function highlightFill(color: HighlightColor | null, dark: boolean): stri
   return (dark ? night : light)[color ?? "yellow"];
 }
 
+/** Annotations drawn on the text: highlights, and voice notes about
+ * selected text (drawn with a dotted underline). */
+export function isDrawn(a: Annotation): boolean {
+  return a.kind === "highlight" || (a.kind === "voice" && !!a.quote);
+}
+
+/** Classes for a drawn annotation. */
+export function drawnClass(base: string, a: Annotation): string {
+  return `${base}${a.note && a.kind !== "voice" ? " lb-hl-note" : ""}${a.kind === "voice" ? " lb-hl-voice" : ""}`;
+}
+
 export function parseLocator(json: string | null | undefined): Locator | null {
   if (!json) return null;
   try {

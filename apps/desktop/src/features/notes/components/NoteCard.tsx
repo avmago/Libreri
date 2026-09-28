@@ -1,7 +1,16 @@
-import { useState } from "react";
-import { ArrowUpRight, Bookmark, Copy, MessageSquareText, Trash2, StickyNote } from "lucide-react";
+import { useRef, useState } from "react";
+import {
+  ArrowUpRight,
+  Bookmark,
+  Copy,
+  MessageSquareText,
+  Mic,
+  Trash2,
+  StickyNote,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
+import { DictateButton, VoicePlayer, voiceOf } from "@/features/speech";
 import type { HighlightColor, NoteDto } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
 import { HIGHLIGHT_COLORS } from "@/readers";
@@ -34,19 +43,42 @@ export function NoteCard({
   const bookmark = a.kind === "bookmark";
   const markup = a.kind === "markup";
   const drawn = markup ? (markupText(a) ?? "Sticky note") : null;
+  const voice = a.kind === "voice" ? voiceOf(a.locator) : null;
+  const box = useRef<HTMLTextAreaElement>(null);
 
   return (
     <article
       className="group relative flex gap-3 rounded-lg border bg-background p-3.5 pl-4"
-      aria-label={bookmark ? `Bookmark, ${a.label ?? ""}` : `Highlight: ${a.quote?.exact ?? ""}`}
+      aria-label={
+        bookmark
+          ? `Bookmark, ${a.label ?? ""}`
+          : voice
+            ? `Voice note, ${a.label ?? ""}`
+            : `Highlight: ${a.quote?.exact ?? ""}`
+      }
     >
       <span
         aria-hidden
         className="absolute inset-y-3 left-0 w-1 rounded-r"
-        style={{ background: bookmark ? "var(--muted-foreground)" : SWATCH[a.color ?? "yellow"] }}
+        style={{
+          background: bookmark || voice ? "var(--muted-foreground)" : SWATCH[a.color ?? "yellow"],
+        }}
       />
       <div className="flex min-w-0 flex-1 flex-col gap-2">
-        {markup ? (
+        {voice && (
+          <>
+            <p className="flex items-center gap-2 font-medium">
+              <Mic className="size-4 text-muted-foreground" aria-hidden /> Voice note
+            </p>
+            {a.quote?.exact && (
+              <blockquote className="line-clamp-4 border-l-2 pl-2.5 text-[13px] leading-relaxed text-muted-foreground">
+                {a.quote.exact}
+              </blockquote>
+            )}
+            <VoicePlayer path={voice} className="max-w-md" />
+          </>
+        )}
+        {voice ? null : markup ? (
           <p className="flex items-center gap-2 font-medium">
             <StickyNote className="size-4 text-muted-foreground" aria-hidden /> {drawn}
           </p>
@@ -69,6 +101,7 @@ export function NoteCard({
             }}
           >
             <Textarea
+              ref={box}
               autoFocus
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
@@ -77,10 +110,11 @@ export function NoteCard({
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey))
                   e.currentTarget.form?.requestSubmit();
               }}
-              aria-label="Comment"
-              placeholder="Your comment…"
+              aria-label={voice ? "What was said" : "Comment"}
+              placeholder={voice ? "What was said…" : "Your comment…"}
             />
             <div className="flex justify-end gap-2">
+              <DictateButton target={box} className="mr-auto size-8" />
               <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
                 Cancel
               </Button>
@@ -90,7 +124,10 @@ export function NoteCard({
             </div>
           </form>
         ) : (
-          a.note && (
+          a.note &&
+          (voice ? (
+            <p className="text-[13px] leading-relaxed whitespace-pre-line italic">“{a.note}”</p>
+          ) : (
             <p className="flex gap-2 rounded-md bg-muted px-2.5 py-2 text-[13px] leading-relaxed whitespace-pre-line">
               <MessageSquareText
                 className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
@@ -98,7 +135,7 @@ export function NoteCard({
               />
               {a.note}
             </p>
-          )
+          ))
         )}
         <footer className="flex flex-wrap items-center gap-x-2 text-[11.5px] text-muted-foreground">
           {showBook && (

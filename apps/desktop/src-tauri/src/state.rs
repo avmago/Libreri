@@ -1,10 +1,10 @@
 //! Shared app state held by Tauri.
 
 use crate::backup_store::{BackupSettings, BackupStore};
-use crate::error::{AppError, AppResult};
+use crate::error::{AppError, AppErrorKind, AppResult};
 use crate::events::{
-    ArchiveImported, BackupFinished, CompareFinished, DetailsFilled, ExportFinished,
-    ForeignImported, ImportFinished, JobEventPayload, LibraryChanged, OcrFinished,
+    ArchiveImported, AutoSyncFinished, BackupFinished, CompareFinished, DetailsFilled,
+    ExportFinished, ForeignImported, ImportFinished, JobEventPayload, LibraryChanged, OcrFinished,
     SearchIndexProgress,
 };
 use crate::online_store::OnlineStore;
@@ -44,6 +44,12 @@ pub struct AppState {
     index_running: Arc<AtomicBool>,
     /// OCR language files downloaded by Libreri (this computer only).
     pub tessdata: std::path::PathBuf,
+    /// Speech models downloaded by Libreri (this computer only).
+    pub whisper_dir: std::path::PathBuf,
+    /// The speech model in use, loaded once.
+    transcriber: Mutex<Option<Arc<libreri_speech::Transcriber>>>,
+    /// Model downloads running, to cancel them.
+    pub model_downloads: Mutex<std::collections::HashMap<String, Arc<AtomicBool>>>,
     /// A backup is running; the schedule does not start another.
     backup_running: Arc<AtomicBool>,
     /// Shared by all lookups, so connections are reused.
@@ -218,6 +224,7 @@ impl AppState {
         let page_cache = app.path().app_cache_dir()?.join("pages");
         let search_dir = app.path().app_cache_dir()?.join("search");
         let tessdata = app.path().app_data_dir()?.join("tessdata");
+        let whisper_dir = app.path().app_data_dir()?.join("whisper");
         // Keep the page cache under 2 GB (least recently read books go first).
         let cache = page_cache.clone();
         std::thread::spawn(move || {
@@ -245,6 +252,9 @@ impl AppState {
             index_wanted: Arc::default(),
             index_running: Arc::default(),
             tessdata,
+            whisper_dir,
+            transcriber: Mutex::new(None),
+            model_downloads: Mutex::default(),
             backup_running: Arc::default(),
             http: make_http(),
             phone: Mutex::new(None),
@@ -276,6 +286,102 @@ impl AppState {
         change(&mut settings);
         self.settings_store.save(&settings)?;
         Ok(settings.clone())
+    }
+
+    /// The speech model chosen in Settings (or the first downloaded one),
+    /// loaded on first use and kept.
+    pub fn transcriber(&self) -> AppResult<Arc<libreri_speech::Transcriber>> {
+        let speech = lock(&self.settings).speech.clone();
+        let models = libreri_speech::models(&self.whisper_dir);
+        let id = speech
+            .model
+            .filter(|m| models.iter().any(|x| &x.id == m && x.downloaded))
+            .or_else(|| models.iter().find(|m| m.downloaded).map(|m| m.id.clone()))
+            .ok_or_else(|| {
+                AppError::new(
+                    AppErrorKind::NotFound,
+                    "download a speech model first (Settings › Speech)",
+                )
+            })?;
+        let mut cached = lock(&self.transcriber);
+        if let Some(t) = cached.as_ref().filter(|t| t.model == id) {
+            return Ok(Arc::clone(t));
+        }
+        // Free the old model before loading the next (they are large).
+        *cached = None;
+        let path = libreri_speech::model_path(&self.whisper_dir, &id)
+            .ok_or_else(|| AppError::new(AppErrorKind::NotFound, "the speech model is missing"))?;
+        let t = Arc::new(libreri_speech::Transcriber::load(&path, &id).map_err(AppError::invalid)?);
+        *cached = Some(Arc::clone(&t));
+        Ok(t)
+    }
+
+    /// Forgets the loaded speech model (it was removed or changed).
+    pub fn drop_transcriber(&self) {
+        *lock(&self.transcriber) = None;
+    }
+
+    /// Listens to stretches of an audiobook and places them in its linked
+    /// book; the places become sync points. Ends with `AutoSyncFinished`.
+    pub fn start_auto_sync(&self, audio: BookId) -> AppResult<JobId> {
+        let library = self.library()?;
+        let link = library.audio_link(&audio)?;
+        let text = link
+            .text
+            .ok_or_else(|| AppError::invalid("link the audiobook to its book first"))?;
+        if !libreri_speech::models(&self.whisper_dir)
+            .iter()
+            .any(|m| m.downloaded)
+        {
+            return Err(AppError::new(
+                AppErrorKind::NotFound,
+                "download a speech model first (Settings › Speech)",
+            ));
+        }
+        let language = lock(&self.settings).speech.language.clone();
+        let handle = self.app.clone();
+        let title = library
+            .book(&audio)
+            .map(|b| b.metadata.title)
+            .unwrap_or_default();
+        let label = format!("Finding places in “{title}”");
+        Ok(self.jobs.submit(label, move |ctx| {
+            let mut finished = AutoSyncFinished {
+                audio_id: audio.to_string(),
+                found: 0,
+                tried: 0,
+                error: None,
+            };
+            // Loading the model takes a moment, so it happens here.
+            let result = handle
+                .state::<AppState>()
+                .transcriber()
+                .map_err(|e| JobError::Failed(e.to_string()))
+                .and_then(|transcriber| {
+                    crate::commands::speech::auto_sync(
+                        &library,
+                        &transcriber,
+                        language.as_deref(),
+                        &audio,
+                        &text,
+                        ctx,
+                        &mut finished,
+                    )
+                });
+            let outcome = match result {
+                Ok(()) => Ok(()),
+                Err(JobError::Cancelled(c)) => {
+                    finished.error = Some("cancelled".into());
+                    Err(JobError::Cancelled(c))
+                }
+                Err(JobError::Failed(e)) => {
+                    finished.error = Some(e.clone());
+                    Err(JobError::Failed(e))
+                }
+            };
+            let _ = finished.emit(&handle);
+            outcome
+        }))
     }
 
     pub fn set_phone_scanner(&self, scanner: libreri_scan::PhoneScanner) {

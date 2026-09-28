@@ -19,6 +19,7 @@ const KINDS: { id: NoteKind; label: string }[] = [
   { id: "all", label: "All" },
   { id: "highlights", label: "Highlights" },
   { id: "comments", label: "With comments" },
+  { id: "voice", label: "Voice notes" },
   { id: "bookmarks", label: "Bookmarks" },
 ];
 

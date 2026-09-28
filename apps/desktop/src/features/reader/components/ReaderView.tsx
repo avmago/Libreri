@@ -6,6 +6,7 @@ import {
   GitCompare,
   Headphones,
   History,
+  Mic,
   Volume2,
   NotebookPen,
   PanelLeft,
@@ -17,7 +18,8 @@ import { Button } from "@/components/ui/button";
 import { useBook, useLibraryView } from "@/features/library";
 import { useHelperDialog } from "@/features/helpers";
 import { usePermissions, useProfilePrefs } from "@/features/profiles";
-import { bookUrl, commands, type Annotation, type HighlightColor } from "@/lib/ipc";
+import { VoiceNoteBar, useVoiceNote, type RecordedVoice } from "@/features/speech";
+import { bookUrl, commands, type Annotation, type HighlightColor, type TextQuote } from "@/lib/ipc";
 import { keysLabel, platform, shortcutFor, useShortcut, type ActionId } from "@/lib/shortcuts";
 import { useTabs, type BookTab } from "@/lib/tabs";
 import { cn } from "@/lib/utils";
@@ -108,8 +110,11 @@ function countLabel(list: Annotation[]): string {
   const h = list.filter((a) => a.kind === "highlight").length;
   const b = list.filter((a) => a.kind === "bookmark").length;
   const m = list.filter((a) => a.kind === "markup").length;
+  const v = list.filter((a) => a.kind === "voice").length;
   const part = (n: number, one: string) => (n ? `${n} ${one}${n === 1 ? "" : "s"}` : "");
-  return [part(h, "highlight"), part(b, "bookmark"), part(m, "mark")].filter(Boolean).join(" · ");
+  return [part(h, "highlight"), part(b, "bookmark"), part(m, "mark"), part(v, "voice note")]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 /** One open book: the audiobook player, or the reader. */
@@ -580,6 +585,67 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
     setSelection(null);
   };
 
+  // Voice notes: about the selected text, or about the place being read.
+  const voice = useVoiceNote(book?.metadata.language);
+  const voiceAt = useRef<{
+    locator: Locator;
+    quote: TextQuote | null;
+    label: string | null;
+    position: number;
+  } | null>(null);
+  const startVoice = (fromSelection: boolean) => {
+    const sel = fromSelection ? selection : null;
+    if (sel) {
+      voiceAt.current = {
+        locator: sel.locator,
+        quote: sel.quote,
+        label: sel.label || location?.shortLabel || null,
+        position: sel.position,
+      };
+      r()?.clearSelection();
+      setSelection(null);
+    } else if (location) {
+      voiceAt.current = {
+        locator:
+          location.locator.type === "pdf"
+            ? { type: "pdf", page: location.page ?? 1 }
+            : location.locator,
+        quote: null,
+        label:
+          location.section && location.page === undefined ? location.section : location.shortLabel,
+        position: location.progress,
+      };
+    } else return;
+    void voice.start();
+  };
+  const saveVoice = (rec: RecordedVoice) => {
+    const at = voiceAt.current;
+    if (!at) return;
+    saveAnnotation.mutate(
+      {
+        id: newId(),
+        bookId,
+        kind: "voice",
+        color: null,
+        locator: JSON.stringify({
+          ...at.locator,
+          audio: rec.path,
+          duration: Math.round(rec.duration * 10) / 10,
+        }),
+        quote: at.quote,
+        note: rec.transcript,
+        label: at.label,
+        position: at.position,
+        createdAt: "",
+        modifiedAt: "",
+      },
+      {
+        onSuccess: () => toast.success("Voice note saved"),
+        onError: (e) => toast.error("Could not save the voice note", { description: String(e) }),
+      },
+    );
+  };
+
   const addToNotebook = (a: Annotation) => {
     setNotebookOpen(true);
     const block = quoteBlock(a, bookId, location?.shortLabel ?? "");
@@ -909,6 +975,16 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
         <Button
           variant="ghost"
           size="icon"
+          aria-label="Record a voice note here"
+          title="Record a voice note about this page (select text first to note a passage)"
+          disabled={!location || voice.phase !== "idle"}
+          onClick={() => startVoice(false)}
+        >
+          <Mic />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           aria-label="Notebook"
           aria-pressed={notebookOpen}
           title={`Notebook (${keys("reader.notebook")})`}
@@ -918,6 +994,11 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
         </Button>
       </div>
 
+      <VoiceNoteBar
+        v={voice}
+        onDone={saveVoice}
+        className="h-10 shrink-0 border-b bg-muted/40 px-3"
+      />
       {!focusMode && !comparing && !editing && (
         <ReadAloudBar r={readAloud} lang={book?.metadata.language ?? undefined} />
       )}
@@ -1088,6 +1169,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
             onInserted={() => setNotebookInsert(null)}
             onLink={handleLink}
             onClose={() => setNotebookOpen(false)}
+            lang={book?.metadata.language}
           />
         )}
       </div>
@@ -1125,6 +1207,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
             )
           }
           onNotebook={() => highlightFromSelection(profilePrefs.notes.defaultColor, addToNotebook)}
+          onVoice={() => startVoice(true)}
           onCopy={() => {
             void navigator.clipboard.writeText(selection.quote.exact ?? "");
             r()?.clearSelection();
@@ -1139,6 +1222,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
           annotation={menuAnnotation}
           rect={menu.rect}
           startEditing={menu.edit}
+          lang={book?.metadata.language}
           onChange={(a) => saveAnnotation.mutate(a)}
           onNotebook={(a) => {
             setMenu(null);

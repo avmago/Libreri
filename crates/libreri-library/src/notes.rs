@@ -85,7 +85,7 @@ fn excerpt(text: &str) -> String {
 
 impl Library {
     /// The signed-in profile's notes folder, if it keeps data.
-    fn own_notes_dir(&self) -> Result<std::path::PathBuf> {
+    pub(crate) fn own_notes_dir(&self) -> Result<std::path::PathBuf> {
         let session = self.session_info().ok_or(crate::Error::SignedOut)?;
         if !session.kind.keeps_data() {
             return Err(crate::Error::NotAllowed(

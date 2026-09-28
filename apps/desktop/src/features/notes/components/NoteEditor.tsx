@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { BookOpen, Eye, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DictateButton,
+  VoiceNoteBar,
+  VoiceNoteButton,
+  attachVoicePlayers,
+  useVoiceNote,
+  voiceMarkdown,
+  type RecordedVoice,
+} from "@/features/speech";
 import { renderMarkdown } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
 import { useNoteFile, useWriteNote } from "../api";
@@ -51,6 +60,13 @@ export function NoteEditor({
   );
 
   const html = useMemo(() => (mode === "preview" ? renderMarkdown(value) : ""), [mode, value]);
+  const preview = useRef<HTMLDivElement>(null);
+  const editor = useRef<HTMLTextAreaElement>(null);
+  // Links to recordings play in place.
+  useEffect(() => attachVoicePlayers(preview.current, relPath), [html, relPath]);
+  const voice = useVoiceNote();
+  const addVoice = (r: RecordedVoice) =>
+    change(`${value.replace(/\s*$/, "")}\n\n${voiceMarkdown(relPath, r)}\n`);
   const onClick = (e: MouseEvent) => {
     const a = (e.target as HTMLElement).closest("a[href]");
     if (!a) return;
@@ -68,6 +84,8 @@ export function NoteEditor({
         <span className="text-[11px] text-muted-foreground" aria-live="polite">
           {write.isPending || dirty ? "Saving…" : "Saved"}
         </span>
+        <VoiceNoteButton v={voice} label="Record a voice note in this note" />
+        {mode === "edit" && <DictateButton target={editor} />}
         {bookTitle && onOpenBook && (
           <Button variant="outline" size="sm" onClick={onOpenBook} title={`Open ${bookTitle}`}>
             <BookOpen /> Open book
@@ -96,6 +114,7 @@ export function NoteEditor({
           </Button>
         </div>
       </div>
+      <VoiceNoteBar v={voice} onDone={addVoice} className="border-b px-4 py-1.5" />
       <div className="min-h-0 flex-1">
         {isPending ? (
           <p className="p-6 text-muted-foreground">Opening…</p>
@@ -103,6 +122,7 @@ export function NoteEditor({
           <p className="p-6 text-destructive">{String(error)}</p>
         ) : mode === "edit" ? (
           <textarea
+            ref={editor}
             aria-label="Note (Markdown)"
             value={value}
             onChange={(e) => change(e.target.value)}
@@ -112,6 +132,7 @@ export function NoteEditor({
           />
         ) : (
           <div
+            ref={preview}
             className="lb-doc lb-notebook size-full overflow-y-auto !max-w-3xl !px-6 !pt-5 !pb-16"
             onClick={onClick}
             onDoubleClick={() => setMode("edit")}

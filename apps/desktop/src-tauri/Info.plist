@@ -4,6 +4,8 @@
 <dict>
   <key>NSCameraUsageDescription</key>
   <string>Libreri uses the camera only while you scan a book's barcode, to look up its details.</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Libreri uses the microphone only while you record a voice note or dictate.</string>
   <key>NSLocalNetworkUsageDescription</key>
   <string>Libreri lets a phone on the same network send photos of barcodes while you scan.</string>
 </dict>

@@ -25,4 +25,4 @@ pub use library::{LibraryInfo, LIBRARY_FORMAT_VERSION};
 pub use organize::BulkEdit;
 pub use profile::{Profile, ProfileKind};
 pub use query::{BookQuery, SortKey};
-pub use settings::{AppSettings, ThemePreference};
+pub use settings::{AppSettings, SpeechSettings, ThemePreference};
