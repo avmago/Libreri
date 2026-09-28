@@ -351,16 +351,21 @@ export function ExportMarkupDialog({
   open,
   count,
   canAdd,
+  canSaveInto,
   busy,
   onClose,
   onExport,
+  onSaveInto,
 }: {
   open: boolean;
   count: number;
   canAdd: boolean;
+  /** PDFs: the markup can be written into the book as PDF annotations. */
+  canSaveInto: boolean;
   busy: boolean;
   onClose: () => void;
   onExport: (addToLibrary: boolean) => void;
+  onSaveInto: () => void;
 }) {
   const [add, setAdd] = useState(false);
   return (
@@ -388,6 +393,25 @@ export function ExportMarkupDialog({
           {busy ? "Exporting…" : "Choose where to save…"}
         </Button>
       </div>
+      {canSaveInto && (
+        <div className="flex flex-col gap-2 border-t pt-3">
+          <p className="text-[13px]">
+            <span className="font-medium">Or save the markup into this PDF.</span>{" "}
+            <span className="text-muted-foreground">
+              The marks become standard PDF annotations that other PDF apps show and can change, and
+              leave Libreri’s markup list. The file as it is now is kept in Version history.
+            </span>
+          </p>
+          <Button
+            variant="outline"
+            className="self-end"
+            onClick={onSaveInto}
+            disabled={busy || count === 0}
+          >
+            Save into the PDF
+          </Button>
+        </div>
+      )}
     </Dialog>
   );
 }

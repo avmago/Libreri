@@ -40,7 +40,7 @@ Requirement (user, 2026-09-27): when the database, metadata and every kind of no
 - Archives, import, re-linking, backups and the health check: `docs/adr/0014-export-import-backups.md`. Round-trip tests live in `crates/libreri-library/src/archive_tests.rs`.
 - Old ids of a book (edited file, or notes from another copy) are *aliases* kept in the database and in the book's sidecar, so links survive a rebuild and an import.
 - Exports carry only the signed-in profile's personal data (the owner may include everyone's) and never PINs or keys. Backups carry everyone's data and PIN hashes, so a restore is complete.
-- Differences from the plan above: the archive's catalogue copy is for reference and other tools; import works from the sidecars and backups, which are the source of truth. Versions history arrives with Phase 6 and will be added to the archive then.
+- Differences from the plan above: the archive's catalogue copy is for reference and other tools; import works from the sidecars and backups, which are the source of truth. Versions history is in the archive since Phase 6b (with book files).
 
 ## Coming from other apps (Phase 4c)
 - Calibre, Zotero, BibTeX/RIS and Goodreads/StoryGraph imports copy files and never change the other app's library. Zotero highlights are converted to Libreri anchors (page + rectangles, with the quoted text as fallback) and get stable ids, so importing again never duplicates them. See `docs/adr/0015-import-from-other-apps.md`.
@@ -61,6 +61,7 @@ Requirement (user, 2026-09-27): when the database, metadata and every kind of no
 
 ## Edited PDFs (versions)
 - Page edits create a new version with a **page map** (old page → new page). Anchors are migrated through the map; text-quote fallback catches the rest. Exports include the version history so links to older versions still resolve.
+- **As built (Phase 6b):** every change to a PDF's file (edited pages, redaction, text corrections, a filled-in form, markup saved into the PDF, a smaller copy, an OCR text layer) keeps the file as it was in `.library-data/versions/<current book id>/` (`<old id>.pdf` plus `versions.json`: date, reason and each version's page map). The book's id changes with its content and the old id stays an alias, so every link still opens. Notes, highlights, markup, reading positions and OCR text move with their pages (turning and cropping included); notes on removed pages are kept with the version and come back when it is restored. Versions stay until you delete them, travel in backups and exports that include book files (with their page maps) and are merged on import when the same file is in the library. See `docs/adr/0019-edit-pages-and-versions.md`.
 
 ## Verification (built into CI from Phase 1 onward)
 - Round-trip tests: create library → add books + every note type → export → import into an empty library on a different path → assert every link opens the same page / paragraph / timestamp.

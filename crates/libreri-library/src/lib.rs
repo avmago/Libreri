@@ -18,6 +18,7 @@ mod archive_tests;
 mod books;
 mod covers;
 mod details;
+mod edit;
 mod export;
 mod folders;
 mod foreign;
@@ -33,6 +34,7 @@ mod reading;
 mod scan;
 mod sidecar;
 mod text;
+mod versions;
 mod watcher;
 
 use libreri_core::{LibraryInfo, LibraryLayout, ProfileId, LIBRARY_FORMAT_VERSION};
@@ -71,6 +73,7 @@ pub use profiles::{Collection, PinChange};
 pub use reading::Notebook;
 pub use scan::ScanReport;
 pub use text::{IndexReport, OcrOptions, OcrReport, OcrText, TextResult, TextStatus};
+pub use versions::{page_map, KeptNote, NewVersion, PageLink, PageMap, Step, VersionInfo};
 pub use watcher::LibraryWatcher;
 
 /// Errors from library operations. Messages are written for people.
@@ -254,6 +257,8 @@ impl Library {
         lib.backup_all_profiles()?;
         // Best effort: a damaged thumbnail must not stop the library opening.
         let _ = lib.forget_blank_pdf_covers();
+        // Half-written files from edits that never finished.
+        let _ = fs::remove_dir_all(lib.layout().data_dir().join("tmp"));
         lib.sign_in_if_alone()?;
         Ok(lib)
     }

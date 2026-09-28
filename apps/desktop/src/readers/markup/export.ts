@@ -4,8 +4,8 @@
  * stamps, sticky notes and measurement labels are drawn here as pictures,
  * so every font and script looks exactly as on screen.
  */
-import type { DrawOp, DrawPage } from "@/lib/ipc";
-import { measure, type Mark, type MarkupItem, type Pt } from "./model";
+import type { DrawOp, DrawPage, PdfAnnot, PdfAnnotKind } from "@/lib/ipc";
+import { bounds, measure, type Mark, type MarkupItem, type Pt } from "./model";
 import { W, arrowHead, fontFamily, inkPath } from "./render";
 
 /** Rewrites SVG path data from view-box units (1000 × H) to page fractions. */
@@ -272,4 +272,76 @@ export function drawList(marks: Mark[], aspect: (page: number) => number): DrawP
   return [...byPage.entries()]
     .sort((a, b) => a[0] - b[0])
     .map(([page, list]) => ({ page, ops: list }));
+}
+
+function annotKind(i: MarkupItem): PdfAnnotKind {
+  switch (i.tool) {
+    case "pen":
+    case "highlighter":
+      return "ink";
+    case "rect":
+      return "square";
+    case "ellipse":
+      return "circle";
+    case "line":
+    case "arrow":
+      return "line";
+    case "measure":
+      return i.points.length === 2 ? "line" : "ink";
+    case "text":
+      return "freeText";
+    case "note":
+      return "note";
+    case "stamp":
+    case "image":
+      return "stamp";
+  }
+}
+
+/**
+ * Marks as standard PDF annotations ("Save into the PDF"): other PDF apps
+ * show them and can edit them. Each carries its drawing as its appearance.
+ */
+export function pdfAnnots(marks: Mark[], aspect: (page: number) => number): PdfAnnot[] {
+  return marks.map((m) => {
+    const i = m.item;
+    const a = aspect(m.page);
+    const drawn = ops(m, a);
+    // The box around everything drawn (note icons and labels included).
+    let [x, y, w, h] = bounds(i);
+    for (const op of drawn) {
+      if (op.type !== "image") continue;
+      const [rx, ry, rw, rh] = op.rect as [number, number, number, number];
+      const x1 = Math.max(x + w, rx + rw);
+      const y1 = Math.max(y + h, ry + rh);
+      x = Math.min(x, rx);
+      y = Math.min(y, ry);
+      w = x1 - x;
+      h = y1 - y;
+    }
+    const points: Pt[][] =
+      i.tool === "pen" || i.tool === "highlighter"
+        ? [i.points.map(([px, py]) => [px, py] as Pt)]
+        : i.tool === "line" || i.tool === "arrow"
+          ? [[i.from, i.to]]
+          : i.tool === "measure"
+            ? [i.points]
+            : [];
+    const text =
+      i.tool === "text" || i.tool === "stamp"
+        ? [i.text, m.note].filter(Boolean).join("\n\n")
+        : (m.note ?? null);
+    return {
+      page: m.page,
+      kind: annotKind(i),
+      id: m.id,
+      rect: [x, y, w, h],
+      color: "color" in i ? i.color : "#000000",
+      width: "width" in i ? i.width : 0,
+      contents: text || null,
+      points,
+      rects: [],
+      ops: drawn,
+    };
+  });
 }

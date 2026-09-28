@@ -7,7 +7,7 @@
 
 mod phone;
 
-pub use phone::{PhoneEvent, PhonePairing, PhoneScanner};
+pub use phone::{PhoneEvent, PhoneMode, PhonePairing, PhoneScanner};
 
 use image::{DynamicImage, GenericImageView};
 use rxing::{BarcodeFormat, DecodeHints};

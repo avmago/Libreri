@@ -170,7 +170,7 @@ function Body({ onDone }: { onDone: () => void }) {
       )}
       <Section
         title="Things Libreri can fix by itself"
-        count={r.missingSidecars + r.staleNotebooks + r.unusedCovers}
+        count={r.missingSidecars + r.staleNotebooks + r.unusedCovers + r.unusedVersions}
         action={
           <Button size="sm" onClick={fix} disabled={repair.isPending}>
             <Wrench /> Fix
@@ -183,6 +183,12 @@ function Body({ onDone }: { onDone: () => void }) {
           {r.unusedCovers > 0 && (
             <li>
               {r.unusedCovers} covers of removed books ({formatBytes(r.unusedCoverBytes)})
+            </li>
+          )}
+          {r.unusedVersions > 0 && (
+            <li>
+              Earlier versions of {r.unusedVersions} removed books (
+              {formatBytes(r.unusedVersionBytes)})
             </li>
           )}
         </ul>

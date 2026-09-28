@@ -57,6 +57,8 @@ interface TabsState {
   openBeside: (tab: BookTab) => void;
   /** Removes a tab without remembering it (it moved to another window). */
   detach: (bookId: string) => void;
+  /** A book's file changed (a new version): its id changed, the tab follows. */
+  replaceBook: (oldId: string, newId: string) => void;
 }
 
 function withoutSplitOf(split: Split | null, bookId: string): Split | null {
@@ -167,6 +169,16 @@ export const useTabs = create<TabsState>((set, get) => ({
     get().open(tab);
     if (base && base !== tab.bookId) set({ split: { left: base, right: tab.bookId } });
   },
+  replaceBook: (oldId, newId) =>
+    set((s) => {
+      const swap = (id: string | null) => (id === oldId ? newId : id);
+      return {
+        tabs: s.tabs.map((t) => (t.bookId === oldId ? { ...t, bookId: newId } : t)),
+        active: swap(s.active),
+        lastBook: swap(s.lastBook),
+        split: s.split ? { left: swap(s.split.left)!, right: swap(s.split.right)! } : null,
+      };
+    }),
   detach: (bookId) =>
     set((s) => {
       const tabs = s.tabs.filter((t) => t.bookId !== bookId);

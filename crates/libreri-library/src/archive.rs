@@ -235,6 +235,12 @@ impl Library {
             if ocr.is_file() {
                 zip.add_file(&format!(".library-data/text/{id}.json"), &ocr)?;
             }
+            // Earlier versions are files too: they go where the books go.
+            if opts.book_files {
+                for (name, file) in self.version_files(id) {
+                    zip.add_file(&name, &file)?;
+                }
+            }
             let mut included = false;
             if opts.book_files && !book.missing {
                 if let Some(src) = self.layout().resolve_relative(&book.rel_path) {
@@ -532,6 +538,21 @@ impl Library {
             progress.report(i as u64, total, &ab.title);
             match self.import_book(ab, &mut zip, &mut report) {
                 Ok(target) => {
+                    // Earlier versions come along with the same file only.
+                    let manifest = format!(".library-data/versions/{}/versions.json", ab.id);
+                    if target == ab.id && zip.has(&manifest) {
+                        if let Ok(bytes) = zip.read(&manifest) {
+                            let base = format!(".library-data/versions/{}", ab.id);
+                            let merged = self.merge_versions(&target, &bytes, |file, dest| {
+                                zip.extract(&format!("{base}/{file}"), dest)
+                                    .map(|_| ())
+                                    .map_err(archive_err)
+                            });
+                            if let Err(e) = merged {
+                                report.warnings.push(format!("{}: {e}", ab.title));
+                            }
+                        }
+                    }
                     placed.insert(ab.id.clone(), target);
                 }
                 Err(e) => report.warnings.push(format!("{}: {e}", ab.title)),

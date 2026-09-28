@@ -7,12 +7,29 @@
 //! changed. For DjVu and comics, [`pages_to_pdf`] first makes a PDF of the
 //! page images.
 //!
-//! Page edits, redaction and versions come in Phase 6b.
+//! Phase 6b: [`apply`] edits a PDF's pages (order, turning, cropping,
+//! pages from other files, blank and photographed pages), removes what
+//! lies under redaction boxes (text, pictures, shapes and annotations; a
+//! page that cannot be cleaned exactly becomes a picture), writes small
+//! text corrections, embeds OCR text as an invisible layer and shrinks
+//! pictures. [`annotate`] saves markup as standard PDF annotations. The
+//! caller keeps the old file as a version.
 
+mod annotate;
 mod draw;
+mod edit;
+mod fonts;
+mod geom;
+mod inspect;
 mod path;
+mod redact;
+mod std_fonts;
 
+pub use annotate::{annotate, PdfAnnot, PdfAnnotKind};
 pub use draw::{mark_up, pages_to_pdf, DrawOp, DrawPage, PageImage};
+pub use edit::{
+    apply, Correction, EditPlan, EditReport, OcrWords, OutPage, PageMove, Quality, Redaction,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -31,3 +48,13 @@ pub enum Error {
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
+
+/// Every page's size as shown (points, turning applied), in page order.
+pub fn page_sizes(path: &std::path::Path) -> Result<Vec<(f64, f64)>> {
+    let doc = lopdf::Document::load(path).map_err(|e| Error::Read(e.to_string()))?;
+    Ok(doc
+        .get_pages()
+        .values()
+        .map(|id| geom::Geometry::of(&doc, *id).shown())
+        .collect())
+}

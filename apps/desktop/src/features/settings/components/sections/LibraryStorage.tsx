@@ -40,6 +40,22 @@ export function LibrarySettings({
     queryFn: () => unwrap(commands.libraryStorage()),
     staleTime: 30_000,
   });
+  const { data: versions, refetch: refetchVersions } = useQuery({
+    queryKey: ["lib", "versions-usage"],
+    queryFn: () => unwrap(commands.versionsUsage()),
+    staleTime: 30_000,
+  });
+  const deleteVersions = async () => {
+    const ok = await ask(
+      "Every earlier version of every edited PDF is deleted for good. The current files are not touched.",
+      { title: "Delete all earlier versions?", okLabel: "Delete", kind: "warning" },
+    );
+    if (!ok) return;
+    const r = await commands.deleteAllVersions();
+    if (r.status === "error") toast.error(r.error.message);
+    else toast(`${r.data} earlier versions deleted`);
+    void refetchVersions();
+  };
   const rebuild = async () => {
     const ok = await ask(
       "Libreri rebuilds its catalogue from the book files and the JSON backups in .library-data. Your books and notes are not touched; the old catalogue is kept as library.db.bak.",
@@ -107,6 +123,26 @@ export function LibrarySettings({
           >
             Clear
           </Button>
+        </Row>
+        <Row
+          label="Earlier versions"
+          help="Kept when you edit a PDF's pages, redact, fill in a form or save markup into it, until you delete them. Part of backups and exports that include book files."
+        >
+          <span className="tabular-nums">
+            {versions
+              ? `${versions.count} ${versions.count === 1 ? "file" : "files"}, ${size(versions.bytes ?? 0)}`
+              : "…"}
+          </span>
+          {session.canEditLibrary && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!versions?.count}
+              onClick={() => void deleteVersions()}
+            >
+              Delete all…
+            </Button>
+          )}
         </Row>
         <Row
           label=".library-data/"

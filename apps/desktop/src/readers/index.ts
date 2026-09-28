@@ -46,4 +46,5 @@ export { PDF_ASSETS } from "./pdf/assets";
 export { MarkupLayer, DEFAULT_STYLE, stampColor, type MarkupStyle } from "./markup/MarkupLayer";
 export * as markupModel from "./markup/model";
 export type { Mark, MarkupItem, ToolName, Scale, Unit, MeasureKind, Pt } from "./markup/model";
-export { drawList } from "./markup/export";
+export { drawList, pdfAnnots } from "./markup/export";
+export { loadPdfJs } from "./pdf/load";

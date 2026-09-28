@@ -93,6 +93,7 @@ pub fn start_phone_scan(app: AppHandle, state: State<'_, AppState>) -> AppResult
                 kind: "scanned".into(),
                 scanned: Some(s.into()),
             },
+            libreri_scan::PhoneEvent::Page(_) => return,
         };
         let _ = payload.emit(&app);
     })

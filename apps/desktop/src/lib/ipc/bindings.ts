@@ -317,6 +317,41 @@ export const commands = {
 	 *  report arrives as a `ForeignImported` event.
 	 */
 	importForeign: (path: string, options: ForeignImportDto) => typedError<string, AppError>(__TAURI_INVOKE("import_foreign", { path, options })),
+	/**  Applies page edits to a PDF. The old file is kept as a version. */
+	editPages: (id: string, plan: EditPlan) => typedError<EditResultDto, AppError>(__TAURI_INVOKE("edit_pages", { id, plan })),
+	/**
+	 *  Writes the edited pages as a new book next to this one (the book
+	 *  itself is not changed): "Save as new book", extracting and splitting.
+	 */
+	savePagesAsBook: (id: string, plan: EditPlan, name: string) => typedError<null, AppError>(__TAURI_INVOKE("save_pages_as_book", { id, plan, name })),
+	/**
+	 *  Saves a PDF with filled-in form fields (base64 from the reader) as the
+	 *  book's new version.
+	 */
+	saveFilledForm: (id: string, data: string) => typedError<BookDto, AppError>(__TAURI_INVOKE("save_filled_form", { id, data })),
+	/**
+	 *  Writes markup into the PDF as standard annotations (a new version) and
+	 *  removes those marks from Libreri's own markup.
+	 */
+	saveMarkupIntoPdf: (id: string, annots: PdfAnnot[]) => typedError<BookDto, AppError>(__TAURI_INVOKE("save_markup_into_pdf", { id, annots })),
+	/**  A book's earlier versions, newest first. */
+	listVersions: (id: string) => typedError<VersionDto[], AppError>(__TAURI_INVOKE("list_versions", { id })),
+	/**  Makes an earlier version current again (the current file is kept). */
+	restoreVersion: (id: string, version: string) => typedError<BookDto, AppError>(__TAURI_INVOKE("restore_version", { id, version })),
+	deleteVersion: (id: string, version: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_version", { id, version })),
+	/**  Saves a copy of an earlier version where the reader chooses. */
+	saveVersionCopy: (id: string, version: string, dest: string) => typedError<null, AppError>(__TAURI_INVOKE("save_version_copy", { id, version, dest })),
+	/**  How much room earlier versions take. */
+	versionsUsage: () => typedError<VersionsUsage, AppError>(__TAURI_INVOKE("versions_usage")),
+	/**  Deletes every earlier version of every book. */
+	deleteAllVersions: () => typedError<number, AppError>(__TAURI_INVOKE("delete_all_versions")),
+	/**
+	 *  Starts the phone page for photos of paper pages; photos arrive as
+	 *  `PhonePage` events.
+	 */
+	startPhonePages: () => typedError<PhonePairingDto, AppError>(__TAURI_INVOKE("start_phone_pages")),
+	/**  How many pages a PDF file has (before taking pages from it). */
+	pdfPageCount: (path: string) => typedError<number, AppError>(__TAURI_INVOKE("pdf_page_count", { path })),
 };
 
 /** Events */
@@ -332,6 +367,7 @@ export const events = {
 	libraryChanged: makeEvent<LibraryChanged>("library-changed"),
 	ocrFinished: makeEvent<OcrFinished>("ocr-finished"),
 	ocrLanguageDownload: makeEvent<OcrLanguageDownload>("ocr-language-download"),
+	phonePage: makeEvent<PhonePage>("phone-page"),
 	phoneScan: makeEvent<PhoneScan>("phone-scan"),
 	searchIndexProgress: makeEvent<SearchIndexProgress>("search-index-progress"),
 	sessionChanged: makeEvent<SessionChanged>("session-changed"),
@@ -658,6 +694,28 @@ export type CollectionDto = {
 /**  What kind of document a book is. Chosen by the user; guessed on import. */
 export type ContentType = "book" | "textbook" | "researchPaper" | "conferencePaper" | "preprint" | "thesis" | "lectureNotes" | "slides" | "technicalReport" | "whitePaper" | "manual" | "reference" | "standard" | "magazine" | "article" | "comic" | "cheatSheet" | "personalNotes" | "audiobook" | "other";
 
+/**
+ *  A small text correction: the old words under `rect` are removed and
+ *  covered, and `text` is written in their place.
+ */
+export type Correction = {
+	page: number,
+	rect: [(number | null), (number | null), (number | null), (number | null)],
+	text: string,
+	/**  Font size as a fraction of the page width. */
+	size: number | null,
+	color: string,
+	/**  The paper colour around the old words. */
+	background: string,
+	/**  "sans", "serif" or "mono". */
+	font: string,
+	/**
+	 *  The text drawn as a picture, used when it has characters the
+	 *  standard PDF fonts cannot show.
+	 */
+	picture?: string | null,
+};
+
 export type CountDto<T> = {
 	value: T,
 	count: number,
@@ -707,6 +765,26 @@ export type DuplicateDto = {
 export type DuplicateGroup = {
 	key: string,
 	books: BookRef[],
+};
+
+/**  Everything to do to a PDF. */
+export type EditPlan = {
+	pages: OutPage[],
+	/**  Other PDFs that pages come from (absolute paths, set by the app). */
+	files?: string[],
+	redactions?: Redaction[],
+	corrections?: Correction[],
+	compress?: Quality | null,
+	/**  Write saved OCR text into the PDF as an invisible text layer. */
+	embedOcr?: boolean,
+};
+
+export type EditResultDto = {
+	book: BookDto,
+	pages: number,
+	/**  Pages turned into pictures so nothing stayed under a redaction. */
+	flattened: number[],
+	warnings: string[],
 };
 
 /**  An export finished. */
@@ -854,6 +932,8 @@ export type HealthReportDto = {
 	staleNotebooks: number,
 	unusedCovers: number,
 	unusedCoverBytes: number,
+	unusedVersions: number,
+	unusedVersionBytes: number,
 	unreadableBackups: string[],
 	database: string[],
 	fixable: boolean,
@@ -1064,6 +1144,21 @@ export type OnlineSettingsDto = {
 	fillOnImport: boolean,
 };
 
+/**  One page of the result, in order. */
+export type OutPage = 
+/**
+ *  A page of the book (1-based), turned by `rotate` degrees clockwise
+ *  and cut to `crop` (x, y, w, h as fractions of the page as shown
+ *  after turning).
+ */
+{ kind: "page"; page: number; rotate?: number; crop?: [(number | null), (number | null), (number | null), (number | null)] | null } | 
+/**  A page of another PDF (`files[file]`). */
+{ kind: "file"; file: number; page: number; rotate?: number; crop?: [(number | null), (number | null), (number | null), (number | null)] | null } | 
+/**  An empty page, in points. */
+{ kind: "blank"; width: number | null; height: number | null } | 
+/**  A picture as a page (camera, phone, scanner or a picture file). */
+{ kind: "picture"; src: string };
+
 export type OutlineDto = {
 	title: string,
 	page: number | null,
@@ -1085,6 +1180,40 @@ export type PageScaleDto = {
 	page: number,
 	unit: string,
 	perPoint: number | null,
+};
+
+/**
+ *  One mark as an annotation. Positions are fractions of the page as
+ *  shown (top-left origin); `width` is a fraction of the page width.
+ */
+export type PdfAnnot = {
+	page: number,
+	kind: PdfAnnotKind,
+	/**  Libreri's id for the mark (kept as /NM). */
+	id: string,
+	/**  x, y, w, h around everything the mark draws. */
+	rect: [(number | null), (number | null), (number | null), (number | null)],
+	color: string,
+	width?: number | null,
+	/**  The note or text of the mark. */
+	contents?: string | null,
+	/**  Ink strokes; the two ends of a line. */
+	points?: (([(number | null), (number | null)])[])[],
+	/**  Boxes of a highlight, underline or strike-out. */
+	rects?: ([(number | null), (number | null), (number | null), (number | null)])[],
+	/**  How it looks. */
+	ops: DrawOp[],
+};
+
+/**  The kind of PDF annotation a mark becomes. */
+export type PdfAnnotKind = "ink" | "square" | "circle" | "line" | "freeText" | "note" | "stamp" | "highlight" | "underline" | "strikeOut";
+
+/**  The phone page for paper pages was opened, or sent a photo. */
+export type PhonePage = {
+	/**  "opened" | "page" */
+	kind: string,
+	/**  The photo as a data: URL. */
+	picture: string | null,
 };
 
 export type PhonePairingDto = {
@@ -1143,6 +1272,9 @@ export type ProfileMappingDto = {
 /**  Where one archive profile's notes go. */
 export type ProfileTargetDto = { kind: "existing"; profileId: string } | { kind: "new" } | { kind: "skip" };
 
+/**  How much to shrink pictures. */
+export type Quality = "high" | "medium" | "small";
+
 /**
  *  What to look up. Identifiers are tried first; the title and author are
  *  used when there are none (or they find nothing).
@@ -1168,6 +1300,13 @@ export type RecentLibraryDto = {
 	path: string,
 	/**  False when the folder no longer exists or is no longer a library. */
 	available: boolean,
+};
+
+/**  Boxes to black out on a page of the book (fractions of the shown page). */
+export type Redaction = {
+	page: number,
+	boxes: ([(number | null), (number | null), (number | null), (number | null)])[],
+	color?: string,
 };
 
 export type RestoredLibrary = {
@@ -1301,6 +1440,19 @@ export type Theme = "system" | "light" | "dark" | "highContrast";
 export type UnsearchableDto = {
 	id: string,
 	state: TextState,
+};
+
+export type VersionDto = {
+	id: string,
+	fileName: string,
+	savedAt: string,
+	reason: string,
+	size: number | null,
+};
+
+export type VersionsUsage = {
+	count: number,
+	bytes: number | null,
 };
 
 export type WordDto = {

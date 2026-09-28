@@ -311,6 +311,9 @@ pub struct HealthReportDto {
     pub unused_covers: u32,
     #[specta(type = u32)]
     pub unused_cover_bytes: u64,
+    pub unused_versions: u32,
+    #[specta(type = u32)]
+    pub unused_version_bytes: u64,
     pub unreadable_backups: Vec<String>,
     pub database: Vec<String>,
     pub fixable: bool,
@@ -375,6 +378,8 @@ pub async fn health_check(state: State<'_, AppState>) -> AppResult<HealthReportD
             stale_notebooks: r.stale_notebooks,
             unused_covers: r.unused_covers,
             unused_cover_bytes: r.unused_cover_bytes,
+            unused_versions: r.unused_versions,
+            unused_version_bytes: r.unused_version_bytes,
             unreadable_backups: r.unreadable_backups.clone(),
             database: r.database.clone(),
             fixable: r.fixable(),

@@ -1,5 +1,6 @@
 //! Drawing markup onto PDF pages.
 
+use crate::geom::{inherited, resolve, Geometry};
 use crate::path::{self, Seg};
 use crate::{Error, Result};
 use lopdf::{dictionary, Dictionary, Document, Object, ObjectId, Stream};
@@ -53,108 +54,7 @@ pub struct PageImage {
     pub bytes: Vec<u8>,
 }
 
-/// The visible page: crop box within the media box, and rotation.
-struct Geometry {
-    x0: f64,
-    y0: f64,
-    x1: f64,
-    y1: f64,
-    rotate: i64,
-}
-
-impl Geometry {
-    /// Width and height as shown.
-    fn shown(&self) -> (f64, f64) {
-        let (w, h) = (self.x1 - self.x0, self.y1 - self.y0);
-        if self.rotate % 180 == 0 {
-            (w, h)
-        } else {
-            (h, w)
-        }
-    }
-
-    /// Maps shown points (y down, from the top left) to PDF user space.
-    fn matrix(&self) -> [f64; 6] {
-        let w = self.x1 - self.x0;
-        match self.rotate {
-            90 => [0.0, 1.0, 1.0, 0.0, self.x0, self.y0],
-            180 => [-1.0, 0.0, 0.0, 1.0, self.x0 + w, self.y0],
-            270 => [0.0, -1.0, -1.0, 0.0, self.x0 + w, self.y1],
-            _ => [1.0, 0.0, 0.0, -1.0, self.x0, self.y1],
-        }
-    }
-}
-
-fn resolve<'a>(doc: &'a Document, o: &'a Object) -> &'a Object {
-    match o {
-        Object::Reference(r) => doc.get_object(*r).unwrap_or(o),
-        _ => o,
-    }
-}
-
-fn num(o: &Object) -> Option<f64> {
-    match o {
-        Object::Integer(i) => Some(*i as f64),
-        Object::Real(r) => Some(f64::from(*r)),
-        _ => None,
-    }
-}
-
-/// A page attribute, looking up the page tree for inherited ones.
-fn inherited(doc: &Document, page: ObjectId, key: &[u8]) -> Option<Object> {
-    let mut id = page;
-    for _ in 0..32 {
-        let d = doc.get_dictionary(id).ok()?;
-        if let Ok(v) = d.get(key) {
-            return Some(resolve(doc, v).clone());
-        }
-        id = d.get(b"Parent").ok()?.as_reference().ok()?;
-    }
-    None
-}
-
-fn rect(doc: &Document, o: &Object) -> Option<[f64; 4]> {
-    let a = resolve(doc, o).as_array().ok()?;
-    let v: Vec<f64> = a.iter().filter_map(|x| num(resolve(doc, x))).collect();
-    (v.len() == 4).then(|| {
-        [
-            v[0].min(v[2]),
-            v[1].min(v[3]),
-            v[0].max(v[2]),
-            v[1].max(v[3]),
-        ]
-    })
-}
-
-fn geometry(doc: &Document, page: ObjectId) -> Geometry {
-    let media = inherited(doc, page, b"MediaBox")
-        .and_then(|o| rect(doc, &o))
-        .unwrap_or([0.0, 0.0, 612.0, 792.0]);
-    let crop = inherited(doc, page, b"CropBox")
-        .and_then(|o| rect(doc, &o))
-        .map(|c| {
-            [
-                c[0].max(media[0]),
-                c[1].max(media[1]),
-                c[2].min(media[2]),
-                c[3].min(media[3]),
-            ]
-        })
-        .filter(|c| c[2] > c[0] && c[3] > c[1])
-        .unwrap_or(media);
-    let rotate = inherited(doc, page, b"Rotate")
-        .and_then(|o| num(&o))
-        .map_or(0, |r| (r as i64).rem_euclid(360) / 90 * 90);
-    Geometry {
-        x0: crop[0],
-        y0: crop[1],
-        x1: crop[2],
-        y1: crop[3],
-        rotate,
-    }
-}
-
-fn color(hex: &str) -> [f64; 3] {
+pub(crate) fn color(hex: &str) -> [f64; 3] {
     let h = hex.trim_start_matches('#');
     let c = |i: usize| {
         h.get(i..i + 2)
@@ -172,7 +72,7 @@ fn color(hex: &str) -> [f64; 3] {
     [c(0), c(2), c(4)]
 }
 
-fn f(v: f64) -> String {
+pub(crate) fn f(v: f64) -> String {
     let s = format!("{v:.3}");
     let s = s.trim_end_matches('0').trim_end_matches('.');
     if s == "-0" || s.is_empty() {
@@ -239,7 +139,7 @@ fn path_ops(out: &mut String, d: &str, w: f64, h: f64) -> Result<()> {
     Ok(())
 }
 
-fn decode_data_url(src: &str) -> Result<Vec<u8>> {
+pub(crate) fn decode_data_url(src: &str) -> Result<Vec<u8>> {
     use base64::Engine;
     let (_, b64) = src
         .split_once(";base64,")
@@ -250,7 +150,7 @@ fn decode_data_url(src: &str) -> Result<Vec<u8>> {
 }
 
 /// An image XObject (with a soft mask when it has transparency).
-fn image_xobject(doc: &mut Document, bytes: &[u8]) -> Result<ObjectId> {
+pub(crate) fn image_xobject(doc: &mut Document, bytes: &[u8]) -> Result<ObjectId> {
     let img = image::load_from_memory(bytes).map_err(|e| Error::Picture(e.to_string()))?;
     let (w, h) = (img.width(), img.height());
     let rgba = img.to_rgba8();
@@ -287,7 +187,7 @@ fn image_xobject(doc: &mut Document, bytes: &[u8]) -> Result<ObjectId> {
 
 /// A page's resources as a direct dictionary of its own (inherited or
 /// shared ones are copied, so other pages are not affected).
-fn own_resources(doc: &Document, page: ObjectId) -> Dictionary {
+pub(crate) fn own_resources(doc: &Document, page: ObjectId) -> Dictionary {
     let mut res = match inherited(doc, page, b"Resources") {
         Some(Object::Dictionary(d)) => d,
         _ => Dictionary::new(),
@@ -302,7 +202,7 @@ fn own_resources(doc: &Document, page: ObjectId) -> Dictionary {
     res
 }
 
-fn sub<'a>(res: &'a mut Dictionary, key: &[u8]) -> &'a mut Dictionary {
+pub(crate) fn sub<'a>(res: &'a mut Dictionary, key: &[u8]) -> &'a mut Dictionary {
     if !matches!(res.get(key), Ok(Object::Dictionary(_))) {
         res.set(key, Dictionary::new());
     }
@@ -312,7 +212,7 @@ fn sub<'a>(res: &'a mut Dictionary, key: &[u8]) -> &'a mut Dictionary {
     }
 }
 
-fn unique_name(dict: &Dictionary, prefix: &str, n: &mut usize) -> String {
+pub(crate) fn unique_name(dict: &Dictionary, prefix: &str, n: &mut usize) -> String {
     loop {
         *n += 1;
         let name = format!("{prefix}{n}");
@@ -347,14 +247,15 @@ fn graphics_state(
     name
 }
 
-fn draw_on_page(doc: &mut Document, page: ObjectId, ops: &[DrawOp]) -> Result<()> {
-    if ops.is_empty() {
-        return Ok(());
-    }
-    let geo = geometry(doc, page);
-    let (w, h) = geo.shown();
-    let m = geo.matrix();
-    let mut res = own_resources(doc, page);
+/// The drawing for `ops` on a page of `size` (as shown), wrapped in
+/// `q <m> cm … Q`; pictures and transparency go into `res`.
+pub(crate) fn draw_body(
+    doc: &mut Document,
+    res: &mut Dictionary,
+    ops: &[DrawOp],
+    (w, h): (f64, f64),
+    m: [f64; 6],
+) -> Result<String> {
     let mut states: HashMap<(i32, bool), String> = HashMap::new();
     let mut counter = 0usize;
     let mut body = String::new();
@@ -376,14 +277,7 @@ fn draw_on_page(doc: &mut Document, page: ObjectId, ops: &[DrawOp]) -> Result<()
                 opacity,
                 multiply,
             } => {
-                let name = graphics_state(
-                    doc,
-                    &mut res,
-                    &mut states,
-                    &mut counter,
-                    *opacity,
-                    *multiply,
-                );
+                let name = graphics_state(doc, res, &mut states, &mut counter, *opacity, *multiply);
                 let [r, g, b] = color(c);
                 let _ = writeln!(body, "q /{name} gs {} {} {} rg", f(r), f(g), f(b));
                 path_ops(&mut body, d, w, h)?;
@@ -396,8 +290,7 @@ fn draw_on_page(doc: &mut Document, page: ObjectId, ops: &[DrawOp]) -> Result<()
                 width,
                 dash,
             } => {
-                let name =
-                    graphics_state(doc, &mut res, &mut states, &mut counter, *opacity, false);
+                let name = graphics_state(doc, res, &mut states, &mut counter, *opacity, false);
                 let [r, g, b] = color(c);
                 let dashes: Vec<String> = dash.iter().map(|v| f(v * w)).collect();
                 let _ = writeln!(
@@ -415,7 +308,7 @@ fn draw_on_page(doc: &mut Document, page: ObjectId, ops: &[DrawOp]) -> Result<()
             DrawOp::Image { rect, src } => {
                 let bytes = decode_data_url(src)?;
                 let id = image_xobject(doc, &bytes)?;
-                let xo = sub(&mut res, b"XObject");
+                let xo = sub(res, b"XObject");
                 let name = unique_name(xo, "LbIm", &mut counter);
                 xo.set(name.as_bytes(), id);
                 let [x, y, iw, ih] = *rect;
@@ -433,6 +326,23 @@ fn draw_on_page(doc: &mut Document, page: ObjectId, ops: &[DrawOp]) -> Result<()
         }
     }
     body.push_str("Q\n");
+    Ok(body)
+}
+
+pub(crate) fn draw_on_page(doc: &mut Document, page: ObjectId, ops: &[DrawOp]) -> Result<()> {
+    if ops.is_empty() {
+        return Ok(());
+    }
+    let geo = Geometry::of(doc, page);
+    let mut res = match doc
+        .get_dictionary(page)
+        .ok()
+        .and_then(|d| d.get(b"Resources").ok())
+    {
+        Some(Object::Dictionary(d)) => d.clone(),
+        _ => own_resources(doc, page),
+    };
+    let body = draw_body(doc, &mut res, ops, geo.shown(), geo.matrix())?;
 
     let before = doc.add_object(Stream::new(Dictionary::new(), b"q\n".to_vec()));
     let mut ours = Stream::new(Dictionary::new(), body.into_bytes());
@@ -463,7 +373,7 @@ fn draw_on_page(doc: &mut Document, page: ObjectId, ops: &[DrawOp]) -> Result<()
     Ok(())
 }
 
-fn save(doc: &mut Document, dest: &Path) -> Result<()> {
+pub(crate) fn save(doc: &mut Document, dest: &Path) -> Result<()> {
     if let Some(dir) = dest.parent() {
         std::fs::create_dir_all(dir)?;
     }

@@ -6,6 +6,7 @@
 pub mod app;
 pub mod books;
 pub mod details;
+pub mod edit;
 pub mod folders;
 pub mod library;
 pub mod notes;

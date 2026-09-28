@@ -25,39 +25,13 @@ import {
   type ZoomValue,
 } from "../types";
 import { PDF_ASSETS } from "./assets";
+import { loadPdfJs } from "./load";
 
 type ViewerModule = typeof import("pdfjs-dist/legacy/web/pdf_viewer.mjs");
 type PdfViewer = InstanceType<ViewerModule["PDFViewer"]>;
 type EventBus = InstanceType<ViewerModule["EventBus"]>;
 type FindController = InstanceType<ViewerModule["PDFFindController"]>;
 type LinkService = InstanceType<ViewerModule["PDFLinkService"]>;
-
-let loaded: Promise<{
-  pdfjs: typeof import("pdfjs-dist/legacy/build/pdf.mjs");
-  viewer: ViewerModule;
-}> | null = null;
-
-/**
- * PDF.js is big; load it the first time a PDF opens. The "legacy" build is
- * used because the standard one needs the newest JavaScript (such as
- * `Map.prototype.getOrInsertComputed`), which the system web views on older
- * macOS versions and on Linux (WebKitGTK) do not have yet.
- */
-function loadPdfJs() {
-  loaded ??= (async () => {
-    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-    if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-      const worker = await import("pdfjs-dist/legacy/build/pdf.worker.min.mjs?url");
-      pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
-    }
-    // The viewer expects the library on globalThis.
-    (globalThis as { pdfjsLib?: unknown }).pdfjsLib = pdfjs;
-    await import("pdfjs-dist/legacy/web/pdf_viewer.css");
-    const viewer = await import("pdfjs-dist/legacy/web/pdf_viewer.mjs");
-    return { pdfjs, viewer };
-  })();
-  return loaded;
-}
 
 export class PdfRenderer implements Renderer {
   readonly paged = true;
@@ -129,6 +103,13 @@ export class PdfRenderer implements Renderer {
     this.cleanup.push(() => void task.destroy());
     this.doc = await task.promise;
     if (this.destroyed) return;
+    // Typing into a form field marks the book as changed (Save offers a new version).
+    const storage = this.doc.annotationStorage as unknown as {
+      onSetModified: (() => void) | null;
+      onResetModified: (() => void) | null;
+    };
+    storage.onSetModified = () => this.events.formChanged?.(true);
+    storage.onResetModified = () => this.events.formChanged?.(false);
 
     const pagesReady = new Promise<void>((resolve) =>
       this.bus.on("pagesinit", () => resolve(), { once: true }),
@@ -595,6 +576,10 @@ export class PdfRenderer implements Renderer {
 
   clearSelection() {
     document.getSelection()?.removeAllRanges();
+  }
+
+  async saveForm(): Promise<Uint8Array> {
+    return this.doc.saveDocument();
   }
 }
 

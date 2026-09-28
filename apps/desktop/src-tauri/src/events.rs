@@ -168,6 +168,16 @@ pub struct PhoneScan {
     pub scanned: Option<crate::commands::scan::ScannedDto>,
 }
 
+/// The phone page for paper pages was opened, or sent a photo.
+#[derive(Debug, Clone, Serialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct PhonePage {
+    /// "opened" | "page"
+    pub kind: String,
+    /// The photo as a data: URL.
+    pub picture: Option<String>,
+}
+
 /// An export finished.
 #[derive(Debug, Clone, Serialize, Type, Event)]
 #[serde(rename_all = "camelCase")]

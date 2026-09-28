@@ -41,6 +41,9 @@ pub struct HealthReport {
     /// Covers and thumbnails of books no longer in the library (fixable).
     pub unused_covers: u32,
     pub unused_cover_bytes: u64,
+    /// Earlier versions of books no longer in the library (fixable).
+    pub unused_versions: u32,
+    pub unused_version_bytes: u64,
     /// Backups of personal data that cannot be read.
     pub unreadable_backups: Vec<String>,
     /// Problems in the catalogue file itself (fix: Rebuild library index).
@@ -49,7 +52,7 @@ pub struct HealthReport {
 
 impl HealthReport {
     pub fn fixable(&self) -> bool {
-        self.missing_sidecars + self.stale_notebooks + self.unused_covers > 0
+        self.missing_sidecars + self.stale_notebooks + self.unused_covers + self.unused_versions > 0
     }
 }
 
@@ -174,6 +177,11 @@ impl Library {
             }
         }
 
+        for (_, bytes) in self.unused_versions(&known) {
+            r.unused_versions += 1;
+            r.unused_version_bytes += bytes;
+        }
+
         // Personal backups that cannot be read.
         for e in walkdir::WalkDir::new(self.layout().data_dir().join("annotations"))
             .max_depth(2)
@@ -234,6 +242,11 @@ impl Library {
                 {
                     fixed += 1;
                 }
+            }
+        }
+        for (dir, _) in self.unused_versions(&known) {
+            if fs::remove_dir_all(dir).is_ok() {
+                fixed += 1;
             }
         }
         Ok(fixed)

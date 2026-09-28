@@ -153,6 +153,58 @@ impl Database {
             .and_then(|(a, p)| p.parse().ok().map(|p| (a, p))))
     }
 
+    /// Every profile's annotations in one book (for moving them when the
+    /// book's pages change).
+    pub fn book_annotations(&self, book: &BookId) -> Result<Vec<(Annotation, ProfileId)>> {
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {ANNOTATION_COLUMNS}, profile_id FROM annotations WHERE book_id=?1"
+        ))?;
+        let rows = stmt.query_map([book.as_str()], |r| {
+            let profile: String = r.get(13)?;
+            Ok((row_to_annotation(r)?, profile))
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            let (a, p) = row?;
+            if let Ok(p) = p.parse() {
+                out.push((a, p));
+            }
+        }
+        Ok(out)
+    }
+
+    /// Every profile's reading position in one book.
+    pub fn book_positions(&self, book: &BookId) -> Result<Vec<(ProfileId, String)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT profile_id, position FROM book_user WHERE book_id=?1 AND position IS NOT NULL",
+        )?;
+        let rows = stmt.query_map([book.as_str()], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            let (p, pos) = row?;
+            if let Ok(p) = p.parse() {
+                out.push((p, pos));
+            }
+        }
+        Ok(out)
+    }
+
+    /// Replaces a reading position without touching when it was read.
+    pub fn replace_position(
+        &self,
+        book: &BookId,
+        profile: &ProfileId,
+        locator: &str,
+    ) -> Result<()> {
+        self.conn.execute(
+            "UPDATE book_user SET position=?3 WHERE book_id=?1 AND profile_id=?2",
+            params![book.as_str(), profile.to_string(), locator],
+        )?;
+        Ok(())
+    }
+
     /// Adds or replaces an annotation.
     pub fn save_annotation(&self, a: &Annotation, profile: &ProfileId) -> Result<()> {
         let (exact, prefix, suffix) = match &a.quote {

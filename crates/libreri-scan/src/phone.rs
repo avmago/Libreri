@@ -1,7 +1,8 @@
 //! Scanning with a phone: a small web server on the local network serves a
 //! one-time page (its address holds a random token and is shown as a QR
-//! code). The phone takes a photo of the barcode with its own camera app
-//! and sends it; the computer reads the barcode.
+//! code). The phone takes a photo with its own camera app and sends it:
+//! of a barcode (the computer reads it), or of a paper page to add to a
+//! PDF (Phase 6b, [`PhoneMode::Pages`]).
 //!
 //! The server listens only on the computer's local network address, only
 //! answers requests carrying the token, accepts only pictures and short
@@ -27,6 +28,18 @@ pub enum PhoneEvent {
     Opened,
     /// A barcode was read (from a photo, or typed on the phone).
     Scanned(Scanned),
+    /// A photo of a page (JPEG or PNG bytes), in [`PhoneMode::Pages`].
+    Page(Vec<u8>),
+}
+
+/// What the phone page is for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PhoneMode {
+    /// Barcodes of books.
+    #[default]
+    Barcode,
+    /// Photos of paper pages.
+    Pages,
 }
 
 /// What to show so the phone can connect.
@@ -66,13 +79,23 @@ impl PhoneScanner {
         lifetime: Duration,
         on_event: impl Fn(PhoneEvent) + Send + 'static,
     ) -> Result<Self, String> {
+        Self::start_for(PhoneMode::Barcode, lifetime, on_event)
+    }
+
+    /// Starts serving the page for `mode`.
+    pub fn start_for(
+        mode: PhoneMode,
+        lifetime: Duration,
+        on_event: impl Fn(PhoneEvent) + Send + 'static,
+    ) -> Result<Self, String> {
         let ip = local_ip_address::local_ip()
             .map_err(|_| "this computer does not seem to be on a network".to_owned())?;
-        Self::start_on(ip, lifetime, on_event)
+        Self::start_on(ip, mode, lifetime, on_event)
     }
 
     pub(crate) fn start_on(
         ip: IpAddr,
+        mode: PhoneMode,
         lifetime: Duration,
         on_event: impl Fn(PhoneEvent) + Send + 'static,
     ) -> Result<Self, String> {
@@ -101,7 +124,7 @@ impl PhoneScanner {
             .spawn(move || {
                 while !stopping.load(Ordering::SeqCst) && Instant::now() < deadline {
                     match server.recv_timeout(Duration::from_millis(250)) {
-                        Ok(Some(req)) => handle(req, &token, &on_event),
+                        Ok(Some(req)) => handle(req, &token, mode, &on_event),
                         Ok(None) => {}
                         Err(_) => break,
                     }
@@ -170,7 +193,12 @@ fn read_body(req: &mut tiny_http::Request, max: usize) -> Option<Vec<u8>> {
     (body.len() <= max).then_some(body)
 }
 
-fn handle(mut req: tiny_http::Request, token: &str, on_event: &dyn Fn(PhoneEvent)) {
+fn handle(
+    mut req: tiny_http::Request,
+    token: &str,
+    mode: PhoneMode,
+    on_event: &dyn Fn(PhoneEvent),
+) {
     let path = req.url().split('?').next().unwrap_or("").to_owned();
     let Some(rest) = path.strip_prefix('/').and_then(|p| p.strip_prefix(token)) else {
         return reply(req, 404, "text/plain", "Not found".into());
@@ -178,14 +206,33 @@ fn handle(mut req: tiny_http::Request, token: &str, on_event: &dyn Fn(PhoneEvent
     match (req.method(), rest) {
         (Method::Get, "" | "/") => {
             on_event(PhoneEvent::Opened);
+            let page = match mode {
+                PhoneMode::Barcode => PAGE,
+                PhoneMode::Pages => PAGES_PAGE,
+            };
             reply(
                 req,
                 200,
                 "text/html; charset=utf-8",
-                PAGE.replace("{TOKEN}", token),
+                page.replace("{TOKEN}", token),
             );
         }
-        (Method::Post, "/photo") => {
+        (Method::Post, "/page") if mode == PhoneMode::Pages => {
+            let Some(body) = read_body(&mut req, MAX_PHOTO) else {
+                return reply(req, 413, "text/plain", "Too large".into());
+            };
+            let kind = image::guess_format(&body).ok();
+            let ok = matches!(
+                kind,
+                Some(image::ImageFormat::Jpeg | image::ImageFormat::Png)
+            ) && image::load_from_memory(&body).is_ok();
+            if !ok {
+                return reply(req, 415, "text/plain", "Not a picture".into());
+            }
+            on_event(PhoneEvent::Page(body));
+            reply(req, 200, "application/json", r#"{"ok":true}"#.into());
+        }
+        (Method::Post, "/photo") if mode == PhoneMode::Barcode => {
             let Some(body) = read_body(&mut req, MAX_PHOTO) else {
                 return reply(req, 413, "text/plain", "Too large".into());
             };
@@ -199,7 +246,7 @@ fn handle(mut req: tiny_http::Request, token: &str, on_event: &dyn Fn(PhoneEvent
                 Err(_) => reply(req, 415, "text/plain", "Not a picture".into()),
             }
         }
-        (Method::Post, "/code") => {
+        (Method::Post, "/code") if mode == PhoneMode::Barcode => {
             let text = read_body(&mut req, 64)
                 .and_then(|b| String::from_utf8(b).ok())
                 .unwrap_or_default();
@@ -307,6 +354,78 @@ document.getElementById("manual").addEventListener("submit", async (e) => {
 </html>
 "##;
 
+/// The phone page for photos of paper pages.
+const PAGES_PAGE: &str = r##"<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Libreri – Add pages</title>
+<style>
+  :root { color-scheme: light dark; --fg: #111; --bg: #fff; --muted: #666; --line: #ddd; --accent: #111; --on-accent: #fff; }
+  @media (prefers-color-scheme: dark) { :root { --fg: #f2f2f2; --bg: #111; --muted: #aaa; --line: #333; --accent: #f2f2f2; --on-accent: #111; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: var(--fg); background: var(--bg); }
+  main { max-width: 28rem; margin: 0 auto; padding: 24px 16px 40px; }
+  h1 { font-size: 1.35rem; margin: 0 0 4px; }
+  p { margin: 0 0 16px; color: var(--muted); }
+  .take { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 56px; border-radius: 12px; background: var(--accent); color: var(--on-accent); font-weight: 600; font-size: 1.05rem; cursor: pointer; }
+  input[type=file] { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  #status { margin: 16px 0; min-height: 1.5em; font-weight: 500; }
+  #status.bad { color: #c62828; }
+  #status.good { color: #2e7d32; }
+  #sent { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  #sent img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Add pages</h1>
+  <p>Photograph each page flat, from straight above, in good light. Every photo goes to Libreri as a new page.</p>
+  <label class="take">Take photo<input id="photo" type="file" accept="image/*" capture="environment" multiple></label>
+  <div id="status" role="status" aria-live="polite"></div>
+  <div id="sent"></div>
+</main>
+<script>
+const base = "/{TOKEN}";
+const status = document.getElementById("status");
+const say = (text, kind) => { status.textContent = text; status.className = kind || ""; };
+let count = 0;
+
+async function shrink(file) {
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  await new Promise((ok, bad) => { img.onload = ok; img.onerror = bad; img.src = url; });
+  const scale = Math.min(1, 2400 / Math.max(img.naturalWidth, img.naturalHeight));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(img.naturalWidth * scale);
+  canvas.height = Math.round(img.naturalHeight * scale);
+  canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+  const blob = await new Promise((ok) => canvas.toBlob(ok, "image/jpeg", 0.88));
+  return { blob, url };
+}
+
+document.getElementById("photo").addEventListener("change", async (e) => {
+  for (const file of e.target.files) {
+    say("Sending…");
+    try {
+      const { blob, url } = await shrink(file);
+      const res = await fetch(base + "/page", { method: "POST", body: blob });
+      if (!res.ok) throw new Error();
+      count += 1;
+      const thumb = document.createElement("img");
+      thumb.src = url; thumb.alt = "Page " + count;
+      document.getElementById("sent").appendChild(thumb);
+      say(count + (count === 1 ? " page" : " pages") + " sent. Take the next one.", "good");
+    } catch { say("Could not reach Libreri. Is the window still open on the computer?", "bad"); }
+  }
+  e.target.value = "";
+});
+</script>
+</body>
+</html>
+"##;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -341,6 +460,7 @@ mod tests {
         let log = Arc::clone(&seen);
         let scanner = PhoneScanner::start_on(
             "127.0.0.1".parse().unwrap(),
+            PhoneMode::Barcode,
             Duration::from_secs(30),
             move |e| log.lock().unwrap().push(e),
         )
@@ -383,5 +503,31 @@ mod tests {
             TcpStream::connect(url[7..].split('/').next().unwrap()).is_err(),
             "the server stops with the scanner"
         );
+    }
+
+    #[test]
+    fn takes_photos_of_pages() {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let log = Arc::clone(&seen);
+        let scanner = PhoneScanner::start_on(
+            "127.0.0.1".parse().unwrap(),
+            PhoneMode::Pages,
+            Duration::from_secs(30),
+            move |e| log.lock().unwrap().push(e),
+        )
+        .unwrap();
+        let url = scanner.pairing().url.clone();
+        let (status, page) = request(&url, "GET", b"");
+        assert_eq!(status, 200);
+        assert!(page.contains("Add pages"));
+        let png = crate::testing::barcode_png("9780306406157", false);
+        assert_eq!(request(&format!("{url}/page"), "POST", &png).0, 200);
+        assert_eq!(request(&format!("{url}/page"), "POST", b"junk").0, 415);
+        // Barcodes are not read on this page.
+        assert_eq!(request(&format!("{url}/photo"), "POST", &png).0, 404);
+        drop(scanner);
+        let events = seen.lock().unwrap().clone();
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[1], PhoneEvent::Page(png));
     }
 }

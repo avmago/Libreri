@@ -323,3 +323,44 @@ fn only_the_owner_imports_and_bad_files_are_refused() {
     a.sign_in(&sam.id, Some(PIN)).unwrap();
     assert!(a.inspect_archive(&archive).is_err());
 }
+
+#[test]
+fn earlier_versions_travel_with_the_book_files() {
+    let (dir, a) = library();
+    let books = a.layout().books_dir();
+    libreri_formats::test_text_pdf(&books.join("report.pdf"), &["first draft"]);
+    a.scan(&NoProgress).unwrap();
+    let old = a.books(&BookQuery::default()).unwrap().remove(0);
+    let edited = dir.path().join("edited.pdf");
+    libreri_formats::test_text_pdf(&edited, &["second draft"]);
+    let new = a
+        .save_version(
+            &old.id,
+            NewVersion {
+                file: &edited,
+                reason: "Edited pages",
+                pages: None,
+                cover_changed: false,
+            },
+        )
+        .unwrap();
+
+    // Without book files, no versions either.
+    let light = dir.path().join("light.libreri");
+    export(&a, &light, false, false);
+    let manifest_name = format!(".library-data/versions/{}/versions.json", new.id);
+    assert!(!ArchiveReader::open(&light).unwrap().has(&manifest_name));
+
+    let archive = dir.path().join("all.libreri");
+    export(&a, &archive, true, false);
+    assert!(ArchiveReader::open(&archive).unwrap().has(&manifest_name));
+    let b = new_library(dir.path(), "B");
+    b.import_archive(&archive, &ArchiveImport::default(), &NoProgress)
+        .unwrap();
+    let versions = b.versions(&new.id).unwrap();
+    assert_eq!(versions.len(), 1);
+    assert_eq!(versions[0].id, old.id);
+    assert_eq!(versions[0].reason, "Edited pages");
+    let file = b.version_path(&new.id, &old.id).unwrap();
+    assert_eq!(paths::hash_file(&file).unwrap(), old.id);
+}

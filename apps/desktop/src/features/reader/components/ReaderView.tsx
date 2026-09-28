@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   Bookmark,
   BookmarkCheck,
+  History,
   NotebookPen,
   PanelLeft,
   Search,
@@ -60,6 +61,11 @@ import {
   SignatureDialog,
 } from "../markup/MarkupDialogs";
 import { pickPicture } from "../markup/pickPicture";
+import { PageEditor } from "../edit/PageEditor";
+import { VersionsDialog } from "../edit/EditDialogs";
+import { pdfAnnots } from "@/readers";
+import { useQuery } from "@tanstack/react-query";
+import { unwrap } from "@/lib/ipc";
 import "@/readers/reader.css";
 import "katex/dist/katex.min.css";
 
@@ -136,6 +142,11 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
   const [attempt, setAttempt] = useState(0);
   const openHelper = useHelperDialog((s) => s.open);
   const [pageInput, setPageInput] = useState("");
+  // Edit pages mode (PDF), filled-in forms, version history.
+  const [editing, setEditing] = useState(false);
+  const [formDirty, setFormDirty] = useState(false);
+  const [savingForm, setSavingForm] = useState(false);
+  const [versionsOpen, setVersionsOpen] = useState(false);
   const pageInputRef = useRef<HTMLInputElement>(null);
 
   const theme = useMemo(() => {
@@ -222,6 +233,7 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
             },
             annotationClick: (id, rect) => setMenu({ id, rect, edit: false }),
             externalLink: (href) => linkRef.current(href),
+            formChanged: (dirty) => setFormDirty(dirty),
           },
           bookId,
         );
@@ -373,6 +385,57 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
       setExporting(false);
     }
   };
+  /** The file changed (a new version): the tab follows the book's new id. */
+  const fileChanged = (next: { id: string }) => {
+    setEditing(false);
+    setFormDirty(false);
+    void qc.invalidateQueries({ queryKey: ["lib"] });
+    if (next.id !== bookId) useTabs.getState().replaceBook(bookId, next.id);
+    else setAttempt((a) => a + 1);
+  };
+  const saveIntoPdf = async () => {
+    setExporting(true);
+    try {
+      const annots = pdfAnnots(markup.visibleMarks(), markup.pageAspect);
+      const saved = await unwrap(commands.saveMarkupIntoPdf(bookId, annots));
+      setExportOpen(false);
+      toast.success("Markup saved into the PDF", {
+        description: "Other PDF apps now show it. The earlier file is kept in Version history.",
+      });
+      fileChanged(saved);
+    } catch (e) {
+      toast.error("The markup could not be saved into the PDF", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+  const saveForm = async () => {
+    const renderer = r();
+    if (!renderer?.saveForm) return;
+    setSavingForm(true);
+    try {
+      const bytes = await renderer.saveForm();
+      let binary = "";
+      for (let i = 0; i < bytes.length; i += 0x8000)
+        binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      const saved = await unwrap(commands.saveFilledForm(bookId, btoa(binary)));
+      toast.success("Form saved", { description: "The earlier file is kept in Version history." });
+      fileChanged(saved);
+    } catch (e) {
+      toast.error("The form could not be saved", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setSavingForm(false);
+    }
+  };
+  const { data: ocrPages = [] } = useQuery({
+    queryKey: ["lib", "reader", bookId, "ocr-pages"],
+    queryFn: () => unwrap(commands.ocrPages(bookId)),
+    enabled: editing,
+  });
   const changeLayout = (change: Partial<PageLayout>) => {
     r()?.setLayout?.(change);
     setPageLayout(r()?.layoutOptions?.() ?? null);
@@ -662,29 +725,48 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
           <div className="mr-1 flex rounded-md border p-0.5" role="radiogroup" aria-label="Mode">
             {(
               [
-                [false, "Read"],
-                [true, "Markup"],
+                ["read", "Read", "Read"],
+                [
+                  "markup",
+                  "Markup",
+                  `Markup: draw and write on the pages (${keys("reader.markup")})`,
+                ],
+                ...(fileType === "pdf" && editLibrary
+                  ? ([
+                      ["edit", "Edit pages", "Edit pages: reorder, turn, crop, redact, correct"],
+                    ] as const)
+                  : []),
               ] as const
-            ).map(([on, label]) => (
-              <button
-                key={label}
-                type="button"
-                role="radio"
-                aria-checked={markup.active === on}
-                title={
-                  on ? `Markup: draw and write on the pages (${keys("reader.markup")})` : "Read"
-                }
-                onClick={() => markup.setActive(on)}
-                className={cn(
-                  "h-6 rounded px-2.5 text-[12.5px]",
-                  markup.active === on
-                    ? "bg-muted font-medium text-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {label}
-              </button>
-            ))}
+            ).map(([id, label, title]) => {
+              const on = id === "edit" ? editing : !editing && (id === "markup") === markup.active;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  title={title}
+                  disabled={status !== "ready"}
+                  onClick={() => {
+                    if (id === "edit") {
+                      markup.setActive(false);
+                      setEditing(true);
+                    } else {
+                      setEditing(false);
+                      markup.setActive(id === "markup");
+                    }
+                  }}
+                  className={cn(
+                    "h-6 rounded px-2.5 text-[12.5px]",
+                    on
+                      ? "bg-muted font-medium text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
         )}
         <Button
@@ -714,6 +796,17 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
         >
           {bookmarkHere ? <BookmarkCheck className="fill-current" /> : <Bookmark />}
         </Button>
+        {fileType === "pdf" && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Version history"
+            title="Version history"
+            onClick={() => setVersionsOpen(true)}
+          >
+            <History />
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon"
@@ -726,7 +819,30 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
         </Button>
       </div>
 
-      {markup.active && !focusMode && (
+      {formDirty && !editing && (
+        <div className="flex h-10 shrink-0 items-center gap-3 border-b bg-primary/5 px-3 text-[13px]">
+          <span className="flex-1">
+            You filled in the form. Save it into the PDF, or undo your changes.
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setFormDirty(false);
+              setAttempt((a) => a + 1);
+            }}
+          >
+            Undo changes
+          </Button>
+          {editLibrary && (
+            <Button size="sm" disabled={savingForm} onClick={() => void saveForm()}>
+              {savingForm ? "Saving…" : "Save form"}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {markup.active && !focusMode && !editing && (
         <MarkupToolbar
           m={markup}
           onPickImage={() => void pickImage()}
@@ -744,7 +860,16 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
         />
       )}
 
-      <div className="flex min-h-0 flex-1">
+      {editing && book && (
+        <PageEditor
+          book={book}
+          hasOcr={ocrPages.length > 0}
+          canEdit={editLibrary}
+          onClose={() => setEditing(false)}
+          onSaved={fileChanged}
+        />
+      )}
+      <div className={cn("flex min-h-0 flex-1", editing && "hidden")}>
         {left && !focusMode && (
           <ContentsPanel
             panel={left}
@@ -963,10 +1088,25 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
         open={exportOpen}
         count={exportOpen ? markup.visibleMarks().length : 0}
         canAdd={editLibrary}
+        canSaveInto={editLibrary && fileType === "pdf"}
         busy={exporting}
         onClose={() => setExportOpen(false)}
         onExport={(add) => void exportMarkedUp(add)}
+        onSaveInto={() => void saveIntoPdf()}
       />
+      {versionsOpen && (
+        <VersionsDialog
+          open
+          bookId={bookId}
+          title={book?.metadata.title ?? tab.title}
+          canEdit={editLibrary}
+          onClose={() => setVersionsOpen(false)}
+          onRestored={(b) => {
+            setVersionsOpen(false);
+            fileChanged(b);
+          }}
+        />
+      )}
     </div>
   );
 }

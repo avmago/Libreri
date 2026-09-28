@@ -8,6 +8,7 @@
 //! .library-data/profiles/<profile>.json  (and .collections.json)
 //! .library-data/covers/<book>.jpg
 //! .library-data/text/<book>.json         OCR text (Phase 5)
+//! .library-data/versions/<book>/…        earlier versions, with book files (Phase 6b)
 //! Notes/<profile name>/…                 notebooks and notes, as Markdown
 //! Books/…                                book files, when included
 //! database/library.db                    a copy of the catalogue, for reference
@@ -36,6 +37,7 @@ const ALLOWED: &[&str] = &[
     ".library-data/profiles/",
     ".library-data/covers/",
     ".library-data/text/",
+    ".library-data/versions/",
     "Notes/",
     "Books/",
     "database/",

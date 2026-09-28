@@ -2880,7 +2880,9 @@ name = "libreri-pdf-edit"
 version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
+ "hayro",
  "image",
+ "kurbo",
  "libreri-formats",
  "lopdf",
  "serde",

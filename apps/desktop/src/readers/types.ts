@@ -63,6 +63,8 @@ export interface RendererEvents {
   annotationClick: (id: string, rect: DOMRect) => void;
   /** A `libreri://` link (from notes inside a book) or external link was clicked. */
   externalLink?: (href: string) => void;
+  /** PDF forms: fields were filled in (true) or put back (false). */
+  formChanged?: (dirty: boolean) => void;
 }
 
 export interface Renderer {
@@ -107,6 +109,8 @@ export interface Renderer {
   /** Comics: how pages are laid out (null for other books). */
   layoutOptions?(): PageLayout | null;
   setLayout?(layout: Partial<PageLayout>): void;
+  /** PDF forms: the PDF with the fields as filled in. */
+  saveForm?(): Promise<Uint8Array>;
 }
 
 /** How comic pages are shown. */
