@@ -94,7 +94,7 @@ pub struct TextStatusDto {
     pub suggested_languages: Vec<String>,
 }
 
-fn default_languages(state: &AppState) -> Vec<String> {
+pub(crate) fn default_languages(state: &AppState) -> Vec<String> {
     let list = state
         .settings
         .lock()

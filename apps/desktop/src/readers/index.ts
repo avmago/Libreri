@@ -59,3 +59,4 @@ export { drawList, pdfAnnots } from "./markup/export";
 export { loadPdfJs } from "./pdf/load";
 export type { SpeechPiece, SpeechSource } from "./speech/types";
 export { sentences, mathmlToSpeech, texToSpeech } from "./speech";
+export type { PageClip } from "./clip";

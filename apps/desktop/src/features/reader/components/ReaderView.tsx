@@ -10,6 +10,7 @@ import {
   Volume2,
   NotebookPen,
   PanelLeft,
+  PenLine,
   Search,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -19,6 +20,7 @@ import { useBook, useLibraryView } from "@/features/library";
 import { useHelperDialog } from "@/features/helpers";
 import { usePermissions, useProfilePrefs } from "@/features/profiles";
 import { VoiceNoteBar, useVoiceNote, type RecordedVoice } from "@/features/speech";
+import { CanvasPanel } from "@/features/canvas";
 import { bookUrl, commands, type Annotation, type HighlightColor, type TextQuote } from "@/lib/ipc";
 import { keysLabel, platform, shortcutFor, useShortcut, type ActionId } from "@/lib/shortcuts";
 import { useTabs, type BookTab } from "@/lib/tabs";
@@ -47,7 +49,7 @@ import {
   useSaveAnnotation,
 } from "../api";
 import { useAppDark } from "../hooks/useAppDark";
-import { parseBookLink } from "../links";
+import { pageJump, parseBookLink } from "../links";
 import { useReaderPrefs } from "../prefs";
 import { AppearanceMenu } from "./AppearanceMenu";
 import { ContentsPanel, type LeftPanel } from "./ContentsPanel";
@@ -150,7 +152,26 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   const [menu, setMenu] = useState<{ id: string; rect: DOMRect; edit: boolean } | null>(null);
   const [left, setLeft] = useState<LeftPanel | null>("contents");
   const [lastLeft, setLastLeft] = useState<LeftPanel>("contents");
-  const [notebookOpen, setNotebookOpen] = useState(false);
+  const [notebookOpen, setNotebookOpenRaw] = useState(false);
+  const [canvasOpen, setCanvasOpenRaw] = useState(false);
+  // The notebook and the canvas share the right side: one at a time.
+  const setNotebookOpen = (v: boolean | ((o: boolean) => boolean)) =>
+    setNotebookOpenRaw((o) => {
+      const next = typeof v === "function" ? v(o) : v;
+      if (next) setCanvasOpenRaw(false);
+      return next;
+    });
+  const setCanvasOpen = (v: boolean | ((o: boolean) => boolean)) =>
+    setCanvasOpenRaw((o) => {
+      const next = typeof v === "function" ? v(o) : v;
+      if (next) setNotebookOpenRaw(false);
+      return next;
+    });
+  // Clipping a figure: a box drawn over the page.
+  const [clipping, setClipping] = useState<{ done: (r: DOMRect | null) => void } | null>(null);
+  const [clipBox, setClipBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(
+    null,
+  );
   const [notebookInsert, setNotebookInsert] = useState<string | null>(null);
   const [findOpen, setFindOpen] = useState(false);
   const [findStep, setFindStep] = useState<{ backwards: boolean; seq: number }>({
@@ -215,10 +236,16 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
       const link = parseBookLink(href);
       if (link) {
         if (link.bookId === bookId) {
+          if (link.page) void rendererRef.current?.goTo({ type: "pdf", page: link.page });
           const a = annotationsRef.current.find((x) => x.id === link.annotation);
           if (a) void rendererRef.current?.showAnnotation(a);
         } else {
-          openTab({ bookId: link.bookId, title: "Book", fileType: "pdf", jumpTo: link.annotation });
+          openTab({
+            bookId: link.bookId,
+            title: "Book",
+            fileType: "pdf",
+            jumpTo: link.page ? pageJump(link.page) : link.annotation,
+          });
         }
       } else if (/^(https?:|mailto:)/i.test(href)) {
         void commands.openExternalUrl(href).then((r) => {
@@ -313,7 +340,14 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
 
   // Jump to an annotation when the tab was opened from a link.
   useEffect(() => {
-    if (status !== "ready" || !tab.jumpTo || !annotations.length) return;
+    if (status !== "ready" || !tab.jumpTo) return;
+    const page = /^page:(\d+)$/.exec(tab.jumpTo);
+    if (page) {
+      void rendererRef.current?.goTo({ type: "pdf", page: Number(page[1]) });
+      clearJump(bookId);
+      return;
+    }
+    if (!annotations.length) return;
     const a = annotations.find((x) => x.id === tab.jumpTo);
     if (a) void rendererRef.current?.showAnnotation(a);
     clearJump(bookId);
@@ -644,6 +678,38 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
         onError: (e) => toast.error("Could not save the voice note", { description: String(e) }),
       },
     );
+  };
+
+  useEffect(() => {
+    if (!clipping) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      setClipping(null);
+      setClipBox(null);
+      clipping.done(null);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [clipping]);
+
+  /** Lets the person draw a box on the page and clips the figure in it. */
+  const clipFromPage = async () => {
+    const renderer = r();
+    if (!renderer?.clipPicture) return null;
+    const rect = await new Promise<DOMRect | null>((done) => setClipping({ done }));
+    if (!rect) return null;
+    const clip = await renderer.clipPicture(rect);
+    if (!clip) {
+      toast("Nothing to clip there", { description: "Draw the box over a page." });
+      return null;
+    }
+    const box = clip.box.map((v) => Math.round(v * 10000) / 10000).join(",");
+    return {
+      clip,
+      link: `libreri://book/${bookId}#page=${clip.page}&rect=${box}`,
+      label: `${book?.metadata.title ?? "Book"}, p. ${clip.page}`,
+    };
   };
 
   const addToNotebook = (a: Annotation) => {
@@ -985,6 +1051,16 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
         <Button
           variant="ghost"
           size="icon"
+          aria-label="Canvas"
+          aria-pressed={canvasOpen}
+          title="Canvas: write and draw by hand"
+          onClick={() => setCanvasOpen((o) => !o)}
+        >
+          <PenLine />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           aria-label="Notebook"
           aria-pressed={notebookOpen}
           title={`Notebook (${keys("reader.notebook")})`}
@@ -1107,6 +1183,50 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
                 : undefined
             }
           />
+          {clipping && (
+            <div
+              className="absolute inset-0 z-20 cursor-crosshair bg-black/10"
+              role="application"
+              aria-label="Draw a box around what to clip"
+              onPointerDown={(e) => {
+                e.currentTarget.setPointerCapture(e.pointerId);
+                setClipBox({ x0: e.clientX, y0: e.clientY, x1: e.clientX, y1: e.clientY });
+              }}
+              onPointerMove={(e) =>
+                setClipBox((b) => (b ? { ...b, x1: e.clientX, y1: e.clientY } : b))
+              }
+              onPointerUp={() => {
+                const b = clipBox;
+                setClipBox(null);
+                const done = clipping.done;
+                setClipping(null);
+                if (!b || Math.abs(b.x1 - b.x0) < 8 || Math.abs(b.y1 - b.y0) < 8) return done(null);
+                done(
+                  new DOMRect(
+                    Math.min(b.x0, b.x1),
+                    Math.min(b.y0, b.y1),
+                    Math.abs(b.x1 - b.x0),
+                    Math.abs(b.y1 - b.y0),
+                  ),
+                );
+              }}
+            >
+              <div className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 rounded-md bg-foreground px-3 py-1.5 text-[12.5px] text-background shadow">
+                Draw a box around the figure · Esc to cancel
+              </div>
+              {clipBox && (
+                <div
+                  className="pointer-events-none fixed border-2 border-dashed border-blue-600 bg-blue-500/10"
+                  style={{
+                    left: Math.min(clipBox.x0, clipBox.x1),
+                    top: Math.min(clipBox.y0, clipBox.y1),
+                    width: Math.abs(clipBox.x1 - clipBox.x0),
+                    height: Math.abs(clipBox.y1 - clipBox.y0),
+                  }}
+                />
+              )}
+            </div>
+          )}
           {focusMode && (
             <Button
               variant="outline"
@@ -1170,6 +1290,16 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
             onLink={handleLink}
             onClose={() => setNotebookOpen(false)}
             lang={book?.metadata.language}
+          />
+        )}
+        {canvasOpen && !focusMode && (
+          <CanvasPanel
+            bookId={bookId}
+            dark={appDark}
+            lang={book?.metadata.language}
+            onLink={handleLink}
+            onClose={() => setCanvasOpen(false)}
+            clip={fileType === "pdf" || isPaged(fileType) ? clipFromPage : undefined}
           />
         )}
       </div>

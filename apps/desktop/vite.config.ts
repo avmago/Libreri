@@ -46,9 +46,28 @@ function pdfjsAssets(): Plugin {
   };
 }
 
+/**
+ * Excalidraw (handwriting canvases) loads its fonts as files from
+ * `window.EXCALIDRAW_ASSET_PATH`. Copy them into public/excalidraw (ignored
+ * by git), leaving out the 13 MB Chinese/Japanese handwriting font.
+ */
+function excalidrawAssets(): Plugin {
+  return {
+    name: "libreri-excalidraw-assets",
+    buildStart() {
+      const from = fileURLToPath(
+        new URL("./node_modules/@excalidraw/excalidraw/dist/prod/fonts", import.meta.url),
+      );
+      const to = fileURLToPath(new URL("./public/excalidraw/fonts", import.meta.url));
+      if (existsSync(from) && !existsSync(to))
+        cpSync(from, to, { recursive: true, filter: (src) => !src.includes("Xiaolai") });
+    },
+  };
+}
+
 // https://tauri.app/start/frontend/vite/
 export default defineConfig({
-  plugins: [react(), tailwindcss(), pdfjsAssets()],
+  plugins: [react(), tailwindcss(), pdfjsAssets(), excalidrawAssets()],
   resolve: {
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },

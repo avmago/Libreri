@@ -410,6 +410,23 @@ export const commands = {
 	 *  Returns the job id.
 	 */
 	autoSyncAudiobook: (id: string) => typedError<string, AppError>(__TAURI_INVOKE("auto_sync_audiobook", { id })),
+	/**  The profile's canvases, newest first (only a book's, when given). */
+	canvases: (book: string | null) => typedError<CanvasDto[], AppError>(__TAURI_INVOKE("canvases", { book })),
+	/**  Starts a canvas. Returns its path. */
+	createCanvas: (title: string, book: string | null, paper: string) => typedError<string, AppError>(__TAURI_INVOKE("create_canvas", { title, book, paper })),
+	readCanvas: (path: string) => typedError<string, AppError>(__TAURI_INVOKE("read_canvas", { path })),
+	writeCanvas: (path: string, content: string) => typedError<null, AppError>(__TAURI_INVOKE("write_canvas", { path, content })),
+	setCanvasPaper: (path: string, paper: string) => typedError<null, AppError>(__TAURI_INVOKE("set_canvas_paper", { path, paper })),
+	/**  Renames a canvas; returns its new path. */
+	renameCanvas: (path: string, title: string) => typedError<string, AppError>(__TAURI_INVOKE("rename_canvas", { path, title })),
+	deleteCanvas: (path: string) => typedError<null, AppError>(__TAURI_INVOKE("delete_canvas", { path })),
+	inkSettings: () => __TAURI_INVOKE<InkSettingsDto>("ink_settings"),
+	setInkEngine: (engine: string) => typedError<InkSettingsDto, AppError>(__TAURI_INVOKE("set_ink_engine", { engine })),
+	/**
+	 *  Reads handwriting: a PNG of the ink (base64), with the engine chosen in
+	 *  Settings. `lang` is the book's language, when known.
+	 */
+	inkToText: (pngBase64: string, lang: string | null) => typedError<string, AppError>(__TAURI_INVOKE("ink_to_text", { pngBase64, lang })),
 	spellDictionaries: () => __TAURI_INVOKE<DictionaryInfo[]>("spell_dictionaries"),
 	/**  Downloads a dictionary; progress arrives as `DictionaryDownload`. */
 	downloadDictionary: (code: string) => typedError<DictionaryInfo[], AppError>(__TAURI_INVOKE("download_dictionary", { code })),
@@ -786,6 +803,15 @@ export type Candidate = {
 	coverUrl: string | null,
 	/**  How well it matches the query, 0–1. An identifier match is 1. */
 	score: number | null,
+};
+
+export type CanvasDto = {
+	title: string,
+	relPath: string,
+	bookId: string | null,
+	paper: string,
+	modified: number | null,
+	elements: number,
 };
 
 /**  One difference. `pair` is the index into the page pairs. */
@@ -1211,6 +1237,14 @@ export type IndexStatusDto = {
 	/**  Bytes on this computer. */
 	size: number | null,
 	running: boolean,
+};
+
+export type InkSettingsDto = {
+	/**  "system" or "tesseract". */
+	engine: string,
+	/**  The system's recogniser, if this system has one. */
+	system: string | null,
+	tesseract: boolean,
 };
 
 /**  What will be run to install a helper, shown to the user first. */

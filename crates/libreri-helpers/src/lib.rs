@@ -9,6 +9,7 @@
 //! (Homebrew, winget, apt, dnf, pacman, zypper). Libreri's own signed
 //! downloads replace the package managers in Phase 9 (user, 2026-09-28).
 
+pub mod ink;
 pub mod speech;
 pub mod tessdata;
 

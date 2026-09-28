@@ -16,6 +16,7 @@ mod archive;
 #[cfg(test)]
 mod archive_tests;
 mod books;
+mod canvases;
 mod compare;
 mod covers;
 mod details;
@@ -60,6 +61,7 @@ pub use archive::{
     ArchiveImport, ArchiveImportReport, ArchiveOptions, ArchiveSummary, ProfileChoice,
     ProfileTarget,
 };
+pub use canvases::{CanvasEntry, PAPERS};
 pub use compare::{CompareDoc, CompareSource, Comparison};
 pub use covers::{cover_rel, thumbnail_rel};
 pub use details::FillReport;

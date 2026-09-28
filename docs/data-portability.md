@@ -67,6 +67,7 @@ Requirement (user, 2026-09-27): when the database, metadata and every kind of no
   - **In a notebook:** a relative Markdown link to the file (`[0:42](<Voice notes/<file>.flac>)`), which also works in other editors.
   - Speech models are per computer (app data `whisper/`) and never exported. See `docs/adr/0022-voice-notes-dictation-and-sync.md`.
 - The personal spelling dictionary is `Notes/<profile>/Dictionary.txt` (one word per line), so it travels with the notes folder. Writing settings (spell check, completion, languages) are profile preferences; downloaded dictionaries are per computer (app data `dictionaries/`) and never exported. See `docs/adr/0023-spell-check-and-word-suggestions.md`.
+- Canvases are standard Excalidraw files in `Notes/<profile>/Canvases/` (pictures inside). Their `libreri.book` is a `libreri://book/<id>` link, and clipped figures link to `libreri://book/<id>#page=<n>&rect=x,y,w,h`. Both follow book id changes through aliases. They open in other Excalidraw tools, which ignore Libreri's details. The ink-to-text choice is per computer. See `docs/adr/0024-handwriting-canvases.md`.
 
 ## Edited PDFs (versions)
 - Page edits create a new version with a **page map** (old page → new page). Anchors are migrated through the map; text-quote fallback catches the rest. Exports include the version history so links to older versions still resolve.

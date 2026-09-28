@@ -12,6 +12,7 @@
  * as PDFs (`{type:"pdf-highlight", page, rects}`), so notes, links and
  * exports treat both alike.
  */
+import { clipFrom, imageOf } from "../clip";
 import { bookUrl, commands, unwrap, type Annotation, type WordDto } from "@/lib/ipc";
 import type { MarkupLayer } from "../markup/MarkupLayer";
 import { makeQuote } from "../quote";
@@ -515,6 +516,15 @@ export class PageRenderer implements Renderer {
     const f = Math.max(0, Math.min(1, fraction)) * pages;
     const page = Math.min(pages, Math.floor(f) + 1);
     await this.showPage(page, f - (page - 1));
+  }
+
+  clipPicture(rect: DOMRect) {
+    return clipFrom(
+      rect,
+      this.slots
+        .filter((s) => s.div.isConnected)
+        .map((s) => ({ page: s.n, div: s.div, image: () => imageOf(s.img) })),
+    );
   }
 
   attachMarkup(layer: MarkupLayer | null) {

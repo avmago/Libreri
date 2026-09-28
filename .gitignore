@@ -22,3 +22,4 @@ Thumbs.db
 # Local test libraries
 /tmp-library*/
 apps/desktop/public/pdfjs/
+apps/desktop/public/excalidraw/

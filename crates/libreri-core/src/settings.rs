@@ -36,6 +36,10 @@ pub struct AppSettings {
     pub ocr_languages: Vec<String>,
     /// Speech recognition (whisper models are per computer).
     pub speech: SpeechSettings,
+    /// How handwriting on canvases is read: "system" (macOS or Windows
+    /// recognition) or "tesseract". `None` picks the system's where there
+    /// is one.
+    pub ink_engine: Option<String>,
 }
 
 /// Speech recognition: which downloaded model to use and how.

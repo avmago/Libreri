@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Download, Loader2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { useInkSettings, useSetInkEngine } from "@/features/canvas";
 import { useProfilePrefs } from "@/features/profiles";
 import {
   cancelDictionaryDownload,
@@ -32,6 +33,8 @@ export function WritingSettings() {
   const [progress, setProgress] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState<string[]>([]);
   const [pick, setPick] = useState("");
+  const { data: ink } = useInkSettings();
+  const setInk = useSetInkEngine();
 
   useEffect(() => {
     const off = events.dictionaryDownload.listen(({ payload: p }) => {
@@ -206,6 +209,49 @@ export function WritingSettings() {
           <p className="px-4 py-3 text-[12.5px] text-muted-foreground">No words added yet.</p>
         )}
       </Group>
+      {ink && (
+        <Group
+          title="Handwriting"
+          scope="computer"
+          description="Canvases can turn handwriting into typed text (select the ink, then Ink to text). Choose what reads it."
+        >
+          {ink.system && (
+            <Row
+              label={ink.system}
+              help="Built into the system: reads joined-up handwriting well. Nothing to install."
+              htmlFor="ink-system"
+            >
+              <input
+                id="ink-system"
+                type="radio"
+                name="ink-engine"
+                checked={ink.engine === "system"}
+                onChange={() => setInk.mutate("system", { onError: (e) => toast.error(e.message) })}
+              />
+            </Row>
+          )}
+          <Row
+            label="Tesseract"
+            help={
+              ink.tesseract
+                ? "The OCR helper program, with the languages chosen in Settings › Helper programs. Best for neat printed letters."
+                : "Install Tesseract in Settings › Helper programs to use it."
+            }
+            htmlFor="ink-tesseract"
+          >
+            <input
+              id="ink-tesseract"
+              type="radio"
+              name="ink-engine"
+              checked={ink.engine === "tesseract"}
+              disabled={!ink.tesseract && ink.engine !== "tesseract"}
+              onChange={() =>
+                setInk.mutate("tesseract", { onError: (e) => toast.error(e.message) })
+              }
+            />
+          </Row>
+        </Group>
+      )}
     </>
   );
 }

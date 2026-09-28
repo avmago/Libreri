@@ -8,6 +8,7 @@ import type { Annotation, HighlightColor, TextQuote } from "@/lib/ipc";
 import type { MarkupLayer } from "./markup/MarkupLayer";
 import type { PageTheme } from "./themes";
 import type { SpeechSource } from "./speech/types";
+import type { PageClip } from "./clip";
 
 /** A place in a book. Stored as JSON (`locator` in the database). */
 export type Locator =
@@ -116,6 +117,9 @@ export interface Renderer {
   /** Read aloud: the text from the place shown, a sentence at a time
    * (null when the book has no text to read). */
   readAloud?(): Promise<SpeechSource | null>;
+  /** The part of a page under a rectangle on the screen, as a picture
+   * (page-based books). */
+  clipPicture?(rect: DOMRect): Promise<PageClip | null>;
   /** Goes to a place given as 0–1 through the book (audiobook sync). */
   goToFraction?(fraction: number): Promise<void>;
 }

@@ -139,6 +139,37 @@ pub fn recognize(
     Ok(parse_tsv(&String::from_utf8_lossy(&out.stdout), page))
 }
 
+/// Reads a small image of writing (a block of lines, like handwriting on
+/// a canvas) with Tesseract. Returns the text.
+pub fn recognize_block(
+    image: &Path,
+    languages: &[String],
+    tessdata: Option<&Path>,
+) -> Result<String, String> {
+    let mut cmd = libreri_helpers::command("tesseract").ok_or(NOT_INSTALLED)?;
+    cmd.arg(image).arg("stdout");
+    if let Some(dir) = tessdata {
+        cmd.arg("--tessdata-dir").arg(dir);
+    }
+    let langs = if languages.is_empty() {
+        "eng".to_owned()
+    } else {
+        languages.join("+")
+    };
+    cmd.args(["-l", &langs, "--psm", "6"]);
+    let out = cmd
+        .output()
+        .map_err(|e| format!("Tesseract could not start: {e}"))?;
+    if !out.status.success() {
+        let err = String::from_utf8_lossy(&out.stderr);
+        return Err(format!(
+            "Tesseract could not read the writing: {}",
+            err.lines().last().unwrap_or("unknown error").trim()
+        ));
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).trim().to_owned())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -175,6 +206,8 @@ mod tests {
         let img = dir.path().join("p.png");
         std::fs::write(&img, png).unwrap();
         let page = recognize(&img, 1, &["eng".into()], None, Some(300)).unwrap();
+        let block = recognize_block(&img, &["eng".into()], None).unwrap();
+        assert!(block.contains("lighthouse keeper"), "{block}");
         assert!(page.text.contains("lighthouse keeper"), "{page:?}");
         let w = &page.words[0];
         assert!(w.rect[0] > 0.1 && w.rect[0] < 0.14, "{w:?}");

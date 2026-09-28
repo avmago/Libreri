@@ -7,6 +7,7 @@
  * (`{type:"pdf-highlight", page, rects}`) plus the quoted text, and drawn in
  * a layer on top of each rendered page.
  */
+import { clipFrom } from "../clip";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { commands, unwrap, type Annotation, type WordDto } from "@/lib/ipc";
 import type { MarkupLayer } from "../markup/MarkupLayer";
@@ -498,6 +499,22 @@ export class PdfRenderer implements Renderer {
         void this.goTo({ type: "pdf", page, top: Math.max(0, y - 0.15) });
       },
     );
+  }
+
+  clipPicture(rect: DOMRect) {
+    const sources = [];
+    for (let i = 0; i < (this.viewer?.pagesCount ?? 0); i++) {
+      const div = this.viewer.getPageView(i)?.div as HTMLElement | undefined;
+      const canvas = div?.querySelector<HTMLCanvasElement>(".canvasWrapper canvas");
+      if (!div || !canvas) continue;
+      sources.push({
+        page: i + 1,
+        div,
+        image: () =>
+          Promise.resolve({ source: canvas, width: canvas.width, height: canvas.height }),
+      });
+    }
+    return clipFrom(rect, sources);
   }
 
   async goToFraction(fraction: number) {
