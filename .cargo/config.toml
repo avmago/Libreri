@@ -1,0 +1,7 @@
+# Settings for building whisper.cpp (libreri-speech), passed to its CMake
+# build by whisper-rs-sys.
+[env]
+# Build for any computer of the target's kind rather than for the one doing
+# the build: installers must run everywhere, and `-mcpu=native` fails when
+# CMake runs under Rosetta on Apple silicon.
+GGML_NATIVE = "OFF"
