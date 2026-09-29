@@ -242,29 +242,35 @@ pub struct RestoredLibrary {
 /// export into it, owner included.
 #[tauri::command]
 #[specta::specta]
-pub fn restore_library(
-    state: State<'_, AppState>,
+pub async fn restore_library(
+    app: AppHandle,
     archive: String,
     folder: String,
 ) -> AppResult<RestoredLibrary> {
-    let archive = PathBuf::from(archive);
-    // Refuse a file that is not an archive before making anything.
-    libreri_export::archive::ArchiveReader::open(&archive)
-        .map_err(|e| AppError::invalid(e.to_string()))?;
-    state.close_library();
-    let library = Library::create(Path::new(&folder), None, APP_VERSION)?;
-    let summary = crate::commands::library::adopt(&state, library)?;
-    let job = state.start_archive_import(
-        archive,
-        ArchiveImport {
-            profiles: Vec::new(),
-            adopt_owner: true,
-        },
-    )?;
-    Ok(RestoredLibrary {
-        library: summary,
-        job_id: job.to_string(),
+    blocking(move || {
+        use tauri::Manager;
+        let state = app.state::<AppState>();
+        let archive = PathBuf::from(archive);
+        // Refuse a file that is not an archive before making anything.
+        libreri_export::archive::ArchiveReader::open(&archive)
+            .map_err(|e| AppError::invalid(e.to_string()))?;
+        let _opening = state.opening();
+        state.close_library();
+        let library = Library::create(Path::new(&folder), None, APP_VERSION)?;
+        let summary = crate::commands::library::adopt(&state, library)?;
+        let job = state.start_archive_import(
+            archive,
+            ArchiveImport {
+                profiles: Vec::new(),
+                adopt_owner: true,
+            },
+        )?;
+        Ok(RestoredLibrary {
+            library: summary,
+            job_id: job.to_string(),
+        })
     })
+    .await
 }
 
 #[derive(Debug, Clone, Serialize, Type)]

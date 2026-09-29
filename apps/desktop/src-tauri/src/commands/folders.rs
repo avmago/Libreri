@@ -1,5 +1,6 @@
 //! Folders under `Books/` and importing into them.
 
+use super::blocking;
 use crate::dto::{FolderDto, ImportModeDto};
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
@@ -17,32 +18,44 @@ pub fn list_folders(state: State<'_, AppState>) -> AppResult<Vec<FolderDto>> {
 /// Creates `name` inside `parent`; returns the new folder's path.
 #[tauri::command]
 #[specta::specta]
-pub fn create_folder(
+pub async fn create_folder(
     state: State<'_, AppState>,
     parent: String,
     name: String,
 ) -> AppResult<String> {
-    Ok(state.library()?.create_folder(&parent, &name)?)
+    let library = state.library()?;
+    blocking(move || Ok(library.create_folder(&parent, &name)?)).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn rename_folder(state: State<'_, AppState>, path: String, name: String) -> AppResult<String> {
-    Ok(state.library()?.rename_folder(&path, &name)?)
+pub async fn rename_folder(
+    state: State<'_, AppState>,
+    path: String,
+    name: String,
+) -> AppResult<String> {
+    let library = state.library()?;
+    blocking(move || Ok(library.rename_folder(&path, &name)?)).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn move_folder(state: State<'_, AppState>, path: String, parent: String) -> AppResult<String> {
-    Ok(state.library()?.move_folder(&path, &parent)?)
+pub async fn move_folder(
+    state: State<'_, AppState>,
+    path: String,
+    parent: String,
+) -> AppResult<String> {
+    let library = state.library()?;
+    blocking(move || Ok(library.move_folder(&path, &parent)?)).await
 }
 
 /// Moves a folder and its books to the system trash; returns the number of
 /// books removed.
 #[tauri::command]
 #[specta::specta]
-pub fn trash_folder(state: State<'_, AppState>, path: String) -> AppResult<u32> {
-    Ok(state.library()?.trash_folder(&path)? as u32)
+pub async fn trash_folder(state: State<'_, AppState>, path: String) -> AppResult<u32> {
+    let library = state.library()?;
+    blocking(move || Ok(library.trash_folder(&path)? as u32)).await
 }
 
 #[tauri::command]

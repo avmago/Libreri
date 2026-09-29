@@ -14,6 +14,13 @@ use std::io::{Read, Seek, SeekFrom};
 use tauri::http::{header, Method, Request, Response, StatusCode};
 use tauri::{AppHandle, Manager, UriSchemeContext, UriSchemeResponder, Wry};
 
+/// The most one range response holds. Asking for more (`bytes=0-`, which
+/// audio and video players send first) gets this much with a matching
+/// `Content-Range`, and the player asks again for the rest. Requests
+/// without a range still get the whole file: the readers fetch EPUBs and
+/// documents whole and need all of it.
+const MAX_RANGE: u64 = 8 * 1024 * 1024;
+
 /// Called by Tauri; answers on a separate thread so big reads never block.
 pub fn handle(
     ctx: UriSchemeContext<'_, Wry>,
@@ -75,7 +82,7 @@ fn serve(app: &AppHandle, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
         let path = state
             .media_files
             .lock()
-            .expect("media lock")
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .get(token)
             .cloned();
         return match path {
@@ -117,7 +124,8 @@ fn serve_file(request: &Request<Vec<u8>>, path: &std::path::Path, name: &str) ->
         .headers()
         .get(header::RANGE)
         .and_then(|v| v.to_str().ok())
-        .and_then(|v| parse_range(v, total));
+        .and_then(|v| parse_range(v, total))
+        .map(|r| r.map(|(start, end)| (start, cap_range(start, end))));
 
     let kind = content_type(relative);
     let mut builder = base(StatusCode::OK)
@@ -262,6 +270,11 @@ fn parse_range(value: &str, total: u64) -> Option<Result<(u64, u64), ()>> {
     })
 }
 
+/// The end of a range shortened to at most [`MAX_RANGE`] bytes.
+fn cap_range(start: u64, end: u64) -> u64 {
+    end.min(start.saturating_add(MAX_RANGE - 1))
+}
+
 /// Decodes `%20`-style escapes; rejects malformed input.
 fn percent_decode(input: &str) -> Result<String, ()> {
     let bytes = input.as_bytes();
@@ -342,5 +355,20 @@ mod tests {
         assert_eq!(parse_range("bytes=1000-", 1000), Some(Err(())));
         assert_eq!(parse_range("bytes=0-1,5-6", 1000), None);
         assert_eq!(parse_range("items=1-2", 1000), None);
+    }
+
+    #[test]
+    fn caps_long_ranges() {
+        let big = 3 * MAX_RANGE;
+        // `bytes=0-` of a large video: the first 8 MiB.
+        let Some(Ok((start, end))) = parse_range("bytes=0-", big) else {
+            panic!("a range")
+        };
+        assert_eq!((start, cap_range(start, end)), (0, MAX_RANGE - 1));
+        // A range in the middle, then near the end (not past it).
+        assert_eq!(cap_range(100, big - 1), 100 + MAX_RANGE - 1);
+        assert_eq!(cap_range(big - 10, big - 1), big - 1);
+        // Short ranges are kept as asked.
+        assert_eq!(cap_range(0, 99), 99);
     }
 }

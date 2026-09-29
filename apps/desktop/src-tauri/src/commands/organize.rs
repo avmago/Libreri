@@ -1,5 +1,6 @@
 //! Organising: bulk edit, tags and categories.
 
+use super::blocking;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use libreri_core::{BookId, BulkEdit};
@@ -16,46 +17,57 @@ fn book_ids(ids: &[String]) -> AppResult<Vec<BookId>> {
 /// Applies one edit to many books. Returns how many changed.
 #[tauri::command]
 #[specta::specta]
-pub fn bulk_edit_books(
+pub async fn bulk_edit_books(
     state: State<'_, AppState>,
     ids: Vec<String>,
     edit: BulkEdit,
 ) -> AppResult<u32> {
-    Ok(state.library()?.bulk_edit(&book_ids(&ids)?, &edit)? as u32)
+    let library = state.library()?;
+    let ids = book_ids(&ids)?;
+    blocking(move || Ok(library.bulk_edit(&ids, &edit)? as u32)).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn rename_tag(state: State<'_, AppState>, from: String, to: String) -> AppResult<u32> {
-    Ok(state.library()?.rename_tag(&from, &to)? as u32)
+pub async fn rename_tag(state: State<'_, AppState>, from: String, to: String) -> AppResult<u32> {
+    let library = state.library()?;
+    blocking(move || Ok(library.rename_tag(&from, &to)? as u32)).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn merge_tags(
+pub async fn merge_tags(
     state: State<'_, AppState>,
     sources: Vec<String>,
     into: String,
 ) -> AppResult<u32> {
-    Ok(state.library()?.merge_tags(&sources, &into)? as u32)
+    let library = state.library()?;
+    blocking(move || Ok(library.merge_tags(&sources, &into)? as u32)).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn delete_tag(state: State<'_, AppState>, tag: String) -> AppResult<u32> {
-    Ok(state.library()?.delete_tag(&tag)? as u32)
+pub async fn delete_tag(state: State<'_, AppState>, tag: String) -> AppResult<u32> {
+    let library = state.library()?;
+    blocking(move || Ok(library.delete_tag(&tag)? as u32)).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn rename_category(state: State<'_, AppState>, from: String, to: String) -> AppResult<u32> {
-    Ok(state.library()?.rename_category(&from, &to)? as u32)
+pub async fn rename_category(
+    state: State<'_, AppState>,
+    from: String,
+    to: String,
+) -> AppResult<u32> {
+    let library = state.library()?;
+    blocking(move || Ok(library.rename_category(&from, &to)? as u32)).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn delete_category(state: State<'_, AppState>, path: String) -> AppResult<u32> {
-    Ok(state.library()?.delete_category(&path)? as u32)
+pub async fn delete_category(state: State<'_, AppState>, path: String) -> AppResult<u32> {
+    let library = state.library()?;
+    blocking(move || Ok(library.delete_category(&path)? as u32)).await
 }
 
 #[derive(Debug, Clone, Serialize, Type)]
@@ -68,15 +80,18 @@ pub struct TagCountDto {
 /// Groups of tags that look like the same thing.
 #[tauri::command]
 #[specta::specta]
-pub fn similar_tags(state: State<'_, AppState>) -> AppResult<Vec<Vec<TagCountDto>>> {
-    Ok(state
-        .library()?
-        .similar_tags()?
-        .into_iter()
-        .map(|g| {
-            g.into_iter()
-                .map(|(name, count)| TagCountDto { name, count })
-                .collect()
-        })
-        .collect())
+pub async fn similar_tags(state: State<'_, AppState>) -> AppResult<Vec<Vec<TagCountDto>>> {
+    let library = state.library()?;
+    blocking(move || {
+        Ok(library
+            .similar_tags()?
+            .into_iter()
+            .map(|g| {
+                g.into_iter()
+                    .map(|(name, count)| TagCountDto { name, count })
+                    .collect()
+            })
+            .collect())
+    })
+    .await
 }

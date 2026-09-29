@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { create } from "zustand";
 import { events, type ImportFinished } from "@/lib/ipc";
+import { report } from "@/lib/windows";
 import { libKey } from "../api";
 
 export interface RunningJob {
@@ -67,10 +68,26 @@ export function useLibraryEvents() {
   const update = useJobs((s) => s.update);
 
   useEffect(() => {
+    // An import changes the library many times a second: refresh at once,
+    // then at most every half second while changes keep coming.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let again = false;
+    const refresh = () => {
+      if (timer) {
+        again = true;
+        return;
+      }
+      void qc.invalidateQueries({ queryKey: libKey });
+      timer = setTimeout(() => {
+        timer = undefined;
+        if (again) {
+          again = false;
+          refresh();
+        }
+      }, 500);
+    };
     const unlisten = [
-      events.libraryChanged.listen(() => {
-        void qc.invalidateQueries({ queryKey: libKey });
-      }),
+      events.libraryChanged.listen(refresh),
       events.jobEventPayload.listen(({ payload: e }) => {
         switch (e.kind) {
           case "started":
@@ -81,7 +98,9 @@ export function useLibraryEvents() {
             break;
           case "failed":
             update(e.id, null);
-            toast.error("Something went wrong", { description: e.message ?? undefined });
+            report(() =>
+              toast.error("Something went wrong", { description: e.message ?? undefined }),
+            );
             break;
           default:
             update(e.id, null);
@@ -90,13 +109,16 @@ export function useLibraryEvents() {
       events.importFinished.listen(({ payload }) => {
         const { title, description } = summarise(payload);
         const hasProblems = payload.failed.length > 0;
-        (hasProblems ? toast.warning : toast.success)(title, {
-          description: description || undefined,
-          duration: hasProblems || payload.duplicates.length ? 10_000 : 4_000,
-        });
+        report(() =>
+          (hasProblems ? toast.warning : toast.success)(title, {
+            description: description || undefined,
+            duration: hasProblems || payload.duplicates.length ? 10_000 : 4_000,
+          }),
+        );
       }),
     ];
     return () => {
+      clearTimeout(timer);
       for (const p of unlisten) void p.then((off) => off());
     };
   }, [qc, update]);

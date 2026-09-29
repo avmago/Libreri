@@ -3,7 +3,7 @@ import { ArrowDown, ArrowUp, Folder, Heart } from "lucide-react";
 import type { FolderDto, SortKey } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
 import { authorsText, FILE_TYPE_LABEL, formatDate, formatSize, type BookView } from "../model";
-import { useLibraryView } from "../store";
+import { useLibraryView, useSelectedIds } from "../store";
 import { useDrag } from "../drag";
 import { BookContextMenu } from "./BookContextMenu";
 import { NoTextMark } from "@/features/search";
@@ -110,7 +110,8 @@ export function BookList({
   folders: FolderDto[];
   onOpenFolder: (path: string) => void;
 }) {
-  const { selection, sort, descending, setSort } = useLibraryView();
+  const { sort, descending, setSort } = useLibraryView();
+  const selected = useSelectedIds();
   const handlers = useItemHandlers(books);
   const SortIcon = descending ? ArrowDown : ArrowUp;
 
@@ -139,9 +140,9 @@ export function BookList({
       {folders.map((f) => (
         <FolderRow key={f.path} folder={f} onOpen={() => onOpenFolder(f.path)} />
       ))}
-      <div role="listbox" data-shortcuts aria-multiselectable aria-label="Books">
+      <div role="listbox" data-shortcuts data-book-list aria-multiselectable aria-label="Books">
         {books.map((b) => (
-          <BookRow key={b.id} book={b} selected={selection.includes(b.id)} handlers={handlers} />
+          <BookRow key={b.id} book={b} selected={selected.has(b.id)} handlers={handlers} />
         ))}
       </div>
     </div>

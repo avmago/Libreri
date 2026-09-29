@@ -196,6 +196,54 @@ pub(crate) fn versions_dir(lib: &Library, id: &BookId) -> PathBuf {
     lib.layout().data_dir().join("versions").join(id.as_str())
 }
 
+/// Moves a book's earlier versions along when its id changes (the file was
+/// edited elsewhere, or another copy took its place). Versions already
+/// under the new id are left alone.
+pub(crate) fn rename_versions(lib: &Library, old: &BookId, new: &BookId) {
+    let from = versions_dir(lib, old);
+    let to = versions_dir(lib, new);
+    if from.is_dir() && !to.exists() {
+        let _ = fs::rename(from, to);
+    }
+}
+
+/// What `save_version` has done so far, to put back if a step fails.
+#[derive(Default)]
+struct Undo {
+    /// The new file, moved next to the book: (where it is, where it was).
+    staged: Option<(PathBuf, PathBuf)>,
+    /// The versions folder, renamed: (new name, old name).
+    moved_dir: Option<(PathBuf, PathBuf)>,
+    /// A versions folder made for this save.
+    made_dir: Option<PathBuf>,
+    /// The copy of the old file, when this save made it.
+    copy: Option<PathBuf>,
+    /// The book's file was replaced: (copy of the old file, book file).
+    replaced: Option<(PathBuf, PathBuf)>,
+}
+
+impl Undo {
+    fn run(self) {
+        if let Some((copy, book)) = &self.replaced {
+            let _ = fs::copy(copy, book);
+        }
+        if let Some((staged, original)) = &self.staged {
+            if paths::move_file(staged, original).is_err() {
+                let _ = fs::remove_file(staged);
+            }
+        }
+        if let Some(copy) = &self.copy {
+            let _ = fs::remove_file(copy);
+        }
+        if let Some((now, before)) = &self.moved_dir {
+            let _ = fs::rename(now, before);
+        }
+        if let Some(dir) = &self.made_dir {
+            let _ = fs::remove_dir(dir);
+        }
+    }
+}
+
 fn read_manifest(dir: &Path) -> Manifest {
     fs::read_to_string(dir.join(MANIFEST))
         .ok()
@@ -507,23 +555,53 @@ impl Library {
             .unwrap_or_else(|| "bin".into());
         let old_dir = versions_dir(self, &book.id);
         let dir = versions_dir(self, &new_id);
-        if old_dir.is_dir() {
-            fs::create_dir_all(dir.parent().unwrap_or(&dir))?;
-            fs::rename(&old_dir, &dir)?;
-        }
-        fs::create_dir_all(&dir)?;
         let file = format!("{}.{ext}", book.id);
         let kept_copy = dir.join(&file);
-        fs::copy(&path, &kept_copy)?;
-        let size = fs::metadata(&kept_copy)?.len();
 
-        // Put the new file in place.
+        // Every step below is undone if a later one fails, so a failed save
+        // leaves the book, its versions and the new file as they were.
         let staged = path.with_extension(format!("{ext}.libreri-new"));
         paths::move_file(v.file, &staged)?;
-        fs::rename(&staged, &path)?;
-        let meta = fs::metadata(&path)?;
+        let mut undo = Undo {
+            staged: Some((staged.clone(), v.file.to_path_buf())),
+            ..Default::default()
+        };
+        let placed = (|| -> std::io::Result<u64> {
+            if old_dir.is_dir() {
+                fs::create_dir_all(dir.parent().unwrap_or(&dir))?;
+                fs::rename(&old_dir, &dir)?;
+                undo.moved_dir = Some((dir.clone(), old_dir.clone()));
+            } else if !dir.exists() {
+                fs::create_dir_all(&dir)?;
+                undo.made_dir = Some(dir.clone());
+            }
+            if !kept_copy.exists() {
+                undo.copy = Some(kept_copy.clone());
+            }
+            fs::copy(&path, &kept_copy)?;
+            let size = fs::metadata(&kept_copy)?.len();
+            // Put the new file in place.
+            fs::rename(&staged, &path)?;
+            undo.staged = None;
+            undo.replaced = Some((kept_copy.clone(), path.clone()));
+            Ok(size)
+        })();
+        let size = match placed {
+            Ok(size) => size,
+            Err(e) => {
+                undo.run();
+                return Err(e.into());
+            }
+        };
+        let meta = match fs::metadata(&path) {
+            Ok(m) => m,
+            Err(e) => {
+                undo.run();
+                return Err(e.into());
+            }
+        };
         let old = book.id.clone();
-        self.with_db(|db| {
+        let changed = self.with_db(|db| {
             db.change_book_id(
                 &old,
                 &new_id,
@@ -531,7 +609,11 @@ impl Library {
                 paths::mtime_secs(&meta),
                 &crate::now(),
             )
-        })?;
+        });
+        if let Err(e) = changed {
+            undo.run();
+            return Err(e);
+        }
         sidecar::rename(self.layout(), &old, &new_id);
         crate::text::rename(self.layout(), &old, &new_id);
         self.rename_annotation_backups(&old, &new_id);
@@ -566,6 +648,17 @@ impl Library {
         write_manifest(&dir, &m)?;
         self.after_change(&new_id)?;
         self.record(&new_id)
+    }
+
+    /// Deletes all earlier versions of a book, for good (after redacting,
+    /// so the hidden text is not kept anywhere, backups included).
+    pub fn forget_versions(&self, id: &BookId) -> Result<()> {
+        self.require_edit()?;
+        match fs::remove_dir_all(versions_dir(self, id)) {
+            Ok(()) => Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(e.into()),
+        }
     }
 
     /// Rewrites the sidecar and every personal backup of a book.
@@ -659,7 +752,8 @@ impl Library {
             let before = &mut m.versions[k - 1];
             before.next = compose(before.next.as_ref(), restored.next.as_ref());
         }
-        write_manifest(&dir, &m)?;
+        // `m` is written only once the file is saved: a failed restore
+        // leaves the list of versions as it was.
 
         // Copy it out, then save it like any other change.
         let path = self
@@ -684,7 +778,15 @@ impl Library {
             let _ = fs::remove_file(&tmp);
         }
         let new = new?;
-        let _ = fs::remove_file(versions_dir(self, &new.id).join(&restored.file));
+        // save_version added the current file as the last entry of the
+        // unchanged list; keep that entry after the edited ones.
+        let new_dir = versions_dir(self, &new.id);
+        if new.id != book.id {
+            let saved = read_manifest(&new_dir).versions.pop();
+            m.versions.extend(saved);
+        }
+        write_manifest(&new_dir, &m)?;
+        let _ = fs::remove_file(new_dir.join(&restored.file));
         let no_sizes = PageSizes {
             old: Vec::new(),
             new: Vec::new(),
@@ -1006,5 +1108,69 @@ mod tests {
         lib.delete_version(&back.id, &new.id).unwrap();
         assert!(lib.versions(&back.id).unwrap().is_empty());
         assert_eq!(lib.versions_usage(), (0, 0));
+    }
+
+    #[test]
+    fn a_failed_save_or_restore_leaves_everything_as_it_was() {
+        let (dir, lib) = library();
+        pdf(&lib.layout().books_dir(), &["one", "two"]);
+        lib.scan(&crate::NoProgress).unwrap();
+        let book = lib.books(&BookQuery::default()).unwrap()[0].clone();
+        let path = lib.layout().resolve_relative(&book.rel_path).unwrap();
+        let before = fs::read(&path).unwrap();
+        let edit = |name: &str| {
+            let out = dir.path().join(name);
+            let plan = EditPlan {
+                pages: vec![OutPage::Page {
+                    page: 2,
+                    rotate: 0,
+                    crop: None,
+                }],
+                ..Default::default()
+            };
+            let cur = lib
+                .layout()
+                .resolve_relative(&lib.book(&book.id).unwrap().rel_path);
+            libreri_pdf_edit::apply(&cur.unwrap(), &plan, &[], &out).unwrap();
+            out
+        };
+        let out = edit("a.pdf");
+        let new_id = paths::hash_file(&out).unwrap();
+        // Something in the way of the copy of the old file.
+        let blocker = versions_dir(&lib, &new_id).join(format!("{}.pdf", book.id));
+        fs::create_dir_all(blocker.join("x")).unwrap();
+        let save = |file: &Path| {
+            lib.save_version(
+                &book.id,
+                NewVersion {
+                    file,
+                    reason: "Edited pages",
+                    pages: None,
+                    cover_changed: false,
+                },
+            )
+        };
+        assert!(save(&out).is_err());
+        assert_eq!(fs::read(&path).unwrap(), before, "the book is unchanged");
+        assert!(out.is_file(), "the new file is back where it was");
+        assert!(!path.with_extension("pdf.libreri-new").exists());
+        assert_eq!(lib.book(&book.id).unwrap().id, book.id);
+
+        fs::remove_dir_all(&blocker).unwrap();
+        let _ = fs::remove_dir(versions_dir(&lib, &new_id));
+        let new = save(&out).unwrap();
+        assert_eq!(new.id, new_id);
+
+        // Restoring fails the same way: the list of versions is kept.
+        let blocker = versions_dir(&lib, &book.id).join(format!("{new_id}.pdf"));
+        fs::create_dir_all(blocker.join("x")).unwrap();
+        assert!(lib.restore_version(&new.id, &book.id).is_err());
+        assert_eq!(lib.versions(&new.id).unwrap().len(), 1);
+        assert_eq!(lib.book(&new.id).unwrap().id, new.id);
+        fs::remove_dir_all(versions_dir(&lib, &book.id)).unwrap();
+        let back = lib.restore_version(&new.id, &book.id).unwrap();
+        assert_eq!(back.id, book.id);
+        assert_eq!(fs::read(&path).unwrap(), before);
+        assert_eq!(lib.versions(&back.id).unwrap().len(), 1);
     }
 }

@@ -49,6 +49,12 @@ fn safe_file_name(s: &str) -> String {
         .chars()
         .take(120)
         .collect::<String>();
+    // Cut by bytes too: 120 CJK characters are 360 bytes, over the usual
+    // 255-byte limit on file names.
+    let cleaned = libreri_export::truncate_bytes(&cleaned, libreri_export::MAX_NAME_BYTES)
+        .trim_end()
+        .trim_matches('.')
+        .to_owned();
     if paths::validate_name(&cleaned).is_ok() {
         cleaned
     } else {
@@ -104,6 +110,13 @@ pub(crate) fn read_backup(text: &str) -> Option<PersonalBackup> {
 /// The folder name under `Notes/` for a profile called `name`.
 pub(crate) fn notes_folder_name(name: &str) -> String {
     safe_file_name(name)
+}
+
+/// Two profiles whose notes folders would be the same folder on a
+/// case-insensitive disk (macOS, Windows): "Sam" and "Sam.", "Élise" and
+/// "élise", or two names that both become "Untitled".
+pub(crate) fn same_notes_folder(a: &str, b: &str) -> bool {
+    notes_folder_name(a).to_lowercase() == notes_folder_name(b).to_lowercase()
 }
 
 impl Library {

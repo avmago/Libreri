@@ -1,6 +1,7 @@
 //! Whisper models: which exist, which are downloaded (per computer, in
 //! the app's data folder), downloading and removing them.
 
+use libreri_helpers::download::{self, StallReader};
 use serde::Serialize;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -113,11 +114,11 @@ pub fn download(
         .replace("{name}", k.file);
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_connect(Some(Duration::from_secs(20)))
-        .timeout_recv_body(Some(Duration::from_secs(120)))
+        .timeout_recv_body(Some(libreri_helpers::download::BODY_LIMIT))
         .max_redirects(8)
         .build()
         .into();
-    let mut res = agent.get(&url).call().map_err(|e| match e {
+    let res = agent.get(&url).call().map_err(|e| match e {
         ureq::Error::StatusCode(c) => format!("the download failed (HTTP {c})"),
         ureq::Error::HostNotFound => "the download failed; check the internet connection".into(),
         other => format!("the download failed: {other}"),
@@ -129,11 +130,12 @@ pub fn download(
         .and_then(|v| v.parse().ok());
     let tmp = dir.join(format!(".{}.download", k.file));
     let mut file = std::fs::File::create(&tmp).map_err(|e| e.to_string())?;
-    let mut reader = res
-        .body_mut()
-        .with_config()
+    let body = res
+        .into_body()
+        .into_with_config()
         .limit(4 * 1024 * 1024 * 1024)
         .reader();
+    let mut reader = StallReader::new(body, download::STALL, Some(cancel));
     let mut buf = vec![0u8; 256 * 1024];
     let mut done = 0u64;
     let mut head = Vec::new();
@@ -145,9 +147,13 @@ pub fn download(
         if cancel.load(Ordering::SeqCst) {
             return Err(fail(&tmp, "cancelled".into()));
         }
-        let n = reader
-            .read(&mut buf)
-            .map_err(|e| fail(&tmp, format!("the download stopped: {e}")))?;
+        let n = reader.read(&mut buf).map_err(|e| {
+            if download::is_cancelled(&e) {
+                fail(&tmp, "cancelled".into())
+            } else {
+                fail(&tmp, format!("the download stopped: {e}"))
+            }
+        })?;
         if n == 0 {
             break;
         }

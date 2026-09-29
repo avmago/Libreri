@@ -15,12 +15,40 @@ export function useProfiles() {
   return useQuery({ queryKey: profilesKey, queryFn: () => unwrap(commands.listProfiles()) });
 }
 
+/**
+ * Queries that hold nothing of one profile's (the app's settings, installed
+ * helpers and models, dictionaries…). Every other query is the profile's.
+ */
+const APP_WIDE = new Set([
+  "settings",
+  "library",
+  "helpers",
+  "ink",
+  "canvas-fonts",
+  "page-cache",
+  "online-settings",
+  "speech",
+  "maths-settings",
+  "ocr-languages",
+  "cover-preview",
+]);
+
+/** True for a query that belongs to the signed-in profile. */
+export function isProfileQuery(key: readonly unknown[]): boolean {
+  const [root, sub] = key;
+  if (root === "lib") return sub !== "session";
+  if (root === "spell") return sub !== "dictionaries";
+  return !APP_WIDE.has(String(root));
+}
+
+/** Throws away everything read for the profile that was signed in. */
+export function forgetProfileData(qc: QueryClient) {
+  qc.removeQueries({ predicate: (q) => isProfileQuery(q.queryKey) });
+}
+
 /** Everything read for one profile is thrown away when someone else signs in. */
 function switchTo(qc: QueryClient, session: SessionDto | null) {
-  qc.removeQueries({
-    queryKey: ["lib"],
-    predicate: (q) => q.queryKey[1] !== "session",
-  });
+  forgetProfileData(qc);
   qc.setQueryData(sessionKey, session);
 }
 

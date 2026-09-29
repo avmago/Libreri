@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { authorsText, coverTone, fileName, formatSize, toView } from "./model";
+import {
+  addListItems,
+  authorsText,
+  coverTone,
+  fileName,
+  formatSize,
+  parseNumberField,
+  toView,
+} from "./model";
 import type { BookDto } from "@/lib/ipc";
 
 describe("model helpers", () => {
@@ -35,5 +43,22 @@ describe("model helpers", () => {
     const v = toView(dto);
     expect(v.metadata.authors).toEqual([]);
     expect(v.user.status).toBe("none");
+  });
+});
+
+describe("form helpers", () => {
+  it("adds typed chips once each", () => {
+    expect(addListItems(["a"], "b, a; c")).toEqual(["a", "b", "c"]);
+    expect(addListItems([], "Smith, Jane", false)).toEqual(["Smith, Jane"]);
+    const same = ["a"];
+    expect(addListItems(same, "  ")).toBe(same);
+  });
+
+  it("reads numbers as typed, keeping unfinished decimals", () => {
+    expect(parseNumberField("")).toBeNull();
+    expect(parseNumberField("1.")).toBe(1);
+    expect(parseNumberField("1.5")).toBe(1.5);
+    expect(parseNumberField("2,5")).toBe(2.5);
+    expect(parseNumberField("abc")).toBeUndefined();
   });
 });

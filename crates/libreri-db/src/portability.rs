@@ -14,6 +14,10 @@ pub struct SnapshotScope {
     pub only_profile: Option<ProfileId>,
     /// Remove PIN and recovery-code hashes.
     pub strip_pins: bool,
+    /// Keep no personal data at all: every profile is removed, and with it
+    /// reading status, positions, highlights, notebooks, collections and
+    /// sign-in state. Only the catalogue of books stays.
+    pub no_personal_data: bool,
 }
 
 /// A book with the given title: (id, authors, page count).
@@ -253,6 +257,15 @@ impl Database {
                 [format!("session:{keep}")],
             )?;
         }
+        if scope.no_personal_data {
+            // Deleting the profiles cascades to book_user, annotations,
+            // notebooks and collections; the explicit deletes make sure.
+            conn.execute_batch(
+                "DELETE FROM annotations; DELETE FROM notebooks; DELETE FROM book_user;
+                 DELETE FROM collections; DELETE FROM profiles;
+                 DELETE FROM library_meta WHERE key LIKE 'session:%';",
+            )?;
+        }
         if scope.strip_pins {
             conn.execute(
                 "UPDATE profiles SET pin_hash = NULL, recovery_hash = NULL,
@@ -365,6 +378,7 @@ mod tests {
             &SnapshotScope {
                 only_profile: Some(owner),
                 strip_pins: true,
+                ..Default::default()
             },
         )
         .unwrap();
@@ -374,5 +388,33 @@ mod tests {
         assert_eq!(profiles[0].pin_hash, None);
         assert_eq!(copy.book(&id('a'), &other).unwrap().unwrap().user.rating, 0);
         assert_eq!(copy.book_count().unwrap(), 1);
+        drop(copy);
+
+        let bare = dir.path().join("bare.db");
+        db.snapshot(
+            &bare,
+            &SnapshotScope {
+                no_personal_data: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let conn = Connection::open(&bare).unwrap();
+        for table in [
+            "profiles",
+            "book_user",
+            "annotations",
+            "notebooks",
+            "collections",
+        ] {
+            let n: i64 = conn
+                .query_row(&format!("SELECT count(*) FROM {table}"), [], |r| r.get(0))
+                .unwrap();
+            assert_eq!(n, 0, "{table} should be empty");
+        }
+        let books: i64 = conn
+            .query_row("SELECT count(*) FROM books", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(books, 1);
     }
 }

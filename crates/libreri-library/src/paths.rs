@@ -10,16 +10,21 @@ use std::path::{Component, Path, PathBuf};
 /// Writes a file via a temporary file and rename, so readers never see half
 /// a file.
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    let tmp = path.with_extension(format!(
-        "{}.tmp",
-        path.extension().and_then(|e| e.to_str()).unwrap_or("")
-    ));
-    {
+    // A name of its own, so two writers of the same file never share (and
+    // tear) one temporary file.
+    let mut name = path.file_name().unwrap_or_default().to_os_string();
+    name.push(format!(".{}.tmp", uuid::Uuid::new_v4().simple()));
+    let tmp = path.with_file_name(name);
+    let written = (|| {
         let mut f = fs::File::create(&tmp)?;
         f.write_all(bytes)?;
         f.sync_all()?;
+        fs::rename(&tmp, path)
+    })();
+    if written.is_err() {
+        let _ = fs::remove_file(&tmp);
     }
-    fs::rename(tmp, path)
+    written
 }
 
 /// `abs` as a library-relative path with `/` separators, if inside `root`.
@@ -79,7 +84,8 @@ pub fn validate_name(name: &str) -> Result<String> {
     if reserved.contains(&upper.as_str()) || numbered {
         return bad("that name is reserved on Windows");
     }
-    if name.chars().count() > 200 {
+    // File systems count bytes (255 on most); keep room for " (2)".
+    if name.chars().count() > 200 || name.len() > 240 {
         return bad("the name is too long");
     }
     Ok(name.to_owned())
@@ -157,6 +163,10 @@ mod tests {
         }
         assert!(validate_name("Comics & Manga").is_ok());
         assert!(validate_name("Contracts").is_ok());
+        assert!(
+            validate_name(&"漢".repeat(90)).is_err(),
+            "270 bytes is too long"
+        );
     }
 
     #[test]
@@ -175,6 +185,17 @@ mod tests {
             Some("Books/x y.pdf")
         );
         assert!(folder_abs(&layout, "../x").is_err());
+    }
+
+    #[test]
+    fn atomic_writes_leave_no_temporary_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("a.json");
+        write_atomic(&p, b"1").unwrap();
+        write_atomic(&p, b"2").unwrap();
+        assert_eq!(fs::read(&p).unwrap(), b"2");
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
+        assert!(write_atomic(&dir.path().join("no/such/dir.json"), b"x").is_err());
     }
 
     #[test]

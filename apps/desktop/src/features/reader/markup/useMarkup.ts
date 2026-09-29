@@ -115,10 +115,12 @@ export function useMarkup(opts: {
   renderer: RefObject<Renderer | null>;
   annotations: Annotation[];
   pages: number;
+  /** This book's tab is the one in use (keys go to it). */
+  tabActive: boolean;
   save: (a: Annotation) => void;
   remove: (id: string) => void;
 }): MarkupState {
-  const { bookId, enabled, ready, renderer, annotations, pages } = opts;
+  const { bookId, enabled, ready, renderer, annotations, pages, tabActive } = opts;
   const prefs = useProfilePrefs((s) => s.prefs.markup);
   const updatePrefs = useProfilePrefs((s) => s.update);
   const layerRef = useRef<MarkupLayer | null>(null);
@@ -173,6 +175,11 @@ export function useMarkup(opts: {
       layerRef.current = null;
     };
   }, [enabled, ready, renderer, bookId]);
+
+  // Delete and undo keys only act in the tab in use.
+  useEffect(() => {
+    if (layerRef.current) layerRef.current.active = tabActive;
+  }, [tabActive, ready, enabled]);
 
   // Stored marks → layer.
   useEffect(() => {

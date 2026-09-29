@@ -53,6 +53,20 @@ export function OrganizeView() {
   const [focus, setFocus] = useState<{ kind: "tag" | "category"; value: string } | null>(null);
   const [editing, setEditing] = useState<Editing>(null);
 
+  /** Tags renamed, merged or removed leave the selection (focus follows a rename). */
+  const tagsGone = (gone: string[], now?: string) => {
+    setSelected((s) => s.filter((t) => !gone.includes(t)));
+    setFocus((f) =>
+      f?.kind === "tag" && gone.includes(f.value) ? (now ? { kind: "tag", value: now } : null) : f,
+    );
+  };
+  /** Same for a category, and the categories inside it. */
+  const categoryGone = (path: string, now?: string) =>
+    setFocus((f) => {
+      if (f?.kind !== "category" || (f.value !== path && !f.value.startsWith(`${path}/`))) return f;
+      return now ? { kind: "category", value: now + f.value.slice(path.length) } : null;
+    });
+
   const tags = useMemo(
     () =>
       (facets?.tags ?? []).filter((t) =>
@@ -74,7 +88,10 @@ export function OrganizeView() {
     );
     if (ok)
       deleteTag.mutate(tag, {
-        onSuccess: (n) => done(n, `Removed “${tag}”`),
+        onSuccess: (n) => {
+          tagsGone([tag]);
+          done(n, `Removed “${tag}”`);
+        },
         onError: failed("Could not remove the tag"),
       });
   };
@@ -89,7 +106,10 @@ export function OrganizeView() {
     );
     if (ok) {
       deleteCategory.mutate(path, {
-        onSuccess: (n) => done(n, `Removed “${path}”`),
+        onSuccess: (n) => {
+          categoryGone(path);
+          done(n, `Removed “${path}”`);
+        },
         onError: failed("Could not remove the category"),
       });
     }
@@ -174,7 +194,10 @@ export function OrganizeView() {
                         mergeTags.mutate(
                           { sources: group.slice(1).map((g) => g.name), into },
                           {
-                            onSuccess: (n) => done(n, `Merged into “${into}”`),
+                            onSuccess: (n) => {
+                              tagsGone(group.slice(1).map((g) => g.name));
+                              done(n, `Merged into “${into}”`);
+                            },
                             onError: failed("Could not merge"),
                           },
                         )
@@ -311,7 +334,10 @@ export function OrganizeView() {
             renameTag.mutate(
               { from: editing.tag, to: value },
               {
-                onSuccess: (n) => done(n, `Renamed to “${value}”`),
+                onSuccess: (n) => {
+                  tagsGone([editing.tag], value);
+                  done(n, `Renamed to “${value}”`);
+                },
                 onError: failed("Could not rename the tag"),
               },
             );
@@ -321,6 +347,7 @@ export function OrganizeView() {
               {
                 onSuccess: (n) => {
                   setSelected([]);
+                  tagsGone(editing.tags, value);
                   done(n, `Merged into “${value}”`);
                 },
                 onError: failed("Could not merge the tags"),
@@ -330,7 +357,10 @@ export function OrganizeView() {
             renameCategory.mutate(
               { from: editing.path, to: value },
               {
-                onSuccess: (n) => done(n, `Moved to “${value}”`),
+                onSuccess: (n) => {
+                  categoryGone(editing.path, value);
+                  done(n, `Moved to “${value}”`);
+                },
                 onError: failed("Could not move the category"),
               },
             );

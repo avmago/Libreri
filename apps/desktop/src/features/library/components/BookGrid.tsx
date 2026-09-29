@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { startDragOnMove, useDrag } from "../drag";
 import { useItemHandlers, type ItemHandlers } from "../hooks/useBookInteractions";
 import { authorsText, type BookView } from "../model";
-import { useLibraryView } from "../store";
+import { useSelectedIds } from "../store";
 import { BookContextMenu } from "./BookContextMenu";
 import { NoTextMark } from "@/features/search";
 import { BookCover } from "./BookCover";
@@ -92,7 +92,7 @@ export function BookGrid({
   folders: FolderDto[];
   onOpenFolder: (path: string) => void;
 }) {
-  const selection = useLibraryView((s) => s.selection);
+  const selected = useSelectedIds();
   const handlers = useItemHandlers(books);
 
   return (
@@ -108,7 +108,7 @@ export function BookGrid({
         <FolderTile key={f.path} folder={f} onOpen={() => onOpenFolder(f.path)} />
       ))}
       {books.map((b) => (
-        <BookCard key={b.id} book={b} selected={selection.includes(b.id)} handlers={handlers} />
+        <BookCard key={b.id} book={b} selected={selected.has(b.id)} handlers={handlers} />
       ))}
     </div>
   );

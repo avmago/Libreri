@@ -57,17 +57,31 @@ export function wordLayer(page: HTMLElement, words: WordDto[], className: string
     const span = document.createElement("span");
     const [x, y, ww, wh] = w.rect.map((v) => v ?? 0) as Rect;
     span.textContent = `${w.text} `;
-    span.style.cssText = `left:${x * 100}%;top:${y * 100}%;height:${wh * 100}%;font-size:${wh * h * 0.85}px;--w:${ww}`;
+    span.style.cssText = `left:${x * 100}%;top:${y * 100}%;height:${wh * 100}%;font-size:${wh * h * 0.85}px;--w:${ww};--h:${wh}`;
     layer.append(span);
   }
   page.append(layer);
-  requestAnimationFrame(() => {
-    const pw = page.clientWidth;
-    for (const span of Array.from(layer.children) as HTMLElement[]) {
-      const target = parseFloat(span.style.getPropertyValue("--w")) * pw;
-      const natural = span.offsetWidth;
-      if (natural > 0) span.style.transform = `scaleX(${target / natural})`;
-    }
-  });
+  requestAnimationFrame(() => fitWordLayer(page, layer));
   return layer;
+}
+
+/** Sizes and stretches the words of a layer to the page as it is now
+ * drawn (again after zooming or resizing). */
+export function fitWordLayer(page: HTMLElement, layer: HTMLElement) {
+  const pw = page.clientWidth;
+  const ph = page.clientHeight;
+  // A hidden page has no size: fitted again when shown.
+  if (!pw || !ph) return;
+  const spans = Array.from(layer.children) as HTMLElement[];
+  // Set every size first, then measure, so the page is laid out once.
+  for (const span of spans) {
+    const wh = parseFloat(span.style.getPropertyValue("--h"));
+    if (wh > 0) span.style.fontSize = `${wh * ph * 0.85}px`;
+    span.style.transform = "";
+  }
+  const natural = spans.map((span) => span.offsetWidth);
+  spans.forEach((span, i) => {
+    const target = parseFloat(span.style.getPropertyValue("--w")) * pw;
+    if (natural[i]! > 0) span.style.transform = `scaleX(${target / natural[i]!})`;
+  });
 }

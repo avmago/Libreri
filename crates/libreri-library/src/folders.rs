@@ -165,6 +165,7 @@ impl Library {
             fs::rename(&from_abs, &to_abs)?;
         }
         self.with_db(|db| db.move_folder_paths(&format!("Books/{from}"), &format!("Books/{to}")))?;
+        self.follow_folder_change(from, Some(to))?;
         for book in self.books(&BookQuery {
             folder: Some(to.to_owned()),
             include_subfolders: true,
@@ -195,6 +196,7 @@ impl Library {
         for b in &books {
             self.with_db(|db| db.delete_book(&b.id))?;
         }
+        self.follow_folder_change(path, None)?;
         Ok(books.len())
     }
 }
@@ -260,5 +262,32 @@ mod tests {
             Err(Error::InvalidInput(_))
         ));
         assert!(lib.create_folder("", "a/b").is_err());
+    }
+
+    #[test]
+    fn kids_folders_follow_renames_and_case_matters() {
+        let (_d, lib) = library();
+        let books = lib.layout().books_dir();
+        md_book(&books, "Kids/a.md", "Gruffalo");
+        md_book(&books, "kids2/b.md", "Other");
+        lib.scan(&NoProgress).unwrap();
+        let kid = lib
+            .create_profile("John", "blue", libreri_core::ProfileKind::Kids, None)
+            .unwrap();
+        lib.set_allowed_folders(&kid.id, vec!["Kids".into(), "Kids/Sub".into()])
+            .unwrap();
+        lib.rename_folder("Kids", "Children").unwrap();
+        let p = lib.load_profile(&kid.id).unwrap();
+        assert_eq!(p.allowed_folders, vec!["Children", "Children/Sub"]);
+        lib.move_folder("kids2", "Children").unwrap();
+        assert_eq!(lib.load_profile(&kid.id).unwrap().allowed_folders.len(), 2);
+        let _ = lib.trash_folder("Children");
+        if !lib.layout().books_dir().join("Children").exists() {
+            assert!(lib
+                .load_profile(&kid.id)
+                .unwrap()
+                .allowed_folders
+                .is_empty());
+        }
     }
 }

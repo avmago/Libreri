@@ -34,11 +34,15 @@ fn settings(state: &AppState) -> MathsSettingsDto {
         on: state
             .settings
             .lock()
-            .expect("settings lock")
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .maths_from_pictures,
         downloaded: status.downloaded,
         size_mb: status.size_mb,
-        downloading: state.maths_download.lock().expect("maths lock").is_some(),
+        downloading: state
+            .maths_download
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_some(),
     }
 }
 
@@ -58,7 +62,10 @@ pub fn set_maths_from_pictures(
 ) -> AppResult<MathsSettingsDto> {
     state.update_settings(|s| s.maths_from_pictures = on)?;
     if !on {
-        *state.maths_reader.lock().expect("maths lock") = None;
+        *state
+            .maths_reader
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
     }
     Ok(settings(&state))
 }
@@ -74,7 +81,10 @@ pub async fn download_maths_model(
     use tauri_specta::Event;
     let cancel: Arc<AtomicBool> = Arc::default();
     {
-        let mut running = state.maths_download.lock().expect("maths lock");
+        let mut running = state
+            .maths_download
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         if running.is_some() {
             return Err(AppError::invalid("the maths model is already downloading"));
         }
@@ -106,7 +116,10 @@ pub async fn download_maths_model(
         result.map_err(AppError::invalid)
     })
     .await;
-    *state.maths_download.lock().expect("maths lock") = None;
+    *state
+        .maths_download
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
     result?;
     Ok(settings(&state))
 }
@@ -114,7 +127,12 @@ pub async fn download_maths_model(
 #[tauri::command]
 #[specta::specta]
 pub fn cancel_maths_download(state: State<'_, AppState>) {
-    if let Some(c) = state.maths_download.lock().expect("maths lock").as_ref() {
+    if let Some(c) = state
+        .maths_download
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .as_ref()
+    {
         c.store(true, Ordering::SeqCst);
     }
 }
@@ -122,11 +140,19 @@ pub fn cancel_maths_download(state: State<'_, AppState>) {
 /// Removes the model and turns the feature off.
 #[tauri::command]
 #[specta::specta]
-pub fn remove_maths_model(state: State<'_, AppState>) -> AppResult<MathsSettingsDto> {
-    *state.maths_reader.lock().expect("maths lock") = None;
-    libreri_maths::remove(&state.maths_dir).map_err(AppError::invalid)?;
-    state.update_settings(|s| s.maths_from_pictures = false)?;
-    Ok(settings(&state))
+pub async fn remove_maths_model(app: AppHandle) -> AppResult<MathsSettingsDto> {
+    // The model is large: removing it can take a moment.
+    blocking(move || {
+        let state = app.state::<AppState>();
+        *state
+            .maths_reader
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+        libreri_maths::remove(&state.maths_dir).map_err(AppError::invalid)?;
+        state.update_settings(|s| s.maths_from_pictures = false)?;
+        Ok(settings(&state))
+    })
+    .await
 }
 
 /// Reads a picture of maths (PNG or JPEG, base64 or a data URL) as LaTeX.
@@ -152,7 +178,10 @@ pub async fn maths_from_picture(
     blocking(move || {
         let state = app.state::<AppState>();
         let reader = {
-            let mut slot = state.maths_reader.lock().expect("maths lock");
+            let mut slot = state
+                .maths_reader
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             match slot.as_ref() {
                 Some(r) => Arc::clone(r),
                 None => {

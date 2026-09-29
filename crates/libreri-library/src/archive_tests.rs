@@ -364,3 +364,104 @@ fn earlier_versions_travel_with_the_book_files() {
     let file = b.version_path(&new.id, &old.id).unwrap();
     assert_eq!(paths::hash_file(&file).unwrap(), old.id);
 }
+
+#[test]
+#[cfg(unix)]
+fn names_with_colons_and_backslashes_round_trip() {
+    let (dir, a) = library();
+    md_book(&a.layout().books_dir(), "Re: waves\\1.md", "Waves");
+    a.scan(&NoProgress).unwrap();
+    let waves = by_title(&a, "Waves");
+    let folder = crate::reading::notes_folder_name(&owner(&a).name);
+    let notes = a.layout().notes_dir().join(&folder);
+    fs::create_dir_all(&notes).unwrap();
+    fs::write(notes.join("Q: and A.md"), "# Q&A").unwrap();
+    let archive = dir.path().join("colon.libreri");
+    export(&a, &archive, true, true);
+
+    let b = new_library(dir.path(), "B");
+    let r = b
+        .import_archive(&archive, &ArchiveImport::default(), &NoProgress)
+        .unwrap();
+    assert_eq!(r.added, 1, "{:?}", r.warnings);
+    let book = b.book(&waves.id).unwrap();
+    assert_eq!(book.rel_path, "Books/Re: waves\\1.md");
+    assert!(b.layout().root().join(&book.rel_path).is_file());
+    let folder_b = crate::reading::notes_folder_name(&owner(&b).name);
+    assert_eq!(
+        fs::read_to_string(b.layout().notes_dir().join(folder_b).join("Q: and A.md")).unwrap(),
+        "# Q&A"
+    );
+}
+
+#[test]
+fn exports_without_notes_carry_no_ones_notes_in_the_catalogue() {
+    let (dir, a, _) = source();
+    let archive = dir.path().join("plain.libreri");
+    a.export(
+        &ExportRequest {
+            format: ExportFormat::Archive,
+            books: None,
+            dest: archive.clone(),
+            personal: false,
+            notes: false,
+            book_files: false,
+            everyone: true,
+            app_version: V.into(),
+        },
+        &NoProgress,
+    )
+    .unwrap();
+    let mut r = ArchiveReader::open(&archive).unwrap();
+    let db_copy = dir.path().join("copy.db");
+    r.extract(libreri_export::archive::DATABASE, &db_copy)
+        .unwrap();
+    let copy = libreri_db::Database::open(&db_copy).unwrap();
+    assert!(copy.profiles().unwrap().is_empty());
+    assert!(copy.notebook_rows().unwrap().is_empty());
+    assert_eq!(copy.book_count().unwrap(), 2);
+}
+
+#[test]
+fn a_missing_book_gets_its_file_back_at_its_own_path() {
+    let (dir, a, optics) = source();
+    let without = dir.path().join("without.libreri");
+    export(&a, &without, false, false);
+    let with = dir.path().join("with.libreri");
+    export(&a, &with, true, false);
+
+    let b = new_library(dir.path(), "B");
+    b.import_archive(&without, &ArchiveImport::default(), &NoProgress)
+        .unwrap();
+    assert!(b.book(&optics).unwrap().missing);
+    let r = b
+        .import_archive(&with, &ArchiveImport::default(), &NoProgress)
+        .unwrap();
+    assert_eq!(r.files_restored, 2, "{:?}", r.warnings);
+    let book = b.book(&optics).unwrap();
+    assert!(!book.missing);
+    assert_eq!(book.rel_path, "Books/Physics/optics.md");
+}
+
+#[test]
+fn a_title_alone_does_not_match_another_book() {
+    use crate::archive::same_work;
+    let id = |c: char| BookId::from_hex(c.to_string().repeat(64)).unwrap();
+    let smith = vec!["Jane Smith".to_owned()];
+    let jones = vec!["Ann Jones".to_owned()];
+    let here = vec![(id('a'), jones.clone(), Some(300))];
+    assert_eq!(same_work(&smith, Some(300), &here), None);
+    assert_eq!(same_work(&[], Some(300), &here), None, "no authors");
+    assert_eq!(same_work(&jones, None, &here), Some(id('a')));
+    let anon = vec![(id('b'), vec![], Some(300))];
+    assert_eq!(same_work(&[], Some(305), &anon), Some(id('b')));
+    assert_eq!(
+        same_work(&smith, None, &anon),
+        Some(id('b')),
+        "only one, no authors here"
+    );
+    assert_eq!(same_work(&[], None, &anon), None, "pages unknown");
+    let two = vec![(id('b'), vec![], Some(300)), (id('c'), vec![], Some(300))];
+    assert_eq!(same_work(&[], Some(300), &two), None, "which one?");
+    assert_eq!(same_work(&smith, Some(300), &two), None);
+}

@@ -1,7 +1,8 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { events } from "@/lib/ipc";
+import { events, type OcrFinished } from "@/lib/ipc";
+import { report } from "@/lib/windows";
 import { searchKey } from "./api";
 import { useIndexing } from "./store";
 
@@ -22,34 +23,38 @@ export function useSearchEvents() {
       }),
       events.ocrFinished.listen(({ payload: r }) => {
         void qc.invalidateQueries({ queryKey: searchKey });
-        const pages = r.pagesRead === 1 ? "1 page" : `${r.pagesRead} pages`;
-        const books = r.bookIds.length === 1 ? "The book" : `${r.books} books`;
-        if (r.errors.length && r.pagesRead === 0) {
-          toast.error("OCR could not read the pages", {
-            description: r.errors.slice(0, 3).join("\n"),
-            duration: 12_000,
-          });
-        } else if (r.errors.length || r.pagesFailed) {
-          toast.warning(`${books} can now be searched (${pages} read)`, {
-            description: [
-              r.pagesFailed ? `${r.pagesFailed} pages could not be read.` : "",
-              ...r.errors.slice(0, 3),
-            ]
-              .filter(Boolean)
-              .join("\n"),
-            duration: 12_000,
-          });
-        } else if (r.pagesRead) {
-          toast.success(`${books} can now be searched`, { description: `${pages} read with OCR.` });
-        } else {
-          toast.success("Nothing to read", {
-            description: "Every page already has text.",
-          });
-        }
+        report(() => reportOcr(r));
       }),
     ];
     return () => {
       for (const p of offs) void p.then((off) => off());
     };
   }, [qc]);
+}
+
+function reportOcr(r: OcrFinished) {
+  const pages = r.pagesRead === 1 ? "1 page" : `${r.pagesRead} pages`;
+  const books = r.bookIds.length === 1 ? "The book" : `${r.books} books`;
+  if (r.errors.length && r.pagesRead === 0) {
+    toast.error("OCR could not read the pages", {
+      description: r.errors.slice(0, 3).join("\n"),
+      duration: 12_000,
+    });
+  } else if (r.errors.length || r.pagesFailed) {
+    toast.warning(`${books} can now be searched (${pages} read)`, {
+      description: [
+        r.pagesFailed ? `${r.pagesFailed} pages could not be read.` : "",
+        ...r.errors.slice(0, 3),
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      duration: 12_000,
+    });
+  } else if (r.pagesRead) {
+    toast.success(`${books} can now be searched`, { description: `${pages} read with OCR.` });
+  } else {
+    toast.success("Nothing to read", {
+      description: "Every page already has text.",
+    });
+  }
 }

@@ -86,6 +86,7 @@ export const commands = {
 	 *  computer, after the user has confirmed.
 	 */
 	openLibrary: (path: string, force: boolean) => typedError<LibrarySummary, AppError>(__TAURI_INVOKE("open_library", { path, force })),
+	/**  Closes the library (writing out the database can take a moment). */
 	closeLibrary: () => __TAURI_INVOKE<void>("close_library"),
 	currentLibrary: () => __TAURI_INVOKE<{
 	id: string,

@@ -41,15 +41,13 @@ export function PinPad({
 
   const press = useCallback(
     (digit: string) => {
-      if (disabled) return;
-      setPin((p) => {
-        if (p.length >= 6) return p;
-        const next = p + digit;
-        if (next.length === 6) setTimeout(() => onSubmit(next), 60);
-        return next;
-      });
+      if (disabled || pin.length >= 6) return;
+      const next = pin + digit;
+      setPin(next);
+      // Outside the state update, which React may run twice.
+      if (next.length === 6) setTimeout(() => onSubmit(next), 60);
     },
-    [disabled, onSubmit],
+    [disabled, onSubmit, pin],
   );
   const back = useCallback(() => setPin((p) => p.slice(0, -1)), []);
 

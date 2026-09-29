@@ -18,6 +18,11 @@
 //! Books are identified by content hash, so notes find their books again in
 //! any library (docs/data-portability.md). Reading refuses entry names that
 //! could escape the destination folder and caps what it reads.
+//!
+//! `:` and `\` are allowed in file names on macOS and Linux but not in
+//! entry names. Such a file is stored under a percent-encoded name
+//! ("a%3Ab.pdf") and its real path is kept in the manifest's file list
+//! (`original`), so importing puts it back under its own name.
 
 use libreri_core::{Alias, AnnotationKind, BookId, FileType, ProfileId, ProfileKind};
 use serde::{Deserialize, Serialize};
@@ -118,8 +123,12 @@ pub struct ArchiveNotebook {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ArchiveFile {
+    /// Entry name in the ZIP file.
     pub path: String,
     pub size: u64,
+    /// The file's real path, when the entry name had to be encoded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original: Option<String>,
 }
 
 /// What an archive holds.
@@ -203,6 +212,35 @@ pub fn is_safe_name(name: &str) -> bool {
         .all(|part| !part.is_empty() && part != "." && part != "..")
 }
 
+/// The entry name for a file at `path`: the path itself, or, when it holds
+/// `:` or `\\`, the path with those (and `%`) percent-encoded.
+pub fn entry_name(path: &str) -> String {
+    if !path.contains([':', '\\']) {
+        return path.to_owned();
+    }
+    let mut out = String::with_capacity(path.len() + 8);
+    for c in path.chars() {
+        match c {
+            '%' => out.push_str("%25"),
+            ':' => out.push_str("%3A"),
+            '\\' => out.push_str("%5C"),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+/// The path a file from the archive gets on this computer: its real path,
+/// except that on Windows, where `:` and `\\` cannot be in a name, it keeps
+/// the encoded one.
+pub fn local_path(path: &str) -> String {
+    if cfg!(windows) {
+        entry_name(path)
+    } else {
+        path.to_owned()
+    }
+}
+
 fn part_path(path: &Path) -> PathBuf {
     let mut name = path.file_name().unwrap_or_default().to_os_string();
     name.push(".part");
@@ -244,7 +282,10 @@ impl ArchiveWriter {
             .unix_permissions(0o644)
     }
 
-    fn start(&mut self, name: &str, compress: bool, size: u64) -> io::Result<()> {
+    fn start(&mut self, path: &str, compress: bool, size: u64) -> io::Result<()> {
+        let entry = entry_name(path);
+        let original = (entry != path).then(|| path.to_owned());
+        let name = entry.as_str();
         if !is_safe_name(name) || name == MANIFEST {
             return Err(io::Error::other(format!(
                 "not allowed in an archive: {name}"
@@ -256,14 +297,16 @@ impl ArchiveWriter {
         self.files.push(ArchiveFile {
             path: name.to_owned(),
             size,
+            original,
         });
         let zip = self.zip.as_mut().expect("open until finished");
         zip.start_file(name, Self::options(compress, size))
             .map_err(io::Error::other)
     }
 
-    pub fn contains(&self, name: &str) -> bool {
-        self.written.contains(name)
+    /// Whether the file at `path` (a real path) is in already.
+    pub fn contains(&self, path: &str) -> bool {
+        self.written.contains(&entry_name(path))
     }
 
     pub fn add_bytes(&mut self, name: &str, bytes: &[u8]) -> io::Result<()> {
@@ -320,6 +363,9 @@ pub const MAX_JSON: u64 = 64 * 1024 * 1024;
 pub struct ArchiveReader {
     zip: zip::ZipArchive<BufReader<File>>,
     pub manifest: Manifest,
+    /// Encoded entry name → path on this computer, for files whose real
+    /// name has `:` or `\\` (see [`local_path`]).
+    local_of: std::collections::HashMap<String, String>,
 }
 
 impl ArchiveReader {
@@ -347,24 +393,52 @@ impl ArchiveReader {
             serde_json::from_value::<Manifest>(value)
                 .map_err(|e| ArchiveError::Damaged(format!("manifest: {e}")))?
         };
-        Ok(Self { zip, manifest })
+        // Only originals that encode back to their entry name are trusted:
+        // they differ from it only in `:`, `\\` and `%`.
+        let local_of = manifest
+            .files
+            .iter()
+            .filter_map(|f| {
+                let original = f.original.as_ref()?;
+                (entry_name(original) == f.path).then(|| (f.path.clone(), local_path(original)))
+            })
+            .collect();
+        Ok(Self {
+            zip,
+            manifest,
+            local_of,
+        })
     }
 
-    /// Names of every allowed entry (others are ignored).
+    /// The entry name of a file given by its real path, its path on this
+    /// computer or its entry name.
+    fn entry(&self, path: &str) -> String {
+        entry_name(path)
+    }
+
+    /// Paths of every allowed entry (others are ignored), as they should be
+    /// on this computer.
     pub fn names(&self) -> Vec<String> {
         self.zip
             .file_names()
             .filter(|n| is_safe_name(n) && !n.ends_with('/') && *n != MANIFEST)
-            .map(str::to_owned)
+            .map(|n| {
+                self.local_of
+                    .get(n)
+                    .cloned()
+                    .unwrap_or_else(|| n.to_owned())
+            })
             .collect()
     }
 
     pub fn has(&self, name: &str) -> bool {
-        is_safe_name(name) && self.zip.index_for_name(name).is_some()
+        let name = self.entry(name);
+        is_safe_name(&name) && self.zip.index_for_name(&name).is_some()
     }
 
     /// Reads a small entry (JSON, Markdown) into memory, at most `MAX_JSON`.
     pub fn read(&mut self, name: &str) -> Result<Vec<u8>, ArchiveError> {
+        let name = &self.entry(name);
         if !is_safe_name(name) {
             return Err(ArchiveError::Damaged(format!("unsafe name {name}")));
         }
@@ -380,6 +454,7 @@ impl ArchiveReader {
     /// Writes an entry to `dest` (through `dest.part`), never more bytes
     /// than the entry says it has. Returns the size written.
     pub fn extract(&mut self, name: &str, dest: &Path) -> Result<u64, ArchiveError> {
+        let name = &self.entry(name);
         if !is_safe_name(name) {
             return Err(ArchiveError::Damaged(format!("unsafe name {name}")));
         }
@@ -476,6 +551,44 @@ mod tests {
         w.add_bytes("Notes/a.md", b"x").unwrap();
         drop(w);
         assert!(!other.exists() && !part_path(&other).exists());
+    }
+
+    #[test]
+    fn names_with_colons_and_backslashes_round_trip() {
+        assert_eq!(entry_name("Books/a.pdf"), "Books/a.pdf");
+        assert_eq!(
+            entry_name("Books/100% a:b\\c.pdf"),
+            "Books/100%25 a%3Ab%5Cc.pdf"
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("a.pdf");
+        fs::write(&src, b"%PDF colon").unwrap();
+        let dest = dir.path().join("out.libreri");
+        let mut w = ArchiveWriter::create(&dest).unwrap();
+        w.add_file("Books/Re: notes.pdf", &src).unwrap();
+        w.add_bytes("Notes/Me/a\\b.md", b"# b").unwrap();
+        w.add_bytes("Notes/Me/50%.md", b"# pct").unwrap();
+        assert!(w.contains("Books/Re: notes.pdf"));
+        w.finish(manifest()).unwrap();
+
+        let mut r = ArchiveReader::open(&dest).unwrap();
+        let mut names = r.names();
+        names.sort();
+        let want = |p: &str| local_path(p);
+        assert_eq!(
+            names,
+            vec![
+                want("Books/Re: notes.pdf"),
+                want("Notes/Me/50%.md"),
+                want("Notes/Me/a\\b.md")
+            ]
+        );
+        assert!(r.has("Books/Re: notes.pdf"));
+        assert_eq!(r.read("Notes/Me/a\\b.md").unwrap(), b"# b");
+        assert_eq!(r.read("Notes/Me/50%.md").unwrap(), b"# pct");
+        let out = dir.path().join("x.pdf");
+        r.extract("Books/Re: notes.pdf", &out).unwrap();
+        assert_eq!(fs::read(&out).unwrap(), b"%PDF colon");
     }
 
     #[test]

@@ -7,9 +7,10 @@
 
 use serde::Serialize;
 use std::collections::HashMap;
+use std::panic::{self, AssertUnwindSafe};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Sender};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread::JoinHandle;
 use uuid::Uuid;
 
@@ -108,6 +109,24 @@ struct Task {
     work: Work,
 }
 
+/// Locks a mutex even if a thread panicked while holding it (the data
+/// here stays usable), so one failure does not stop the whole queue.
+fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|p| p.into_inner())
+}
+
+/// The message of a panic, for the user.
+fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
+    let detail = payload
+        .downcast_ref::<&str>()
+        .map(|s| (*s).to_owned())
+        .or_else(|| payload.downcast_ref::<String>().cloned());
+    match detail {
+        Some(d) => format!("something went wrong: {d}"),
+        None => "something went wrong".to_owned(),
+    }
+}
+
 /// A fixed-size pool of worker threads running submitted jobs in order.
 pub struct JobQueue {
     sender: Option<Sender<Task>>,
@@ -128,16 +147,11 @@ impl JobQueue {
                 let sink = Arc::clone(&sink);
                 let cancels = Arc::clone(&cancels);
                 std::thread::spawn(move || loop {
-                    let task = match receiver.lock().expect("job queue poisoned").recv() {
+                    let task = match lock(&receiver).recv() {
                         Ok(task) => task,
                         Err(_) => break, // queue dropped
                     };
-                    let cancel = cancels
-                        .lock()
-                        .expect("job queue poisoned")
-                        .get(&task.id)
-                        .cloned()
-                        .unwrap_or_default();
+                    let cancel = lock(&cancels).get(&task.id).cloned().unwrap_or_default();
                     let ctx = JobContext {
                         id: task.id,
                         cancel,
@@ -150,14 +164,24 @@ impl JobQueue {
                             id: task.id,
                             label: task.label,
                         });
-                        let event = match (task.work)(&ctx) {
-                            Ok(()) => JobEvent::Finished { id: task.id },
-                            Err(JobError::Cancelled(_)) => JobEvent::Cancelled { id: task.id },
-                            Err(JobError::Failed(error)) => JobEvent::Failed { id: task.id, error },
+                        // A job that panics is reported as failed; the worker
+                        // carries on with the next job.
+                        let work = task.work;
+                        let result = panic::catch_unwind(AssertUnwindSafe(|| work(&ctx)));
+                        let event = match result {
+                            Ok(Ok(())) => JobEvent::Finished { id: task.id },
+                            Ok(Err(JobError::Cancelled(_))) => JobEvent::Cancelled { id: task.id },
+                            Ok(Err(JobError::Failed(error))) => {
+                                JobEvent::Failed { id: task.id, error }
+                            }
+                            Err(payload) => JobEvent::Failed {
+                                id: task.id,
+                                error: panic_message(payload.as_ref()),
+                            },
                         };
                         sink.emit(event);
                     }
-                    cancels.lock().expect("job queue poisoned").remove(&task.id);
+                    lock(&cancels).remove(&task.id);
                 })
             })
             .collect();
@@ -175,10 +199,7 @@ impl JobQueue {
         F: FnOnce(&JobContext) -> Result<(), JobError> + Send + 'static,
     {
         let id = Uuid::new_v4();
-        self.cancels
-            .lock()
-            .expect("job queue poisoned")
-            .insert(id, Arc::default());
+        lock(&self.cancels).insert(id, Arc::default());
         let task = Task {
             id,
             label: label.into(),
@@ -193,7 +214,7 @@ impl JobQueue {
 
     /// Requests cancellation; the job stops at its next `check_cancelled`.
     pub fn cancel(&self, id: JobId) -> bool {
-        match self.cancels.lock().expect("job queue poisoned").get(&id) {
+        match lock(&self.cancels).get(&id) {
             Some(flag) => {
                 flag.store(true, Ordering::Relaxed);
                 true
@@ -276,6 +297,56 @@ mod tests {
                 error: "file is damaged".into()
             })
         );
+    }
+
+    #[test]
+    fn a_panicking_job_fails_and_the_queue_keeps_working() {
+        let (q, rx) = queue(1);
+        // More panics than workers: each must be reported, and later jobs
+        // must still run.
+        for _ in 0..3 {
+            let id = q.submit("boom", |_| panic!("bad page"));
+            match until_done(&rx, id).last() {
+                Some(JobEvent::Failed { error, .. }) => assert!(error.contains("bad page")),
+                other => panic!("expected a failure, got {other:?}"),
+            }
+        }
+        let id = q.submit("fine", |_| Ok(()));
+        assert_eq!(until_done(&rx, id).last(), Some(&JobEvent::Finished { id }));
+    }
+
+    #[test]
+    fn a_job_cancelled_before_it_starts_is_dropped_unrun() {
+        let (q, rx) = queue(1);
+        let (release_tx, release_rx) = mpsc::channel::<()>();
+        let blocker = q.submit("block", move |_| {
+            let _ = release_rx.recv_timeout(Duration::from_secs(5));
+            Ok(())
+        });
+        struct Flag(Arc<AtomicBool>);
+        impl Drop for Flag {
+            fn drop(&mut self) {
+                self.0.store(true, Ordering::SeqCst);
+            }
+        }
+        let dropped = Arc::new(AtomicBool::new(false));
+        let flag = Flag(Arc::clone(&dropped));
+        let ran = Arc::new(AtomicBool::new(false));
+        let ran2 = Arc::clone(&ran);
+        let id = q.submit("waiting", move |_| {
+            let _keep = flag;
+            ran2.store(true, Ordering::SeqCst);
+            Ok(())
+        });
+        assert!(q.cancel(id));
+        release_tx.send(()).unwrap();
+        until_done(&rx, blocker);
+        assert_eq!(
+            until_done(&rx, id).last(),
+            Some(&JobEvent::Cancelled { id })
+        );
+        assert!(!ran.load(Ordering::SeqCst));
+        assert!(dropped.load(Ordering::SeqCst), "the unrun job was dropped");
     }
 
     #[test]

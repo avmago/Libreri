@@ -47,7 +47,12 @@ pub struct SpeechSettingsDto {
 }
 
 fn settings_dto(state: &AppState) -> SpeechSettingsDto {
-    let s = state.settings.lock().expect("settings lock").speech.clone();
+    let s = state
+        .settings
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .speech
+        .clone();
     let models = libreri_speech::models(&state.whisper_dir);
     let model = s
         .model
@@ -105,7 +110,10 @@ pub async fn download_speech_model(
     let dir = state.whisper_dir.clone();
     let cancel: Arc<AtomicBool> = Arc::default();
     {
-        let mut running = state.model_downloads.lock().expect("downloads lock");
+        let mut running = state
+            .model_downloads
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         if running.contains_key(&id) {
             return Err(AppError::invalid("that model is already downloading"));
         }
@@ -141,13 +149,13 @@ pub async fn download_speech_model(
     state
         .model_downloads
         .lock()
-        .expect("downloads lock")
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
         .remove(&id);
     result?;
     let chosen = state
         .settings
         .lock()
-        .expect("settings lock")
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
         .speech
         .model
         .clone();
@@ -163,7 +171,7 @@ pub fn cancel_speech_model_download(state: State<'_, AppState>, id: String) {
     if let Some(c) = state
         .model_downloads
         .lock()
-        .expect("downloads lock")
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
         .get(&id)
     {
         c.store(true, Ordering::SeqCst);
@@ -174,31 +182,35 @@ pub fn cancel_speech_model_download(state: State<'_, AppState>, id: String) {
 /// model (if any) takes its place.
 #[tauri::command]
 #[specta::specta]
-pub fn remove_speech_model(state: State<'_, AppState>, id: String) -> AppResult<SpeechSettingsDto> {
-    state.drop_transcriber();
-    libreri_speech::models::remove(&state.whisper_dir, &id).map_err(AppError::invalid)?;
-    let chosen = state
-        .settings
-        .lock()
-        .expect("settings lock")
-        .speech
-        .model
-        .clone();
-    if chosen.as_deref() == Some(id.as_str()) {
-        let next = libreri_speech::models(&state.whisper_dir)
-            .into_iter()
-            .find(|m| m.downloaded)
-            .map(|m| m.id);
-        state.update_settings(|s| s.speech.model = next)?;
-    }
-    Ok(settings_dto(&state))
+pub async fn remove_speech_model(app: AppHandle, id: String) -> AppResult<SpeechSettingsDto> {
+    blocking(move || {
+        let state = app.state::<AppState>();
+        state.drop_transcriber();
+        libreri_speech::models::remove(&state.whisper_dir, &id).map_err(AppError::invalid)?;
+        let chosen = state
+            .settings
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .speech
+            .model
+            .clone();
+        if chosen.as_deref() == Some(id.as_str()) {
+            let next = libreri_speech::models(&state.whisper_dir)
+                .into_iter()
+                .find(|m| m.downloaded)
+                .map(|m| m.id);
+            state.update_settings(|s| s.speech.model = next)?;
+        }
+        Ok(settings_dto(&state))
+    })
+    .await
 }
 
 fn language(state: &AppState, hint: Option<String>) -> Option<String> {
     state
         .settings
         .lock()
-        .expect("settings lock")
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
         .speech
         .language
         .clone()

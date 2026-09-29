@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, KeyRound, Library, Lock, LogOut } from "lucide-react";
+import { LibreriMark } from "@/components/LibreriMark";
+import { ArrowLeft, KeyRound, Lock, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isIpcError, type LibrarySummary, type ProfileDto } from "@/lib/ipc";
 import { useProfiles, useSignIn } from "../api";
@@ -51,7 +52,7 @@ export function ProfilePicker({
         <>
           <div className="flex flex-col items-center gap-2 text-center">
             <span className="flex items-center gap-2 text-[13px] text-muted-foreground">
-              <Library className="size-4" aria-hidden /> {library.name}
+              <LibreriMark className="size-4" /> {library.name}
             </span>
             <h1 className="text-[28px] font-semibold tracking-tight">Who's reading?</h1>
           </div>
@@ -118,10 +119,12 @@ function Unlock({ profile, onBack }: { profile: ProfileDto; onBack: () => void }
   }, [wait]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onBack();
+    // Esc goes back, unless a dialog on top (recovery) used it already.
+    if (recovering) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !e.defaultPrevented && onBack();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onBack]);
+  }, [onBack, recovering]);
 
   const submit = (pin: string) =>
     signIn.mutate(

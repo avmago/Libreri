@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { BookOpen, Eye, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +14,7 @@ import { useSpell } from "@/features/spell";
 import { renderMarkdown } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
 import { useNoteFile, useWriteNote } from "../api";
+import { registerNoteFlush } from "../flush";
 
 /** A Markdown note from the profile's Notes folder, edited in place. */
 export function NoteEditor({
@@ -33,32 +34,58 @@ export function NoteEditor({
   const write = useWriteNote();
   const [text, setText] = useState<string | null>(null);
   const [mode, setMode] = useState<"preview" | "edit">("preview");
-  const [dirty, setDirty] = useState(false);
+  const [status, setStatus] = useState<"saved" | "saving" | "failed">("saved");
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  /** Text typed and not written yet. */
+  const unsaved = useRef<string | null>(null);
+  /** Writes run one after another, so an older one never lands last. */
+  const writing = useRef<Promise<void>>(Promise.resolve());
   const value = text ?? content ?? "";
-  const { mutate } = write;
+  const { mutateAsync } = write;
+
+  /** Writes what is waiting now (a save soon after typing, or before leaving). */
+  const flush = useCallback(() => {
+    clearTimeout(timer.current);
+    const run = writing.current.then(async () => {
+      const next = unsaved.current;
+      if (next === null) return;
+      unsaved.current = null;
+      setStatus("saving");
+      try {
+        await mutateAsync({ relPath, content: next });
+        if (unsaved.current === null) setStatus("saved");
+      } catch {
+        // Kept to try again (newer typing wins).
+        unsaved.current ??= next;
+        setStatus("failed");
+      }
+    });
+    writing.current = run;
+    return run;
+  }, [mutateAsync, relPath]);
 
   const change = (next: string) => {
     setText(next);
-    setDirty(true);
+    unsaved.current = next;
+    setStatus("saving");
     clearTimeout(timer.current);
-    timer.current = setTimeout(
-      () => mutate({ relPath, content: next }, { onSuccess: () => setDirty(false) }),
-      700,
-    );
+    timer.current = setTimeout(() => void flush(), 700);
   };
 
-  const latest = useRef({ value, dirty });
+  // Written when the note closes, the window closes and before the profile
+  // locks or switches (see `flushNotes`).
   useEffect(() => {
-    latest.current = { value, dirty };
-  });
-  useEffect(
-    () => () => {
-      clearTimeout(timer.current);
-      if (latest.current.dirty) mutate({ relPath, content: latest.current.value });
-    },
-    [mutate, relPath],
-  );
+    const off = registerNoteFlush(flush);
+    const onLeave = () => void flush();
+    window.addEventListener("beforeunload", onLeave);
+    window.addEventListener("pagehide", onLeave);
+    return () => {
+      off();
+      window.removeEventListener("beforeunload", onLeave);
+      window.removeEventListener("pagehide", onLeave);
+      void flush();
+    };
+  }, [flush]);
 
   const html = useMemo(() => (mode === "preview" ? renderMarkdown(value) : ""), [mode, value]);
   const preview = useRef<HTMLDivElement>(null);
@@ -83,9 +110,18 @@ export function NoteEditor({
           <span className="truncate font-medium">{title}</span>
           <span className="truncate font-mono text-[10.5px] text-muted-foreground">{relPath}</span>
         </div>
-        <span className="text-[11px] text-muted-foreground" aria-live="polite">
-          {write.isPending || dirty ? "Saving…" : "Saved"}
-        </span>
+        {status === "failed" ? (
+          <span className="flex items-center gap-1.5 text-[11px] text-destructive" role="alert">
+            Not saved
+            <Button variant="outline" size="sm" className="h-6" onClick={() => void flush()}>
+              Try again
+            </Button>
+          </span>
+        ) : (
+          <span className="text-[11px] text-muted-foreground" aria-live="polite">
+            {status === "saving" ? "Saving…" : "Saved"}
+          </span>
+        )}
         <VoiceNoteButton v={voice} label="Record a voice note in this note" />
         {mode === "edit" && <DictateButton target={editor} />}
         {bookTitle && onOpenBook && (

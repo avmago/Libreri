@@ -14,6 +14,17 @@ const joinPath = (dir: string, name: string) => {
   return dir.endsWith(sep) ? dir + name : dir + sep + name;
 };
 
+/** Runs a flow; anything it did not handle itself is shown, not lost. */
+function reported<A extends unknown[]>(fn: (...a: A) => Promise<void>) {
+  return async (...a: A) => {
+    try {
+      await fn(...a);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    }
+  };
+}
+
 export function useLibraryActions() {
   const create = useCreateLibrary();
   const openLib = useOpenLibrary();
@@ -130,10 +141,10 @@ export function useLibraryActions() {
   }
 
   return {
-    createNew,
-    openExisting,
-    openPath,
-    restoreFromBackup,
+    createNew: reported(createNew),
+    openExisting: reported(openExisting),
+    openPath: reported(openPath),
+    restoreFromBackup: reported(restoreFromBackup),
     busy: create.isPending || openLib.isPending || restore.isPending,
   };
 }

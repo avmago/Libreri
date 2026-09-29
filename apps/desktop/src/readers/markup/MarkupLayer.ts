@@ -126,6 +126,8 @@ export class MarkupLayer {
   layer = DEFAULT_LAYER;
   /** Scales pages carry themselves (PDF measure dictionaries). */
   private pageScales = new Map<number, Scale>();
+  /** False while this book's tab is not the one in use: keys are left alone. */
+  active = true;
 
   constructor(
     private readonly events: MarkupEvents,
@@ -146,9 +148,11 @@ export class MarkupLayer {
 
   /** Called by the renderer each time a page is drawn. */
   mount(page: number, div: HTMLElement) {
-    let svg = div.querySelector<SVGSVGElement>(":scope > svg.lb-markup");
     const rect = div.getBoundingClientRect();
-    const aspect = rect.width > 0 ? rect.height / rect.width : 1.294;
+    // A hidden page has no size: the renderer mounts it again once shown.
+    if (rect.width <= 0 || rect.height <= 0) return;
+    let svg = div.querySelector<SVGSVGElement>(":scope > svg.lb-markup");
+    const aspect = rect.height / rect.width;
     const H = W * aspect;
     if (!svg) {
       svg = document.createElementNS(NS, "svg");
@@ -672,10 +676,25 @@ export class MarkupLayer {
       this.events.onEditNote(hit, new DOMRect(e.clientX, e.clientY, 1, 1));
   }
 
+  /** True when some page of this layer is on screen (not in a hidden tab). */
+  private shown(): boolean {
+    for (const v of this.pages.values()) {
+      if (v.div.isConnected && v.div.offsetParent !== null) return true;
+    }
+    return false;
+  }
+
   private onKey = (e: KeyboardEvent) => {
-    if (!this.tool) return;
+    if (!this.tool || !this.active || !this.shown()) return;
     const t = e.target as HTMLElement | null;
-    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+    if (
+      t &&
+      (t.tagName === "INPUT" ||
+        t.tagName === "TEXTAREA" ||
+        t.tagName === "SELECT" ||
+        t.isContentEditable)
+    )
+      return;
     if (e.key === "Escape") {
       if (this.measuring) this.finishMeasure(false);
       else if (this.selected) this.select(null);

@@ -51,3 +51,12 @@ export function findQuote(text: string, quote: TextQuote, hint = 0): [number, nu
   }
   return best;
 }
+
+/** The part of `range` on the page `pageDiv` (a selection can run on to the
+ * next page): ends at the end of the page's text layer when it runs on. */
+export function firstPagePart(range: Range, pageDiv: HTMLElement, layer: HTMLElement): Range {
+  if (pageDiv.contains(range.endContainer)) return range;
+  const part = range.cloneRange();
+  part.setEnd(layer, layer.childNodes.length);
+  return part;
+}

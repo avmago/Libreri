@@ -230,9 +230,8 @@ impl Library {
     /// Moves a canvas to the system trash.
     pub fn delete_canvas(&self, rel: &str) -> Result<()> {
         let path = self.own_canvas(rel)?;
-        trash::delete(&path)
-            .or_else(|_| fs::remove_file(&path))
-            .map_err(|e| Error::Trash(e.to_string()))
+        // No fallback to a permanent delete: if there is no trash, say so.
+        trash::delete(&path).map_err(|e| Error::Trash(e.to_string()))
     }
 }
 

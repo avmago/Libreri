@@ -130,9 +130,16 @@ fn scope_sql(within: &[String]) -> String {
             } else {
                 format!("Books/{f}/")
             };
+            // A NUL cannot be in a path (and would cut the SQL short).
+            if prefix.contains('\0') {
+                return "0=1".to_owned();
+            }
+            // Compared exactly: LIKE ignores ASCII case, so "Kids" would
+            // also let in "kids/".
             format!(
-                "b.rel_path LIKE '{}%' ESCAPE '\\'",
-                like_escape(&prefix).replace('\'', "''")
+                "substr(b.rel_path, 1, {}) = '{}'",
+                prefix.chars().count(),
+                prefix.replace('\'', "''")
             )
         })
         .collect();
@@ -321,10 +328,12 @@ impl Database {
             } else {
                 format!("Books/{}/", folder.trim_matches('/'))
             };
-            let p = arg(Value::Text(format!("{}%", like_escape(&prefix))), &mut args);
-            sql += &format!(" AND b.rel_path LIKE {p} ESCAPE '\\'");
+            let len = prefix.chars().count() as i64;
+            let p = arg(Value::Text(prefix), &mut args);
+            let l = arg(Value::Integer(len), &mut args);
+            sql += &format!(" AND substr(b.rel_path, 1, {l}) = {p}");
             if !q.include_subfolders {
-                let n = arg(Value::Integer(prefix.chars().count() as i64 + 1), &mut args);
+                let n = arg(Value::Integer(len + 1), &mut args);
                 sql += &format!(" AND instr(substr(b.rel_path, {n}), '/') = 0");
             }
         }
@@ -448,13 +457,11 @@ impl Database {
         let old = format!("{}/", old.trim_end_matches('/'));
         let new = format!("{}/", new.trim_end_matches('/'));
         Ok(self.conn.execute(
+            // Exact, case-sensitive prefix: renaming "physics" must not
+            // touch the books in a sibling "Physics".
             "UPDATE books SET rel_path = ?2 || substr(rel_path, ?3)
-             WHERE rel_path LIKE ?1 ESCAPE '\\'",
-            params![
-                format!("{}%", like_escape(&old)),
-                new,
-                old.chars().count() as i64 + 1
-            ],
+             WHERE substr(rel_path, 1, ?3 - 1) = ?1",
+            params![old, new, old.chars().count() as i64 + 1],
         )?)
     }
 
@@ -796,6 +803,64 @@ mod tests {
             )
             .unwrap();
         assert_eq!(reading.len(), 1);
+    }
+
+    #[test]
+    fn folder_prefixes_are_case_sensitive_and_literal() {
+        let (db, p) = setup();
+        db.insert_book(&book(1, "Books/Kids/a.pdf", "A"), 0)
+            .unwrap();
+        db.insert_book(&book(2, "Books/kids/b.pdf", "B"), 0)
+            .unwrap();
+        db.insert_book(&book(3, "Books/K_ds/c.pdf", "C"), 0)
+            .unwrap();
+        db.insert_book(&book(4, "Books/100%/d.pdf", "D"), 0)
+            .unwrap();
+        db.insert_book(&book(5, "Books/100x/e.pdf", "E"), 0)
+            .unwrap();
+        let titles = |q: BookQuery| -> Vec<String> {
+            let mut t: Vec<String> = db
+                .query_books(&q, &p)
+                .unwrap()
+                .into_iter()
+                .map(|b| b.metadata.title)
+                .collect();
+            t.sort();
+            t
+        };
+        let within = |f: &str| BookQuery {
+            within_folders: vec![f.into()],
+            ..Default::default()
+        };
+        assert_eq!(titles(within("Kids")), vec!["A"]);
+        assert_eq!(titles(within("100%")), vec!["D"]);
+        assert_eq!(titles(within("it's")), Vec::<String>::new());
+        assert_eq!(
+            titles(BookQuery {
+                folder: Some("kids".into()),
+                ..Default::default()
+            }),
+            vec!["B"]
+        );
+        assert_eq!(
+            titles(BookQuery {
+                folder: Some("K_ds".into()),
+                ..Default::default()
+            }),
+            vec!["C"]
+        );
+        assert_eq!(
+            db.move_folder_paths("Books/kids", "Books/young").unwrap(),
+            1
+        );
+        assert_eq!(
+            db.book(&hex(1), &p).unwrap().unwrap().rel_path,
+            "Books/Kids/a.pdf"
+        );
+        assert_eq!(
+            db.book(&hex(2), &p).unwrap().unwrap().rel_path,
+            "Books/young/b.pdf"
+        );
     }
 
     #[test]

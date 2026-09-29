@@ -3,7 +3,7 @@ import type { FolderDto } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
 import { useItemHandlers, type ItemHandlers } from "../hooks/useBookInteractions";
 import { authorsText, type BookView } from "../model";
-import { useLibraryView } from "../store";
+import { useSelectedIds } from "../store";
 import { FolderTile } from "./BookGrid";
 import { BookContextMenu } from "./BookContextMenu";
 import { BookCover } from "./BookCover";
@@ -33,7 +33,8 @@ const ShelfBook = memo(function ShelfBook({
         onDoubleClick={() => handlers.open(b)}
         onPointerDown={handlers.pointerDown(b)}
         className={cn(
-          "flex h-full cursor-default items-end justify-center pb-[22px] outline-none transition-transform",
+          // Off-screen books are not laid out or painted (big libraries).
+          "flex h-full cursor-default items-end justify-center pb-[22px] outline-none transition-transform [content-visibility:auto] [contain-intrinsic-size:auto_236px]",
           selected ? "-translate-y-2" : "hover:-translate-y-1",
         )}
       >
@@ -62,7 +63,7 @@ export function BookShelf({
   folders: FolderDto[];
   onOpenFolder: (path: string) => void;
 }) {
-  const selection = useLibraryView((s) => s.selection);
+  const selected = useSelectedIds();
   const handlers = useItemHandlers(books);
   return (
     <div className="px-6 pt-2 pb-10">
@@ -83,7 +84,7 @@ export function BookShelf({
         style={{ gridAutoRows: ROW }}
       >
         {books.map((b) => (
-          <ShelfBook key={b.id} book={b} selected={selection.includes(b.id)} handlers={handlers} />
+          <ShelfBook key={b.id} book={b} selected={selected.has(b.id)} handlers={handlers} />
         ))}
       </div>
     </div>

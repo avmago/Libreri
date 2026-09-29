@@ -176,3 +176,24 @@ export function coverTone(seed: string): readonly [string, string] {
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
   return COVER_TONES[Math.abs(h) % COVER_TONES.length] ?? COVER_TONES[0];
 }
+
+/**
+ * Adds what was typed into a chip field (several at once when separated by
+ * commas, semicolons or new lines), skipping ones already there.
+ */
+export function addListItems(list: string[], typed: string, splitOnComma = true): string[] {
+  const items = typed
+    .split(splitOnComma ? /[,;\n]/ : /[;\n]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const added = items.filter((item, i) => !list.includes(item) && items.indexOf(item) === i);
+  return added.length ? [...list, ...added] : list;
+}
+
+/** A number field as typed: empty = null, `undefined` = not a number. */
+export function parseNumberField(text: string): number | null | undefined {
+  const t = text.trim().replace(",", ".");
+  if (t === "") return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : undefined;
+}

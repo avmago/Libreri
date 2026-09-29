@@ -168,20 +168,27 @@ export function AudiobookView({ tab, active }: { tab: BookTab; active: boolean }
     return loc?.type === "audio" ? loc.t : 0;
   }, [position.data]);
   const started = useRef(false);
+  // Start only once the saved place is known (or could not be read), so an
+  // early start at 0 is not saved over it.
+  const positionKnown = position.isSuccess || position.isError;
+  const begin = useCallback(() => {
+    const a = audio.current;
+    if (!a || started.current || !positionKnown || a.readyState < 1) return;
+    started.current = true;
+    const req = useListening.getState().playFrom[bookId];
+    a.currentTime = req ? req.t : startAt;
+    if (req) {
+      useListening.getState().clearPlay(bookId);
+      void a.play().catch(() => {});
+    }
+  }, [positionKnown, startAt, bookId]);
+  useEffect(() => begin(), [begin]);
   const onLoaded = () => {
     const a = audio.current;
     if (!a) return;
     setDuration(Number.isFinite(a.duration) ? a.duration : 0);
     a.playbackRate = listening.audioRate;
-    if (!started.current) {
-      started.current = true;
-      const req = useListening.getState().playFrom[bookId];
-      a.currentTime = req ? req.t : startAt;
-      if (req) {
-        useListening.getState().clearPlay(bookId);
-        void a.play().catch(() => {});
-      }
-    }
+    begin();
   };
   // Later requests while open.
   const request = useListening((s) => s.playFrom[bookId]);
@@ -198,22 +205,29 @@ export function AudiobookView({ tab, active }: { tab: BookTab; active: boolean }
   }, [listening.audioRate]);
 
   // Save the place now and then, and when pausing.
-  const save = useCallback(() => {
-    const a = audio.current;
-    if (!a || !started.current) return;
-    const t = a.currentTime;
-    void savePosition(
-      bookId,
-      JSON.stringify({ type: "audio", t: Math.round(t * 10) / 10 }),
-      a.duration ? t / a.duration : 0,
-    ).catch(() => {});
-  }, [bookId]);
+  const save = useCallback(
+    (el?: HTMLAudioElement | null) => {
+      const a = el ?? audio.current;
+      if (!a || !started.current) return;
+      const t = a.currentTime;
+      void savePosition(
+        bookId,
+        JSON.stringify({ type: "audio", t: Math.round(t * 10) / 10 }),
+        a.duration ? t / a.duration : 0,
+      ).catch(() => {});
+    },
+    [bookId],
+  );
   useEffect(() => {
     if (!playing) return;
-    const id = setInterval(save, 5000);
+    const id = setInterval(() => save(), 5000);
     return () => clearInterval(id);
   }, [playing, save]);
-  useEffect(() => () => save(), [save]);
+  // On closing, the element is kept here: the ref is empty by then.
+  useEffect(() => {
+    const a = audio.current;
+    return () => save(a);
+  }, [save]);
 
   const toggle = () => {
     const a = audio.current;
@@ -243,6 +257,7 @@ export function AudiobookView({ tab, active }: { tab: BookTab; active: boolean }
 
   // Sleep timer: stop at a time or at the end of the chapter, fading out.
   const chapterRef = useRef(chapter);
+  const volume = useRef(1);
   useEffect(() => {
     chapterRef.current = chapter;
   }, [chapter]);
@@ -255,15 +270,21 @@ export function AudiobookView({ tab, active }: { tab: BookTab; active: boolean }
       if (!a) return;
       const endChapter = sleep.chapter !== null && chapterRef.current !== sleep.chapter;
       const left = sleep.until !== null ? (sleep.until - t) / 1000 : Infinity;
-      if (left < 8 && left > 0) a.volume = Math.max(0, left / 8);
+      // Fade from the volume the listener chose, and go back to it.
+      if (left < 8 && left > 0) a.volume = volume.current * Math.max(0, left / 8);
       if (left <= 0 || endChapter) {
         a.pause();
-        a.volume = 1;
+        a.volume = volume.current;
         setSleep(null);
         toast("Sleep timer: stopped");
       }
     }, 500);
-    return () => clearInterval(id);
+    const el = audio.current;
+    return () => {
+      clearInterval(id);
+      // Timer cancelled while fading: back to the chosen volume.
+      if (el) el.volume = volume.current;
+    };
   }, [sleep]);
 
   // Media keys and the system's now-playing controls.
@@ -584,7 +605,8 @@ export function AudiobookView({ tab, active }: { tab: BookTab; active: boolean }
                 step={0.05}
                 defaultValue={1}
                 onChange={(e) => {
-                  if (audio.current) audio.current.volume = Number(e.target.value);
+                  volume.current = Number(e.target.value);
+                  if (audio.current) audio.current.volume = volume.current;
                 }}
                 aria-label="Volume"
                 className="w-24"

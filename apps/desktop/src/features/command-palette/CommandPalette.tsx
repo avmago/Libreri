@@ -36,6 +36,12 @@ export function CommandPalette({
   onSearch?: (query: string) => void;
 }) {
   const [typed, setTyped] = useState("");
+  // Opens empty each time: what was typed goes when it closes.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (!open) setTyped("");
+  }
   const groups = [...new Set(actions.map((a) => a.group))];
   const run = (a: PaletteAction) => {
     onOpenChange(false);

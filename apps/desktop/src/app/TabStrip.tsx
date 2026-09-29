@@ -1,7 +1,9 @@
 import { useRef } from "react";
-import { BookOpen, Columns2, FileText, Library, X } from "lucide-react";
+import { LibreriMark } from "@/components/LibreriMark";
+import { BookOpen, Columns2, FileText, X } from "lucide-react";
 import { useTabs } from "@/lib/tabs";
 import { cn } from "@/lib/utils";
+import { useUi } from "./ui-store";
 
 const tabClass = (active: boolean) =>
   cn(
@@ -16,7 +18,12 @@ const tabClass = (active: boolean) =>
  * book tab out of the window opens it in a window of its own.
  */
 export function TabStrip({ onMoveToWindow }: { onMoveToWindow: (bookId: string) => void }) {
-  const { tabs, active, activate, close, split } = useTabs();
+  const { tabs, active, activate: activateTab, close, split } = useTabs();
+  // A tab clicked while Settings covers the tabs is shown (even the same one).
+  const activate = (id: string | null) => {
+    useUi.getState().closeSettings();
+    activateTab(id);
+  };
   const drag = useRef<{ id: string; x: number; y: number; moved: boolean } | null>(null);
 
   return (
@@ -28,7 +35,7 @@ export function TabStrip({ onMoveToWindow }: { onMoveToWindow: (bookId: string) 
         onClick={() => activate(null)}
         className={cn(tabClass(active === null), "shrink-0")}
       >
-        <Library className="size-4 shrink-0" aria-hidden /> Library
+        <LibreriMark className="size-4 shrink-0" /> Library
       </button>
       {tabs.map((t) => {
         const isActive = active === t.bookId;

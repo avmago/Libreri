@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { events, type SessionDto } from "@/lib/ipc";
-import { sessionKey } from "../api";
+import { forgetProfileData, sessionKey } from "../api";
 
 /**
  * Follows sign-ins and locks made in other windows: when someone else is
@@ -13,7 +13,7 @@ export function useSessionEvents() {
     const off = events.sessionChanged.listen((e) => {
       const current = qc.getQueryData<SessionDto | null>(sessionKey);
       if ((current?.profile.id ?? null) === (e.payload.profileId ?? null)) return;
-      qc.removeQueries({ queryKey: ["lib"], predicate: (q) => q.queryKey[1] !== "session" });
+      forgetProfileData(qc);
       void qc.invalidateQueries({ queryKey: sessionKey });
     });
     return () => void off.then((f) => f());

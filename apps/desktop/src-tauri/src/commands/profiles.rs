@@ -1,6 +1,7 @@
 //! Profiles: the picker, signing in and out, PINs, managing people, and
 //! each profile's preferences and smart collections.
 
+use super::blocking;
 use crate::error::{AppError, AppResult};
 use crate::events::SessionChanged;
 use crate::state::AppState;
@@ -102,17 +103,21 @@ pub fn current_session(state: State<'_, AppState>) -> AppResult<Option<SessionDt
 
 #[tauri::command]
 #[specta::specta]
-pub fn sign_in(
+pub async fn sign_in(
     app: AppHandle,
     state: State<'_, AppState>,
     id: String,
     pin: Option<String>,
 ) -> AppResult<SessionDto> {
-    let p = state
-        .library()?
-        .sign_in(&profile_id(&id)?, pin.as_deref())?;
-    announce(&app, Some(&p));
-    Ok(SessionDto::of(&p))
+    let library = state.library()?;
+    let id = profile_id(&id)?;
+    // Checking a PIN is slow on purpose (Argon2).
+    blocking(move || {
+        let p = library.sign_in(&id, pin.as_deref())?;
+        announce(&app, Some(&p));
+        Ok(SessionDto::of(&p))
+    })
+    .await
 }
 
 /// Locks the library and goes back to the profile picker.
@@ -135,14 +140,21 @@ pub struct NewProfile {
 
 #[tauri::command]
 #[specta::specta]
-pub fn create_profile(state: State<'_, AppState>, profile: NewProfile) -> AppResult<ProfileDto> {
-    let p = state.library()?.create_profile(
-        &profile.name,
-        &profile.colour,
-        profile.kind,
-        profile.pin.as_deref(),
-    )?;
-    Ok(ProfileDto::of(&p, 0))
+pub async fn create_profile(
+    state: State<'_, AppState>,
+    profile: NewProfile,
+) -> AppResult<ProfileDto> {
+    let library = state.library()?;
+    blocking(move || {
+        let p = library.create_profile(
+            &profile.name,
+            &profile.colour,
+            profile.kind,
+            profile.pin.as_deref(),
+        )?;
+        Ok(ProfileDto::of(&p, 0))
+    })
+    .await
 }
 
 #[tauri::command]
@@ -164,34 +176,38 @@ pub fn update_profile(
 /// which the interface shows once.
 #[tauri::command]
 #[specta::specta]
-pub fn set_profile_pin(
+pub async fn set_profile_pin(
     state: State<'_, AppState>,
     id: String,
     current_pin: Option<String>,
     new_pin: Option<String>,
 ) -> AppResult<Option<String>> {
-    let change = state.library()?.set_pin(
-        &profile_id(&id)?,
-        current_pin.as_deref(),
-        new_pin.as_deref(),
-    )?;
-    Ok(change.recovery_code)
+    let library = state.library()?;
+    let id = profile_id(&id)?;
+    blocking(move || {
+        let change = library.set_pin(&id, current_pin.as_deref(), new_pin.as_deref())?;
+        Ok(change.recovery_code)
+    })
+    .await
 }
 
 /// Resets the owner's forgotten PIN with the recovery code and signs in.
 /// Returns the next recovery code.
 #[tauri::command]
 #[specta::specta]
-pub fn recover_owner(
+pub async fn recover_owner(
     app: AppHandle,
     state: State<'_, AppState>,
     recovery_code: String,
     new_pin: String,
 ) -> AppResult<String> {
     let library = state.library()?;
-    let code = library.recover_owner(&recovery_code, &new_pin)?;
-    announce(&app, library.current_profile()?.as_ref());
-    Ok(code)
+    blocking(move || {
+        let code = library.recover_owner(&recovery_code, &new_pin)?;
+        announce(&app, library.current_profile()?.as_ref());
+        Ok(code)
+    })
+    .await
 }
 
 #[tauri::command]

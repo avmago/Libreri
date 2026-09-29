@@ -8,7 +8,14 @@
 import { createContext, createElement, useContext, useEffect, useRef, type ReactNode } from "react";
 import { create } from "zustand";
 import { ACTION_IDS, ACTIONS, VIM_KEYS, type ActionId } from "./actions";
-import { detectPlatform, matches, parseSequence, type ParsedShortcut } from "./keys";
+import {
+  detectPlatform,
+  keyBelongsToFocus,
+  matches,
+  parseSequence,
+  worksWhileTyping,
+  type ParsedShortcut,
+} from "./keys";
 
 export type { ActionId } from "./actions";
 
@@ -121,18 +128,25 @@ function activeEntry(id: ActionId): { entry: Entry; scoped: boolean } | null {
 
 function onKeyDown(event: KeyboardEvent) {
   if (event.defaultPrevented || event.isComposing) return;
+  // Enter on a focused button presses it; arrows move within tabs.
+  if (keyBelongsToFocus(event)) {
+    resetPending();
+    return;
+  }
   const typing = isTyping(event.target);
   const overlay = inOverlay(event.target);
-  const allowed = (id: ActionId) =>
-    ("whileTyping" in ACTIONS[id] && ACTIONS[id].whileTyping) || (!typing && !overlay);
+  // In a text field or dialog only actions marked `whileTyping` run, and only
+  // with keys that type nothing (Mod+F, F3; never a bare "/").
+  const allowed = (id: ActionId, seq: ParsedShortcut[]) =>
+    (!typing && !overlay) ||
+    ("whileTyping" in ACTIONS[id] && ACTIONS[id].whileTyping && worksWhileTyping(seq));
 
   const steps = [...pendingKeys, event];
   let full: { entry: Entry; scoped: boolean } | null = null;
   let partial = false;
   for (const [id, sequences] of parsed) {
-    if (!allowed(id)) continue;
     for (const seq of sequences) {
-      if (seq.length < steps.length) continue;
+      if (seq.length < steps.length || !allowed(id, seq)) continue;
       const ok = steps.every((e, i) => matches(e, seq[i]!));
       if (!ok) continue;
       const found = activeEntry(id);

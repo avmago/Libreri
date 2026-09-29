@@ -216,14 +216,23 @@ impl Library {
                 return self.write_archive(&req.dest, &opts, progress);
             }
             ExportFormat::Sqlite => {
-                if req.dest.exists() {
-                    fs::remove_file(&req.dest)?;
-                }
                 let scope = libreri_db::SnapshotScope {
                     only_profile: (!req.everyone).then_some(session.id),
                     strip_pins: true,
+                    no_personal_data: false,
                 };
-                self.with_db(|db| db.snapshot(&req.dest, &scope))?;
+                // Made next to the destination, which is replaced only once
+                // the copy is complete.
+                let mut tmp_name = req.dest.file_name().unwrap_or_default().to_os_string();
+                tmp_name.push(format!(".{}.part", uuid::Uuid::new_v4().simple()));
+                let tmp = req.dest.with_file_name(tmp_name);
+                let made = self
+                    .with_db(|db| db.snapshot(&tmp, &scope))
+                    .and_then(|()| Ok(fs::rename(&tmp, &req.dest)?));
+                if let Err(e) = made {
+                    let _ = fs::remove_file(&tmp);
+                    return Err(e);
+                }
                 return Ok(ExportReport {
                     path: req.dest.clone(),
                     books: self.with_db(|db| db.book_count())? as u32,

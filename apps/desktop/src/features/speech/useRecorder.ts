@@ -32,15 +32,22 @@ export function useRecorder(options: Options = {}) {
   const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const session = useRef<Session | null>(null);
+  /** Bumped by each start and by cancel: a start that is no longer the latest gives up. */
+  const attempt = useRef(0);
   const opts = useRef(options);
   useEffect(() => {
     opts.current = options;
   });
 
   const cleanup = useCallback(() => {
+    // A start still waiting for the microphone stops when it gets it.
+    attempt.current++;
     const s = session.current;
     session.current = null;
-    if (!s) return;
+    if (!s) {
+      setState("idle");
+      return;
+    }
     s.node.onaudioprocess = null;
     s.node.disconnect();
     s.stream.getTracks().forEach((t) => t.stop());
@@ -54,6 +61,7 @@ export function useRecorder(options: Options = {}) {
   /** Starts recording. Resolves to null, or what went wrong. */
   const start = useCallback(async (): Promise<string | null> => {
     if (session.current) return null;
+    const id = ++attempt.current;
     setError(null);
     setSeconds(0);
     setState("starting");
@@ -62,7 +70,15 @@ export function useRecorder(options: Options = {}) {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
       });
+      if (attempt.current !== id) {
+        // Cancelled (or unmounted) while asking: let go of the microphone.
+        stream.getTracks().forEach((t) => t.stop());
+        return null;
+      }
       const ctx = new AudioContext();
+      // Made after an await, so it may start suspended (WebKit): it would
+      // record silence.
+      void ctx.resume().catch(() => {});
       const source = ctx.createMediaStreamSource(stream);
       // A script processor works in every web view Libreri runs in (an
       // audio worklet would need a separate script file).
@@ -101,6 +117,7 @@ export function useRecorder(options: Options = {}) {
       setState("recording");
       return null;
     } catch (e) {
+      if (attempt.current !== id) return null;
       const name = (e as { name?: string }).name;
       const message =
         name === "NotAllowedError"

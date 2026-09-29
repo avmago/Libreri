@@ -212,9 +212,11 @@ export function textToLatex(text: string): string {
 /** "sin", "log", "lim"… written as plain letters, as commands. */
 function functionNames(s: string): string {
   return s.replace(
-    // A name on its own, or run into a one-letter variable ("sinx").
-    /(?<![\\a-zA-Z])(arcsin|arccos|arctan|sinh|cosh|tanh|sin|cos|tan|cot|sec|csc|log|ln|exp|lim|max|min|sup|inf|det|gcd|arg|deg|dim)(?![a-zA-Z](?=[a-zA-Z]))(?=[a-zA-Z]?(?![a-zA-Z]))/g,
-    "\\$1 ",
+    // A name on its own, or run into a one-letter variable ("sinx"). The
+    // character before it is matched (not looked behind, which older Safari
+    // cannot read) and put back.
+    /(^|[^\\a-zA-Z])(arcsin|arccos|arctan|sinh|cosh|tanh|sin|cos|tan|cot|sec|csc|log|ln|exp|lim|max|min|sup|inf|det|gcd|arg|deg|dim)(?![a-zA-Z](?=[a-zA-Z]))(?=[a-zA-Z]?(?![a-zA-Z]))/g,
+    "$1\\$2 ",
   );
 }
 

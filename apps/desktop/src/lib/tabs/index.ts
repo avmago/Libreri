@@ -65,6 +65,8 @@ interface TabsState {
   openBeside: (tab: BookTab) => void;
   /** Removes a tab without remembering it (it moved to another window). */
   detach: (bookId: string) => void;
+  /** Closes the tabs of books that are gone (moved to the Trash): not reopenable. */
+  closeGone: (bookIds: Iterable<string>) => void;
   /** Shows a comparison in a book's tab, or ends it (null). */
   setCompare: (bookId: string, compare: CompareRequest | null) => void;
   /** A book's file changed (a new version): its id changed, the tab follows. */
@@ -203,6 +205,14 @@ export const useTabs = create<TabsState>((set, get) => ({
         split: s.split ? { left: swap(s.split.left)!, right: swap(s.split.right)! } : null,
       };
     }),
+  closeGone: (bookIds) => {
+    const gone = new Set(bookIds);
+    for (const t of get().tabs) if (gone.has(t.bookId)) get().detach(t.bookId);
+    set((s) => ({
+      closed: s.closed.filter((t) => !gone.has(t.bookId)),
+      lastBook: s.lastBook && gone.has(s.lastBook) ? null : s.lastBook,
+    }));
+  },
   detach: (bookId) =>
     set((s) => {
       const tabs = s.tabs.filter((t) => t.bookId !== bookId);

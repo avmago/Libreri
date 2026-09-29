@@ -1,17 +1,24 @@
+use super::blocking;
 use crate::dto::{FolderKind, LibrarySummary};
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
 use libreri_library::{Library, OpenOptions};
 use std::path::{Path, PathBuf};
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
 
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Tells the Welcome screen what the chosen folder contains.
 #[tauri::command]
 #[specta::specta]
-pub fn inspect_folder(path: String) -> FolderKind {
-    let path = Path::new(&path);
+pub async fn inspect_folder(path: String) -> FolderKind {
+    // A folder on a sleeping disk or a network share can take a while.
+    tauri::async_runtime::spawn_blocking(move || folder_kind(Path::new(&path)))
+        .await
+        .unwrap_or(FolderKind::Missing)
+}
+
+fn folder_kind(path: &Path) -> FolderKind {
     if !path.exists() {
         FolderKind::Missing
     } else if Library::is_library(path) {
@@ -29,40 +36,61 @@ pub fn inspect_folder(path: String) -> FolderKind {
 /// Creates a new library in `path` and opens it.
 #[tauri::command]
 #[specta::specta]
-pub fn create_library(
-    state: State<'_, AppState>,
+pub async fn create_library(
+    app: AppHandle,
     path: String,
     name: Option<String>,
 ) -> AppResult<LibrarySummary> {
-    state.close_library();
-    let library = Library::create(Path::new(&path), name.as_deref(), APP_VERSION)?;
-    adopt(&state, library)
+    blocking(move || {
+        let state = app.state::<AppState>();
+        let _opening = state.opening();
+        state.close_library();
+        let library = Library::create(Path::new(&path), name.as_deref(), APP_VERSION)?;
+        adopt(&state, library)
+    })
+    .await
 }
 
 /// Opens an existing library. `force` takes over a lock left by another
 /// computer, after the user has confirmed.
 #[tauri::command]
 #[specta::specta]
-pub fn open_library(
-    state: State<'_, AppState>,
-    path: String,
-    force: bool,
-) -> AppResult<LibrarySummary> {
-    state.close_library();
-    let library = Library::open(Path::new(&path), OpenOptions { force })?;
-    adopt(&state, library)
+pub async fn open_library(app: AppHandle, path: String, force: bool) -> AppResult<LibrarySummary> {
+    blocking(move || {
+        let state = app.state::<AppState>();
+        let _opening = state.opening();
+        state.close_library();
+        let library = Library::open(Path::new(&path), OpenOptions { force })?;
+        adopt(&state, library)
+    })
+    .await
+}
+
+/// Closes the library (writing out the database can take a moment).
+#[tauri::command]
+#[specta::specta]
+pub async fn close_library(app: AppHandle) {
+    let _ = blocking(move || {
+        let state = app.state::<AppState>();
+        let _opening = state.opening();
+        state.close_library();
+        Ok(())
+    })
+    .await;
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn close_library(state: State<'_, AppState>) {
-    state.close_library();
-}
-
-#[tauri::command]
-#[specta::specta]
-pub fn current_library(state: State<'_, AppState>) -> Option<LibrarySummary> {
-    state.library_if_open().map(|l| LibrarySummary::of(&l))
+pub async fn current_library(app: AppHandle) -> Option<LibrarySummary> {
+    // At startup the library used last time may still be opening.
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        state.wait_for_reopen();
+        state.library_if_open().map(|l| LibrarySummary::of(&l))
+    })
+    .await
+    .ok()
+    .flatten()
 }
 
 /// Checks the library folder for changes now (the watcher does this

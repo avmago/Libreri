@@ -48,7 +48,10 @@ pub async fn link_fetch(app: AppHandle, url: String) -> AppResult<LinkPreviewDto
             can_copy: fetched.page.is_some(),
         };
         let state = app.state::<AppState>();
-        let mut cache = state.fetched_links.lock().expect("links lock");
+        let mut cache = state
+            .fetched_links
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         if cache.len() > 8 {
             cache.clear();
         }
@@ -83,7 +86,7 @@ pub async fn link_save(
         let cached = state
             .fetched_links
             .lock()
-            .expect("links lock")
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .get(&url)
             .cloned();
         let fetched: Arc<Fetched> = match cached {
@@ -114,7 +117,11 @@ pub async fn link_save(
             }
             _ => None,
         };
-        state.fetched_links.lock().expect("links lock").remove(&url);
+        state
+            .fetched_links
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .remove(&url);
         Ok(LinkSavedDto { picture, copy })
     })
     .await
@@ -149,7 +156,7 @@ fn media_kind(path: &std::path::Path) -> Option<&'static str> {
 /// A video or audio file chosen to link to.
 #[tauri::command]
 #[specta::specta]
-pub fn link_file(state: State<'_, AppState>, path: String) -> AppResult<LinkFileDto> {
+pub async fn link_file(state: State<'_, AppState>, path: String) -> AppResult<LinkFileDto> {
     let p = std::path::PathBuf::from(&path);
     let media = media_kind(&p).ok_or_else(|| {
         AppError::invalid("choose a video or audio file (MP4, WebM, MOV, MP3, M4A, FLAC…)")
@@ -173,12 +180,16 @@ pub fn link_file(state: State<'_, AppState>, path: String) -> AppResult<LinkFile
 /// (`.media/<token>/<name>`), usable while the app runs.
 #[tauri::command]
 #[specta::specta]
-pub fn link_media_url(state: State<'_, AppState>, file: String) -> AppResult<String> {
+pub async fn link_media_url(state: State<'_, AppState>, file: String) -> AppResult<String> {
     let path = if std::path::Path::new(&file).is_absolute() {
         std::path::PathBuf::from(&file)
     } else {
-        state
-            .library()?
+        let library = state.library()?;
+        // Only files the signed-in profile may open.
+        if !library.may_open(&file) {
+            return Err(AppError::invalid("that file is not in the library"));
+        }
+        library
             .layout()
             .resolve_relative(&file)
             .ok_or_else(|| AppError::invalid("that file is not in the library"))?
@@ -201,13 +212,16 @@ pub fn link_media_url(state: State<'_, AppState>, file: String) -> AppResult<Str
     state
         .media_files
         .lock()
-        .expect("media lock")
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
         .insert(token.clone(), path);
     Ok(format!(".media/{token}/{name}"))
 }
 
 fn player(state: &AppState) -> AppResult<Arc<libreri_links::PlayerServer>> {
-    let mut slot = state.player.lock().expect("player lock");
+    let mut slot = state
+        .player
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     if let Some(p) = slot.as_ref() {
         return Ok(Arc::clone(p));
     }
@@ -231,7 +245,7 @@ pub struct PlayerDto {
 /// The player for an embedded video, at a start time (seconds).
 #[tauri::command]
 #[specta::specta]
-pub fn link_player(
+pub async fn link_player(
     state: State<'_, AppState>,
     url: String,
     video: Option<KnownVideo>,
@@ -260,7 +274,9 @@ pub fn link_player(
 /// Opens a player in a window of its own.
 #[tauri::command]
 #[specta::specta]
-pub fn link_pop_out(app: AppHandle, page: String, title: String) -> AppResult<()> {
+pub async fn link_pop_out(app: AppHandle, page: String, title: String) -> AppResult<()> {
+    // Async: building a window from a command on the main thread deadlocks
+    // on Windows.
     let url: tauri::Url = page
         .parse()
         .map_err(|_| AppError::invalid("not a player address"))?;
@@ -285,7 +301,11 @@ pub fn link_pop_out(app: AppHandle, page: String, title: String) -> AppResult<()
 /// app the system uses for it.
 #[tauri::command]
 #[specta::specta]
-pub fn link_open_file(app: AppHandle, state: State<'_, AppState>, file: String) -> AppResult<()> {
+pub async fn link_open_file(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    file: String,
+) -> AppResult<()> {
     use tauri_plugin_opener::OpenerExt;
     let path = if std::path::Path::new(&file).is_absolute() {
         let p = std::path::PathBuf::from(&file);
@@ -296,19 +316,54 @@ pub fn link_open_file(app: AppHandle, state: State<'_, AppState>, file: String) 
         }
         p
     } else {
+        if !opens_linked(&file) {
+            return Err(AppError::invalid(
+                "only linked web pages, videos and recordings open this way",
+            ));
+        }
         let library = state.library()?;
         let p = library
             .layout()
             .resolve_relative(&file)
             .ok_or_else(|| AppError::invalid("that file is not in the library"))?;
-        // Offline copies: only the signed-in profile's own.
+        // Offline copies: only the signed-in profile's own; other files
+        // only where the signed-in profile may look.
         if file.starts_with("Notes/") {
             library.own_note_file(&file)?
-        } else {
+        } else if library.may_open(&file) {
             p
+        } else {
+            return Err(AppError::invalid("that file is not in the library"));
         }
     };
     app.opener()
         .open_path(path.to_string_lossy(), None::<&str>)
         .map_err(|e| AppError::new(AppErrorKind::Io, e.to_string()))
+}
+
+/// Whether a file in the library is one a link may open with another app:
+/// an offline copy of a web page, a PDF, or a video or audio file. Never a
+/// program or script.
+fn opens_linked(rel: &str) -> bool {
+    let p = std::path::Path::new(rel);
+    let ext = p
+        .extension()
+        .map(|e| e.to_string_lossy().to_ascii_lowercase())
+        .unwrap_or_default();
+    media_kind(p).is_some() || matches!(ext.as_str(), "html" | "htm" | "pdf")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn links_open_only_pages_documents_and_media() {
+        assert!(opens_linked("Notes/p/Links/Web pages/Sea.html"));
+        assert!(opens_linked("Books/Talks/Lecture.MP4"));
+        assert!(opens_linked("Books/Paper.pdf"));
+        assert!(!opens_linked("Books/tool.exe"));
+        assert!(!opens_linked("Books/run.command"));
+        assert!(!opens_linked("Books/no-extension"));
+    }
 }

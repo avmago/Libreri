@@ -262,7 +262,8 @@ export function BookContextMenu({
         if (!open) return setTargets(null);
         const { selection, setSelection } = useLibraryView.getState();
         if (selection.includes(book.id)) {
-          setTargets(getBooks().filter((b) => selection.includes(b.id)));
+          const ids = new Set(selection);
+          setTargets(getBooks().filter((b) => ids.has(b.id)));
         } else {
           setSelection([book.id]);
           setTargets([book]);

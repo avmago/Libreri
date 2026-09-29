@@ -12,7 +12,7 @@ use serde::Serialize;
 use specta::Type;
 use std::path::PathBuf;
 use std::time::Duration;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 use tauri_specta::Event;
 
 /// Largest filled-in form accepted from the interface.
@@ -220,10 +220,14 @@ pub async fn restore_version(
 
 #[tauri::command]
 #[specta::specta]
-pub fn delete_version(state: State<'_, AppState>, id: String, version: String) -> AppResult<()> {
-    Ok(state
-        .library()?
-        .delete_version(&book_id(&id)?, &book_id(&version)?)?)
+pub async fn delete_version(
+    state: State<'_, AppState>,
+    id: String,
+    version: String,
+) -> AppResult<()> {
+    let library = state.library()?;
+    let (id, version) = (book_id(&id)?, book_id(&version)?);
+    blocking(move || Ok(library.delete_version(&id, &version)?)).await
 }
 
 /// Saves a copy of an earlier version where the reader chooses.
@@ -272,48 +276,52 @@ pub async fn delete_all_versions(state: State<'_, AppState>) -> AppResult<u32> {
 /// `PhonePage` events.
 #[tauri::command]
 #[specta::specta]
-pub fn start_phone_pages(
+pub async fn start_phone_pages(
     app: AppHandle,
-    state: State<'_, AppState>,
 ) -> AppResult<crate::commands::scan::PhonePairingDto> {
-    state.library()?;
-    state.stop_phone_scan();
-    let scanner = libreri_scan::PhoneScanner::start_for(
-        libreri_scan::PhoneMode::Pages,
-        Duration::from_secs(20 * 60),
-        move |event| {
-            let payload = match event {
-                libreri_scan::PhoneEvent::Opened => PhonePage {
-                    kind: "opened".into(),
-                    picture: None,
-                },
-                libreri_scan::PhoneEvent::Page(bytes) => {
-                    let mime = if bytes.starts_with(&[0xFF, 0xD8]) {
-                        "image/jpeg"
-                    } else {
-                        "image/png"
-                    };
-                    PhonePage {
-                        kind: "page".into(),
-                        picture: Some(format!(
-                            "data:{mime};base64,{}",
-                            base64::engine::general_purpose::STANDARD.encode(bytes)
-                        )),
+    blocking(move || {
+        let state = app.state::<AppState>();
+        let events = app.clone();
+        state.library()?;
+        state.stop_phone_scan();
+        let scanner = libreri_scan::PhoneScanner::start_for(
+            libreri_scan::PhoneMode::Pages,
+            Duration::from_secs(20 * 60),
+            move |event| {
+                let payload = match event {
+                    libreri_scan::PhoneEvent::Opened => PhonePage {
+                        kind: "opened".into(),
+                        picture: None,
+                    },
+                    libreri_scan::PhoneEvent::Page(bytes) => {
+                        let mime = if bytes.starts_with(&[0xFF, 0xD8]) {
+                            "image/jpeg"
+                        } else {
+                            "image/png"
+                        };
+                        PhonePage {
+                            kind: "page".into(),
+                            picture: Some(format!(
+                                "data:{mime};base64,{}",
+                                base64::engine::general_purpose::STANDARD.encode(bytes)
+                            )),
+                        }
                     }
-                }
-                libreri_scan::PhoneEvent::Scanned(_) => return,
-            };
-            let _ = payload.emit(&app);
-        },
-    )
-    .map_err(AppError::invalid)?;
-    let p = scanner.pairing().clone();
-    state.set_phone_scanner(scanner);
-    Ok(crate::commands::scan::PhonePairingDto {
-        url: p.url,
-        qr_svg: p.qr_svg,
-        expires_in: p.expires_in as u32,
+                    libreri_scan::PhoneEvent::Scanned(_) => return,
+                };
+                let _ = payload.emit(&events);
+            },
+        )
+        .map_err(AppError::invalid)?;
+        let p = scanner.pairing().clone();
+        state.set_phone_scanner(scanner);
+        Ok(crate::commands::scan::PhonePairingDto {
+            url: p.url,
+            qr_svg: p.qr_svg,
+            expires_in: p.expires_in as u32,
+        })
     })
+    .await
 }
 
 /// How many pages a PDF file has (before taking pages from it).

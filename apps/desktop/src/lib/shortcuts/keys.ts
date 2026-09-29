@@ -89,8 +89,57 @@ export function matches(event: KeyboardEvent, shortcut: ParsedShortcut): boolean
     return false;
   }
   if (normaliseKey(event.key) === shortcut.key) return true;
+  // The physical key only stands in when the typed character is not a plain
+  // letter or digit (Alt+R = "®", Shift+1 = "!", a Cyrillic "к"). On AZERTY
+  // or Dvorak the letter typed is the one meant, whatever key it sits on.
   const modified = event.altKey || event.shiftKey || event.ctrlKey || event.metaKey;
-  return modified && shortcut.key.length === 1 && keyFromCode(event.code) === shortcut.key;
+  return (
+    modified &&
+    shortcut.key.length === 1 &&
+    !/^[a-z0-9]$/i.test(event.key) &&
+    keyFromCode(event.code) === shortcut.key
+  );
+}
+
+/**
+ * True when a key sequence can run while typing in a text field: every step
+ * holds Ctrl or ⌘, or is a function key (F3). A bare "/" or "n" (Vim keys, or
+ * a key the profile chose) would stop those characters being typed.
+ */
+export function worksWhileTyping(sequence: ParsedShortcut[]): boolean {
+  return sequence.every((s) => s.ctrl || s.meta || /^F\d{1,2}$/.test(s.key));
+}
+
+const ACTIVATING_KEYS = new Set(["Enter", " "]);
+const MOVING_KEYS = new Set([
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "Home",
+  "End",
+  "PageUp",
+  "PageDown",
+]);
+/** Elements that Enter or Space press. */
+const PRESSABLE =
+  "button, a[href], summary, [role=button], [role=link], [role=menuitem], [role=menuitemcheckbox], [role=menuitemradio], [role=tab], [role=checkbox], [role=switch], [role=radio], [role=treeitem]";
+/** Elements that move with the arrow keys themselves. */
+const MOVABLE =
+  "[role=tab], [role=radio], [role=slider], [role=spinbutton], [role=treeitem], [role=menuitem], [role=menuitemcheckbox], [role=menuitemradio], [role=scrollbar]";
+
+/**
+ * True when the focused element uses this key itself: Enter or Space on a
+ * button or link, arrows on tabs, radios or sliders. The app's shortcuts
+ * leave such keys alone.
+ */
+export function keyBelongsToFocus(event: KeyboardEvent): boolean {
+  if (event.ctrlKey || event.metaKey || event.altKey) return false;
+  const target = event.target;
+  if (!(target instanceof Element)) return false;
+  if (ACTIVATING_KEYS.has(event.key)) return target.matches(PRESSABLE);
+  if (MOVING_KEYS.has(event.key)) return target.matches(MOVABLE);
+  return false;
 }
 
 /** Parses "g g" into one shortcut per key press. */
@@ -117,7 +166,9 @@ export function shortcutFromEvent(event: KeyboardEvent, platform: Platform): str
   if (event.altKey) parts.push("Alt");
   if (event.shiftKey) parts.push("Shift");
   const modified = event.altKey || event.shiftKey || event.ctrlKey || event.metaKey;
-  let key = (modified && keyFromCode(event.code)) || event.key;
+  // Same rule as `matches`: the typed letter or digit, else the physical key.
+  const typed = /^[a-z0-9]$/i.test(event.key);
+  let key = (modified && !typed && keyFromCode(event.code)) || event.key;
   if (key === " ") key = "Space";
   else if (key === "+") key = "Plus";
   else if (key.length === 1) key = key.toUpperCase();

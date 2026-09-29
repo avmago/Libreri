@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { events, type DetailsFilled } from "@/lib/ipc";
+import { report } from "@/lib/windows";
 import { useLibraryView } from "@/features/library";
 import { useFillMissingDetails } from "../api";
 
@@ -29,16 +30,18 @@ export function useDetailsEvents() {
     const off = events.detailsFilled.listen(({ payload }) => {
       const { title, description } = summarise(payload);
       const show = payload.failed.length ? toast.warning : toast.success;
-      show(title, {
-        description: description || undefined,
-        duration: payload.unsure.length || payload.failed.length ? 10_000 : 4_000,
-        action: payload.unsure.length
-          ? {
-              label: "Select them",
-              onClick: () => setSelection(payload.unsure),
-            }
-          : undefined,
-      });
+      report(() =>
+        show(title, {
+          description: description || undefined,
+          duration: payload.unsure.length || payload.failed.length ? 10_000 : 4_000,
+          action: payload.unsure.length
+            ? {
+                label: "Select them",
+                onClick: () => setSelection(payload.unsure),
+              }
+            : undefined,
+        }),
+      );
     });
     return () => void off.then((f) => f());
   }, [setSelection]);

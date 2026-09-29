@@ -4,7 +4,8 @@
 
 use serde::Serialize;
 use std::io::Write;
-use std::process::{Child, Stdio};
+use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -50,21 +51,30 @@ pub fn voices() -> Vec<Voice> {
 /// Speaks one piece of text at a time; `stop` cuts it short.
 #[derive(Default)]
 pub struct Speaker {
-    child: Mutex<Option<Child>>,
+    /// The speaking program, with the number of the `speak` call that
+    /// started it, so an earlier call never mistakes a later one's program
+    /// for its own.
+    child: Mutex<Option<(u64, Child)>>,
+    calls: AtomicU64,
 }
 
 impl Speaker {
     /// Speaks `text` and returns when it is done: `Ok(true)` when it was
-    /// spoken to the end, `Ok(false)` when stopped. `rate` is 1 for normal
-    /// speed.
+    /// spoken to the end, `Ok(false)` when stopped (or replaced by another
+    /// `speak`). `rate` is 1 for normal speed.
     pub fn speak(&self, text: &str, voice: Option<&str>, rate: f64) -> Result<bool, String> {
-        self.stop();
         let mut cmd = crate::command("espeak-ng").ok_or("eSpeak NG is not installed")?;
         let wpm = (175.0 * rate).clamp(80.0, 500.0).round() as u32;
         cmd.args(["--stdin", "-s", &wpm.to_string()]);
         if let Some(v) = voice.filter(|v| !v.is_empty()) {
             cmd.args(["-v", v]);
         }
+        self.run(cmd, text)
+    }
+
+    fn run(&self, mut cmd: Command, text: &str) -> Result<bool, String> {
+        self.stop();
+        let me = self.calls.fetch_add(1, Ordering::SeqCst);
         let mut child = cmd
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
@@ -74,14 +84,23 @@ impl Speaker {
         if let Some(mut input) = child.stdin.take() {
             let _ = input.write_all(text.as_bytes());
         }
-        *self.child.lock().unwrap_or_else(|p| p.into_inner()) = Some(child);
+        {
+            let mut slot = self.child.lock().unwrap_or_else(|p| p.into_inner());
+            // Another call may have started meanwhile; this one gives way.
+            if let Some((_, mut old)) = slot.take() {
+                let _ = old.kill();
+                let _ = old.wait();
+            }
+            *slot = Some((me, child));
+        }
         loop {
             {
                 let mut slot = self.child.lock().unwrap_or_else(|p| p.into_inner());
                 match slot.as_mut() {
-                    // Stopped (the child was taken and killed).
+                    // Stopped, or another call's program took its place.
                     None => return Ok(false),
-                    Some(c) => {
+                    Some((call, _)) if *call != me => return Ok(false),
+                    Some((_, c)) => {
                         if let Some(status) = c.try_wait().map_err(|e| e.to_string())? {
                             *slot = None;
                             return Ok(status.success());
@@ -94,7 +113,8 @@ impl Speaker {
     }
 
     pub fn stop(&self) {
-        if let Some(mut c) = self.child.lock().unwrap_or_else(|p| p.into_inner()).take() {
+        let taken = self.child.lock().unwrap_or_else(|p| p.into_inner()).take();
+        if let Some((_, mut c)) = taken {
             let _ = c.kill();
             let _ = c.wait();
         }
@@ -116,5 +136,34 @@ mod tests {
             (v[1].id.as_str(), v[1].name.as_str()),
             ("en-gb", "English (Great Britain)")
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_new_speech_stops_the_old_one_and_is_not_mistaken_for_it() {
+        let speaker = std::sync::Arc::new(Speaker::default());
+        let sh = |script: &str| {
+            let mut c = Command::new("sh");
+            c.args(["-c", script]);
+            c
+        };
+        let first = {
+            let speaker = std::sync::Arc::clone(&speaker);
+            std::thread::spawn(move || speaker.run(sh("sleep 5"), ""))
+        };
+        std::thread::sleep(Duration::from_millis(200));
+        let started = std::time::Instant::now();
+        // The second speaks to the end; the first reports that it stopped.
+        assert_eq!(speaker.run(sh("sleep 0.3"), ""), Ok(true));
+        assert_eq!(first.join().unwrap(), Ok(false));
+        assert!(started.elapsed() < Duration::from_secs(4));
+        // Stopping ends a speech early.
+        let third = {
+            let speaker = std::sync::Arc::clone(&speaker);
+            std::thread::spawn(move || speaker.run(sh("sleep 5"), ""))
+        };
+        std::thread::sleep(Duration::from_millis(200));
+        speaker.stop();
+        assert_eq!(third.join().unwrap(), Ok(false));
     }
 }

@@ -66,7 +66,8 @@ pub fn normalize_isbn13(input: &str) -> Result<String, IsbnError> {
 /// Validates an ISBN-10 and returns it as 10 characters.
 pub fn normalize_isbn10(input: &str) -> Result<String, IsbnError> {
     let s = clean(input);
-    if s.len() != 10 {
+    // Byte slicing below needs plain ASCII; anything else is not an ISBN.
+    if !s.is_ascii() || s.len() != 10 {
         return Err(IsbnError::Length10);
     }
     let d = digits(&s[..9]).ok_or(IsbnError::Length10)?;
@@ -157,6 +158,17 @@ mod tests {
         assert_eq!(normalize_isbn10("0-306-40615-2").unwrap(), "0306406152");
         assert_eq!(normalize_isbn10("080442957x").unwrap(), "080442957X");
         assert_eq!(normalize_isbn10("0306406153"), Err(IsbnError::Checksum));
+    }
+
+    #[test]
+    fn rejects_non_ascii_without_panicking() {
+        // 8 digits + a 2-byte letter = 10 bytes; slicing at 9 used to panic.
+        assert_eq!(normalize_isbn10("12345678é"), Err(IsbnError::Length10));
+        assert_eq!(
+            normalize_isbn10("１２３４５６７８９"),
+            Err(IsbnError::Length10)
+        );
+        assert_eq!(normalize_isbn13("978030640615é"), Err(IsbnError::Length13));
     }
 
     #[test]

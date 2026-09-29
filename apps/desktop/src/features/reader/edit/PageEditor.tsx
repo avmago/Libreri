@@ -125,7 +125,20 @@ export function PageEditor({
       doc?.close();
     };
   }, [book.relPath]);
-  useEffect(() => () => others.forEach((d) => d.close()), [others]);
+  // Other PDFs added: closed when the editor closes (the map is replaced as
+  // files are added, but the documents in it stay open).
+  const othersRef = useRef(others);
+  const closedRef = useRef(false);
+  useEffect(() => {
+    othersRef.current = others;
+  }, [others]);
+  useEffect(() => {
+    closedRef.current = false;
+    return () => {
+      closedRef.current = true;
+      othersRef.current.forEach((d) => d.close());
+    };
+  }, []);
 
   const s = h?.present;
   const pageCount = pdf?.count ?? 0;
@@ -212,7 +225,10 @@ export function PageEditor({
       );
     });
     if (file.url && !others.has(file.ref)) {
-      void PdfPages.open(file.url).then((d) => setOthers((m) => new Map(m).set(file.ref, d)));
+      void PdfPages.open(file.url).then((d) => {
+        if (closedRef.current) return d.close();
+        setOthers((m) => new Map(m).set(file.ref, d));
+      });
     }
     setDialog(null);
   };
@@ -312,6 +328,15 @@ export function PageEditor({
       toast.error("A PDF needs at least one page");
       return;
     }
+    const redacting = Object.values(s.redactions).some((boxes) => boxes.length > 0);
+    if (
+      redacting &&
+      !(await ask(
+        "The hidden text will be gone for good: Libreri does not keep the unredacted file, and this book's earlier versions are deleted too, so the text is not left in Version history or in backups.",
+        { title: "Save the redactions?", kind: "warning", okLabel: "Redact and save" },
+      ))
+    )
+      return;
     setSaving(true);
     try {
       const r = await unwrap(commands.editPages(book.id, M.toPlan(s)));
@@ -325,7 +350,11 @@ export function PageEditor({
           },
         );
       for (const w of r.warnings) toast(w);
-      toast.success("Saved. The earlier version is kept in Version history.");
+      toast.success(
+        redacting
+          ? "Saved. The redacted text is gone, and no earlier versions are kept."
+          : "Saved. The earlier version is kept in Version history.",
+      );
       onSaved(r.book);
     } catch (e) {
       toast.error("The changes could not be saved", { description: String(e) });

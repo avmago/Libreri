@@ -35,7 +35,7 @@ import { commands, type SortKey } from "@/lib/ipc";
 import { keysLabel, platform, shortcutFor, useShortcut, type ActionId } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import { usePermissions } from "@/features/profiles";
-import { useBooks, useFacets, useFolders, useMoveFolder } from "../api";
+import { useBooks, useCollections, useFacets, useFolders, useMoveFolder } from "../api";
 import { useDetailsDialog, useFillDetails } from "@/features/details";
 import { pickArchiveToImport, usePortability } from "@/features/portability";
 import { useLibraryDialogs } from "../dialogs";
@@ -53,6 +53,14 @@ import { DetailsPanel } from "./DetailsPanel";
 import { findFolder } from "./folderUtils";
 
 const keys = (id: ActionId) => keysLabel(shortcutFor(id), platform);
+
+const NO_BOOKS: BookView[] = [];
+
+/** Enter opens the selected book only from the list (or with nothing focused). */
+function focusInBookList() {
+  const el = document.activeElement;
+  return !el || el === document.body || el.closest("[data-book-grid], [data-book-list]") !== null;
+}
 
 function Breadcrumbs({ path }: { path: string }) {
   const setNav = useLibraryView((s) => s.setNav);
@@ -414,7 +422,9 @@ export function LibraryView() {
       view.includeSubfolders,
     ],
   );
-  const { data: books = [], isFetching } = useBooks(query);
+  const { data, isPending, isError, error, refetch, isFetching } = useBooks(query);
+  const books = data ?? NO_BOOKS;
+  const { data: collections } = useCollections();
   const { data: facets } = useFacets();
   const { data: folderTree = [] } = useFolders();
   const actions = useBookActions();
@@ -426,9 +436,10 @@ export function LibraryView() {
   const fillDetails = useFillDetails();
   const openExport = usePortability((s) => s.openExport);
   const openCitation = usePortability((s) => s.openCitation);
-  usePdfCovers(books);
+  usePdfCovers(books, editLibrary);
 
-  const selected = books.filter((b) => view.selection.includes(b.id));
+  const selectedIds = useMemo(() => new Set(view.selection), [view.selection]);
+  const selected = books.filter((b) => selectedIds.has(b.id));
   const childFolders =
     view.nav.kind === "folder" && !query.includeSubfolders && !query.search
       ? view.nav.path === ""
@@ -483,7 +494,7 @@ export function LibraryView() {
   useShortcut("books.selectAll", () => view.setSelection(books.map((b) => b.id)));
   useShortcut("books.clearSelection", () => view.setSelection([]));
   const only = selected.length === 1 ? selected[0] : undefined;
-  useShortcut("books.open", () => only && void actions.open(only));
+  useShortcut("books.open", () => only && focusInBookList() && void actions.open(only));
   useShortcut("books.reveal", () => only && void actions.reveal(only));
   useShortcut("books.trash", () => editLibrary && void actions.moveToTrash(selected));
   useShortcut("books.trashMac", () => editLibrary && void actions.moveToTrash(selected));
@@ -497,14 +508,19 @@ export function LibraryView() {
   const onDrop = useCallback(
     (item: DragItem, folder: string) => {
       if (item.kind === "books") {
+        const ids = new Set(item.ids);
         void actions.moveTo(
-          books.filter((b) => item.ids.includes(b.id)),
+          books.filter((b) => ids.has(b.id)),
           folder,
         );
       } else {
         moveFolder.mutate(
           { path: item.path, parent: folder },
-          { onError: (e) => toast.error("Could not move the folder", { description: String(e) }) },
+          {
+            // The folder shown may be the one moved, or inside it.
+            onSuccess: (to) => useLibraryView.getState().folderMoved(item.path, to),
+            onError: (e) => toast.error("Could not move the folder", { description: String(e) }),
+          },
         );
       }
     },
@@ -514,6 +530,12 @@ export function LibraryView() {
   const Content = view.view === "grid" ? BookGrid : view.view === "shelf" ? BookShelf : BookList;
   const openFolder = (path: string) => view.setNav({ kind: "folder", path });
   const count = books.length;
+  // A collection renamed since it was opened shows its new name.
+  const nav = view.nav;
+  const title =
+    nav.kind === "collection"
+      ? (collections?.find((c) => c.id === nav.id)?.name ?? nav.name)
+      : navTitle(nav);
 
   return (
     <div className="flex h-full min-w-0">
@@ -524,14 +546,12 @@ export function LibraryView() {
               {view.nav.kind === "folder" && view.nav.path !== "" ? (
                 <Breadcrumbs path={view.nav.path} />
               ) : (
-                <h1 className="truncate text-xl font-semibold tracking-tight">
-                  {navTitle(view.nav)}
-                </h1>
+                <h1 className="truncate text-xl font-semibold tracking-tight">{title}</h1>
               )}
               <span className="shrink-0 text-muted-foreground">
                 {childFolders.length > 0 &&
                   `${childFolders.length} ${childFolders.length === 1 ? "folder" : "folders"} · `}
-                {count} {count === 1 ? "book" : "books"}
+                {!isPending && `${count} ${count === 1 ? "book" : "books"}`}
                 {isFetching && (
                   <RefreshCw className="ml-2 inline size-3 animate-spin" aria-label="Loading" />
                 )}
@@ -638,7 +658,27 @@ export function LibraryView() {
             if (e.target === e.currentTarget) view.setSelection([]);
           }}
         >
-          {count === 0 && childFolders.length === 0 ? (
+          {isPending ? (
+            <div
+              className="flex flex-1 items-center justify-center gap-2 py-20 text-muted-foreground"
+              role="status"
+            >
+              <RefreshCw className="size-4 animate-spin" aria-hidden /> Loading books…
+            </div>
+          ) : isError && !data ? (
+            <div
+              className="flex flex-1 flex-col items-center justify-center gap-3 py-20 text-center"
+              role="alert"
+            >
+              <p className="font-medium">The books could not be listed.</p>
+              <p className="max-w-sm text-muted-foreground">
+                {error instanceof Error ? error.message : String(error)}
+              </p>
+              <Button variant="outline" size="sm" onClick={() => void refetch()}>
+                <RefreshCw /> Try again
+              </Button>
+            </div>
+          ) : count === 0 && childFolders.length === 0 ? (
             <EmptyState filtered={filtered} totalBooks={facets?.total ?? 0} />
           ) : (
             <Content books={books} folders={childFolders} onOpenFolder={openFolder} />

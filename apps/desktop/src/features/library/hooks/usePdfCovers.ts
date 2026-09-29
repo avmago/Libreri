@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { bookUrl, commands, unwrap } from "@/lib/ipc";
 import { PDF_ASSETS } from "@/readers";
-import { libKey } from "../api";
 import type { BookView } from "../model";
 
 /** Files bigger than this keep their generated cover (rendering needs the whole file). */
@@ -70,12 +69,18 @@ export function isPlain(rgba: Uint8ClampedArray): boolean {
 /**
  * Renders the first page of PDFs that have no cover yet (PDF.js is already
  * the reader's renderer) and stores it as their cover. Runs one at a time in
- * the background.
+ * the background, and only for profiles that may change the library (the
+ * whole file is read for each cover, and others could not save it).
  */
-export function usePdfCovers(books: BookView[] | undefined) {
+export function usePdfCovers(books: BookView[] | undefined, enabled: boolean) {
   const qc = useQueryClient();
 
   useEffect(() => {
+    if (!enabled) {
+      // Signed in as someone who cannot save covers: stop what is waiting.
+      queue.length = 0;
+      return;
+    }
     if (!books) return;
     for (const b of books) {
       if (
@@ -91,16 +96,23 @@ export function usePdfCovers(books: BookView[] | undefined) {
     }
     if (running) return;
     running = true;
+    // Only the lists of books show covers: the rest of the library stays.
+    const refresh = () =>
+      void qc.invalidateQueries({
+        predicate: (q) =>
+          q.queryKey[0] === "lib" && (q.queryKey[1] === "books" || q.queryKey[1] === "book"),
+      });
     void (async () => {
-      let saved = 0;
+      let unshown = 0;
       while (queue.length) {
         const book = queue.shift()!;
         try {
           const image = await renderFirstPage(book);
           await unwrap(commands.saveCover(book.id, image));
           // Refresh the grid now and then, not after every cover.
-          if (++saved % 6 === 0 || queue.length === 0) {
-            void qc.invalidateQueries({ queryKey: libKey });
+          if (++unshown === 6) {
+            unshown = 0;
+            refresh();
           }
         } catch (e) {
           console.warn(`Libreri: no cover for ${book.relPath}:`, e);
@@ -108,8 +120,8 @@ export function usePdfCovers(books: BookView[] | undefined) {
         // Let the interface breathe between books.
         await new Promise((r) => setTimeout(r, 30));
       }
-      if (saved % 6 !== 0) void qc.invalidateQueries({ queryKey: libKey });
+      if (unshown > 0) refresh();
       running = false;
     })();
-  }, [books, qc]);
+  }, [books, enabled, qc]);
 }

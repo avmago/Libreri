@@ -3,9 +3,12 @@ import { commands, unwrap, type Annotation } from "@/lib/ipc";
 
 const key = (bookId: string) => ["lib", "reader", bookId] as const;
 
+/** Where the saved reading position is cached. */
+export const positionKey = (bookId: string) => [...key(bookId), "position"] as const;
+
 export function usePosition(bookId: string) {
   return useQuery({
-    queryKey: [...key(bookId), "position"],
+    queryKey: positionKey(bookId),
     queryFn: () => unwrap(commands.getPosition(bookId)),
     // Read once when the book opens; the reader owns the position after that.
     staleTime: Infinity,

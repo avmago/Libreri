@@ -102,7 +102,7 @@ fn add(state: &AppState, img: image::DynamicImage) -> AppResult<CapturePhoto> {
     state
         .capture_photos
         .lock()
-        .expect("captures lock")
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
         .insert(id.clone(), path);
     Ok(CapturePhoto {
         id,
@@ -145,7 +145,7 @@ fn photo_path(state: &AppState, id: &str) -> AppResult<PathBuf> {
     state
         .capture_photos
         .lock()
-        .expect("captures lock")
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
         .get(id)
         .cloned()
         .ok_or_else(|| AppError::new(AppErrorKind::NotFound, "that photo is gone; add it again"))
@@ -273,7 +273,10 @@ pub async fn capture_save(
         let count = jpegs.len() as u32;
         let path = library.save_capture(&title, jpegs, &ocr)?;
         // The photos are no longer needed.
-        let mut photos = state.capture_photos.lock().expect("captures lock");
+        let mut photos = state
+            .capture_photos
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         for p in &pages {
             if let Some(f) = photos.remove(&p.id) {
                 let _ = std::fs::remove_file(f);
@@ -292,7 +295,10 @@ pub async fn capture_save(
 #[tauri::command]
 #[specta::specta]
 pub fn capture_discard(state: State<'_, AppState>, ids: Vec<String>) {
-    let mut photos = state.capture_photos.lock().expect("captures lock");
+    let mut photos = state
+        .capture_photos
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     for id in ids {
         if let Some(f) = photos.remove(&id) {
             let _ = std::fs::remove_file(f);

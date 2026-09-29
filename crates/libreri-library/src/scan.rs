@@ -113,6 +113,7 @@ impl Library {
                 covers::rename(self.layout(), &rec.id, &id);
                 crate::text::rename(self.layout(), &rec.id, &id);
                 crate::listening::rename(self.layout(), &rec.id, &id);
+                crate::versions::rename_versions(self, &rec.id, &id);
                 self.rename_annotation_backups(&rec.id, &id);
                 if let Ok(book) = self.record(&id) {
                     sidecar::write(self, &book)?;
@@ -192,35 +193,66 @@ impl Library {
     }
 
     /// Rebuilds the database from the book files and JSON sidecars. The old
-    /// database is kept next to it as `library.db.bak`.
+    /// database is kept next to it as `library.db.bak`. If the new database
+    /// cannot be made, the old one is put back and stays open.
     pub fn rebuild_index(&self, progress: &dyn Progress) -> Result<ScanReport> {
         self.require_edit()?;
         {
             let _busy = self.busy();
             let mut guard = self.db.lock().unwrap_or_else(|p| p.into_inner());
-            if let Some(db) = guard.take() {
-                db.close()?;
-            }
             let path = self.layout().database_path();
+            if let Some(db) = guard.take() {
+                if let Err(e) = db.close() {
+                    // Still usable: open it again rather than leave the
+                    // library closed until a restart.
+                    *guard = libreri_db::Database::open(&path).ok();
+                    return Err(e.into());
+                }
+            }
             let backup = path.with_extension("db.bak");
-            let _ = fs::remove_file(&backup);
-            fs::rename(&path, &backup)?;
+            // The previous backup stays until the new one is in place.
+            let moved = path.with_extension("db.bak-new");
+            let _ = fs::remove_file(&moved);
+            if let Err(e) = fs::rename(&path, &moved) {
+                *guard = libreri_db::Database::open(&path).ok();
+                return Err(e.into());
+            }
             for ext in ["db-wal", "db-shm"] {
                 let _ = fs::remove_file(path.with_extension(ext));
             }
-            let db = libreri_db::Database::open(&path)?;
-            db.meta_set("library_id", &self.info().id.to_string())?;
-            db.meta_set("name", &self.info().name)?;
-            // Bring back profiles (and their PINs) from their backups; keep
-            // whoever is signed in even if their backup is missing.
-            self.restore_profiles(&db)?;
-            if let Some(s) = self.session_info() {
-                db.insert_profile(&s.id, "Owner", &now())?;
+            match self.fresh_database(&path) {
+                Ok(db) => {
+                    *guard = Some(db);
+                    let _ = fs::remove_file(&backup);
+                    let _ = fs::rename(&moved, &backup);
+                }
+                Err(e) => {
+                    for ext in ["db", "db-wal", "db-shm"] {
+                        let _ = fs::remove_file(path.with_extension(ext));
+                    }
+                    let _ = fs::rename(&moved, &path);
+                    *guard = libreri_db::Database::open(&path).ok();
+                    return Err(e);
+                }
             }
-            db.ensure_owner_profile("Owner", &now())?;
-            *guard = Some(db);
         }
         self.scan(progress)
+    }
+
+    /// A new, empty database at `path` with the library's name, id and
+    /// profiles.
+    fn fresh_database(&self, path: &std::path::Path) -> Result<libreri_db::Database> {
+        let db = libreri_db::Database::open(path)?;
+        db.meta_set("library_id", &self.info().id.to_string())?;
+        db.meta_set("name", &self.info().name)?;
+        // Bring back profiles (and their PINs) from their backups; keep
+        // whoever is signed in even if their backup is missing.
+        self.restore_profiles(&db)?;
+        if let Some(s) = self.session_info() {
+            db.insert_profile(&s.id, "Owner", &now())?;
+        }
+        db.ensure_owner_profile("Owner", &now())?;
+        Ok(db)
     }
 }
 
@@ -306,5 +338,14 @@ mod tests {
             .database_path()
             .with_extension("db.bak")
             .is_file());
+        // Again: the previous backup is replaced, nothing is left over.
+        lib.rebuild_index(&NoProgress).unwrap();
+        let db = lib.layout().database_path();
+        assert!(db.with_extension("db.bak").is_file());
+        assert!(!db.with_extension("db.bak-new").exists());
+        assert_eq!(
+            lib.book(&a.id).unwrap().metadata.title,
+            "Alpha, edited by hand"
+        );
     }
 }

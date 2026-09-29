@@ -21,7 +21,7 @@ import {
   type Paper,
 } from "@/features/canvas";
 import { CaptureViewer, CopyViewer, parseBookLink, useAppDark } from "@/features/reader";
-import { commands, type HighlightColor, type NoteDto } from "@/lib/ipc";
+import { commands, unwrap, type HighlightColor, type NoteDto } from "@/lib/ipc";
 import { useShortcut } from "@/lib/shortcuts";
 import { useTabs } from "@/lib/tabs";
 import { cn } from "@/lib/utils";
@@ -159,13 +159,13 @@ function Marks({ search }: { search: string }) {
   );
 
   const copy = () => {
-    void navigator.clipboard
-      .writeText(notesToMarkdown(shown))
-      .then(() =>
+    void navigator.clipboard.writeText(notesToMarkdown(shown)).then(
+      () =>
         toast.success(
           `Copied ${shown.length} ${shown.length === 1 ? "note" : "notes"} as Markdown`,
         ),
-      );
+      () => toast.error("Could not copy to the clipboard"),
+    );
   };
   useShortcut("notes.copyMarkdown", copy);
 
@@ -304,15 +304,27 @@ function Marks({ search }: { search: string }) {
   );
 }
 
+/** Opens a book in a tab, with its own title and format (read from the library). */
+async function openBook(bookId: string, jumpTo?: string) {
+  try {
+    const book = await unwrap(commands.getBook(bookId));
+    useTabs.getState().open({
+      bookId,
+      title: book.metadata.title || "Book",
+      fileType: book.fileType,
+      jumpTo,
+    });
+  } catch (e) {
+    toast.error("Could not open the book", {
+      description: e instanceof Error ? e.message : String(e),
+    });
+  }
+}
+
 function openLink(href: string) {
   const link = parseBookLink(href);
   if (link) {
-    useTabs.getState().open({
-      bookId: link.bookId,
-      title: "Book",
-      fileType: "pdf",
-      jumpTo: link.page ? `page:${link.page}` : link.annotation,
-    });
+    void openBook(link.bookId, link.page ? `page:${link.page}` : link.annotation);
   } else if (/^(https?:|mailto:)/i.test(href)) {
     void commands.openExternalUrl(href);
   }
@@ -402,15 +414,7 @@ function Canvases({ search }: { search: string }) {
             </span>
             <div className="flex-1" />
             {current.bookId && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  useTabs
-                    .getState()
-                    .open({ bookId: current.bookId!, title: current.title, fileType: "pdf" })
-                }
-              >
+              <Button variant="outline" size="sm" onClick={() => void openBook(current.bookId!)}>
                 <BookOpen /> Open book
               </Button>
             )}
@@ -500,16 +504,7 @@ function Notebooks({ search }: { search: string }) {
           relPath={current.relPath}
           title={current.title}
           bookTitle={current.bookId ? current.title : null}
-          onOpenBook={
-            current.bookId
-              ? () =>
-                  useTabs.getState().open({
-                    bookId: current.bookId!,
-                    title: current.title,
-                    fileType: "pdf",
-                  })
-              : undefined
-          }
+          onOpenBook={current.bookId ? () => void openBook(current.bookId!) : undefined}
           onLink={onLink}
         />
       ) : (

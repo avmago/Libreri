@@ -14,7 +14,7 @@ use std::path::Path;
 
 pub use books::{Facets, FileRecord};
 pub use migrations::{latest_version, MIGRATIONS};
-pub use portability::SnapshotScope;
+pub use portability::{SnapshotScope, TitledBook};
 pub use profiles::CollectionRecord;
 
 /// Errors from the storage layer.

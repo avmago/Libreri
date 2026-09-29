@@ -72,16 +72,23 @@ function Form({ bookIds, onDone }: { bookIds: string[] | null; onDone: () => voi
     if (!dest) return;
     setBusy(true);
     const on = (o: ExportOption) => shown(o) && (opts[o] || forced(o));
-    const r = await commands.exportBooks({
-      format,
-      bookIds: selectionOnly ? bookIds : null,
-      dest,
-      personal: on("personal"),
-      notes: on("notes"),
-      bookFiles: on("bookFiles"),
-      everyone: on("everyone"),
-    });
-    setBusy(false);
+    let r: Awaited<ReturnType<typeof commands.exportBooks>>;
+    try {
+      r = await commands.exportBooks({
+        format,
+        bookIds: selectionOnly ? bookIds : null,
+        dest,
+        personal: on("personal"),
+        notes: on("notes"),
+        bookFiles: on("bookFiles"),
+        everyone: on("everyone"),
+      });
+    } catch (e) {
+      toast.error("Could not export", { description: e instanceof Error ? e.message : String(e) });
+      return;
+    } finally {
+      setBusy(false);
+    }
     if (r.status === "error") {
       toast.error(r.error.message);
       return;

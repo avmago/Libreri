@@ -107,6 +107,12 @@ export class DocumentRenderer implements Renderer {
   private lastQuery = "";
   private cleanup: (() => void)[] = [];
   private frame = 0;
+  private destroyed = false;
+  /** Mermaid diagrams: their source, to draw them again for a new theme. */
+  private diagrams = new Map<HTMLElement, string>();
+  /** Diagram drawing, one run after another. */
+  private drawing: Promise<void> = Promise.resolve();
+  private diagramsDark: boolean | null = null;
 
   constructor(
     private readonly kind: "md" | "txt",
@@ -129,7 +135,12 @@ export class DocumentRenderer implements Renderer {
     }
     this.scroller.append(this.article);
     container.append(this.scroller);
-    if (this.kind === "md") void renderMermaid(this.article, this.dark);
+    if (this.kind === "md") {
+      for (const el of this.article.querySelectorAll<HTMLElement>("pre.mermaid")) {
+        this.diagrams.set(el, el.textContent ?? "");
+      }
+      this.drawDiagrams();
+    }
 
     this.tocItems = Array.from(this.article.querySelectorAll<HTMLElement>("h1, h2, h3")).reduce<
       TocItem[]
@@ -202,7 +213,26 @@ export class DocumentRenderer implements Renderer {
     this.emitLocation();
   }
 
+  /** Draws the Mermaid diagrams for the current theme (again if it changed). */
+  private drawDiagrams() {
+    if (!this.diagrams.size) return;
+    this.drawing = this.drawing.then(async () => {
+      const dark = this.dark;
+      if (this.destroyed || this.diagramsDark === dark) return;
+      if (this.diagramsDark !== null) {
+        // Put the source back so Mermaid draws it again.
+        for (const [el, source] of this.diagrams) {
+          el.removeAttribute("data-processed");
+          el.textContent = source;
+        }
+      }
+      this.diagramsDark = dark;
+      await renderMermaid(this.article, dark);
+    });
+  }
+
   destroy() {
+    this.destroyed = true;
     cancelAnimationFrame(this.frame);
     for (const f of this.cleanup) f();
     this.scroller?.remove();
@@ -357,6 +387,8 @@ export class DocumentRenderer implements Renderer {
               return m;
             }),
           )
+          // Matches inside maths and diagrams are not marked: leave them out.
+          .filter((marks) => marks.length > 0)
           .reverse();
       }
       this.findIndex = -1;
@@ -364,9 +396,13 @@ export class DocumentRenderer implements Renderer {
     const total = this.findMatches.length;
     if (!total) return { current: 0, total: 0 };
     this.findMatches[this.findIndex]?.forEach((m) => m.classList.remove("lb-find-current"));
-    this.findIndex = backwards
-      ? (this.findIndex - 1 + total) % total
-      : (this.findIndex + 1) % total;
+    // The first step back from a new search goes to the last match.
+    this.findIndex =
+      this.findIndex < 0
+        ? backwards
+          ? total - 1
+          : 0
+        : (this.findIndex + (backwards ? -1 : 1) + total) % total;
     const current = this.findMatches[this.findIndex] ?? [];
     current.forEach((m) => m.classList.add("lb-find-current"));
     current[0]?.scrollIntoView({ block: "center" });
@@ -387,6 +423,7 @@ export class DocumentRenderer implements Renderer {
     s.setProperty("--page-fg", theme.fg);
     s.setProperty("--page-link", theme.link);
     this.scroller.classList.toggle("lb-dark", theme.dark);
+    if (this.kind === "md") this.drawDiagrams();
     // Recolour existing highlights for the new background.
     for (const m of this.article.querySelectorAll<HTMLElement>("mark[data-annotation]")) {
       const a = this.annotations.find((x) => x.id === m.dataset.annotation);

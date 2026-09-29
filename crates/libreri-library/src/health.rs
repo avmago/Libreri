@@ -98,7 +98,7 @@ impl Library {
         };
         let records = self.with_db(|db| db.file_records())?;
         r.books = records.len() as u32;
-        let known: HashSet<String> = records.iter().map(|b| b.id.to_string()).collect();
+        let known = self.kept_ids(&records);
         for rec in &records {
             if rec.missing {
                 r.missing_files.push(rec.id.clone());
@@ -203,14 +203,31 @@ impl Library {
         Ok(r)
     }
 
+    /// Ids whose covers, text and versions are kept: books in the library,
+    /// and books whose sidecar is still there (in the trash, so restoring
+    /// the file brings everything back).
+    fn kept_ids(&self, records: &[libreri_db::FileRecord]) -> HashSet<String> {
+        let mut known: HashSet<String> = records.iter().map(|b| b.id.to_string()).collect();
+        if let Ok(entries) = fs::read_dir(self.layout().data_dir().join("metadata")) {
+            for e in entries.flatten() {
+                let name = e.file_name().to_string_lossy().into_owned();
+                if let Some(id) = name.strip_suffix(".json") {
+                    known.insert(id.to_owned());
+                }
+            }
+        }
+        known
+    }
+
     /// Fixes what the health check can fix by itself: writes missing
     /// sidecars, forgets notebooks that are gone, removes unused covers.
+    /// Covers, text and versions of books in the trash are kept.
     /// Returns how many things were fixed.
     pub fn repair_health(&self) -> Result<u32> {
         self.require_edit()?;
         let mut fixed = 0;
         let records = self.with_db(|db| db.file_records())?;
-        let known: HashSet<String> = records.iter().map(|b| b.id.to_string()).collect();
+        let known = self.kept_ids(&records);
         for rec in &records {
             if !sidecar::path(self.layout(), &rec.id).is_file() {
                 sidecar::write(self, &self.record(&rec.id)?)?;
@@ -335,6 +352,7 @@ impl Library {
             covers::rename(self.layout(), &book.id, &new_id);
             crate::text::rename(self.layout(), &book.id, &new_id);
             crate::listening::rename(self.layout(), &book.id, &new_id);
+            crate::versions::rename_versions(self, &book.id, &new_id);
             self.rename_annotation_backups(&book.id, &new_id);
             sidecar::write(self, &self.record(&new_id)?)?;
         }
@@ -450,6 +468,50 @@ mod tests {
         let r = lib.health_check().unwrap();
         assert!(!r.fixable(), "{r:?}");
         drop(dir);
+    }
+
+    #[test]
+    fn versions_follow_edits_and_trashed_books_keep_their_data() {
+        let (_dir, lib) = library();
+        md_book(&lib.layout().books_dir(), "a.md", "Alpha");
+        md_book(&lib.layout().books_dir(), "b.md", "Beta");
+        lib.scan(&NoProgress).unwrap();
+        let find = |t: &str| {
+            lib.books(&BookQuery::default())
+                .unwrap()
+                .into_iter()
+                .find(|b| b.metadata.title == t)
+                .unwrap()
+        };
+        let a = find("Alpha");
+        let versions =
+            |id: &libreri_core::BookId| lib.layout().data_dir().join("versions").join(id.as_str());
+        fs::create_dir_all(versions(&a.id)).unwrap();
+        fs::write(versions(&a.id).join("old.md"), "earlier").unwrap();
+
+        // Edited in another app: a new id, and the versions come along.
+        fs::write(
+            lib.layout().books_dir().join("a.md"),
+            "---\ntitle: Alpha\n---\nEdited elsewhere\n",
+        )
+        .unwrap();
+        lib.scan(&NoProgress).unwrap();
+        let a2 = find("Alpha");
+        assert_ne!(a2.id, a.id);
+        assert!(versions(&a2.id).join("old.md").is_file());
+        assert!(!versions(&a.id).exists());
+
+        // In the trash: covers and versions stay for when it comes back.
+        let b = find("Beta");
+        fs::create_dir_all(versions(&b.id)).unwrap();
+        fs::write(versions(&b.id).join("old.md"), "earlier").unwrap();
+        let cover = lib.layout().data_dir().join(format!("covers/{}.jpg", b.id));
+        fs::write(&cover, b"jpeg").unwrap();
+        lib.trash_books(std::slice::from_ref(&b.id)).unwrap();
+        lib.repair_health().unwrap();
+        assert!(cover.is_file());
+        assert!(versions(&b.id).join("old.md").is_file());
+        assert!(versions(&a2.id).join("old.md").is_file());
     }
 
     #[test]

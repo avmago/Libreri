@@ -134,7 +134,12 @@ impl Library {
         if saved.is_err() {
             let _ = fs::remove_file(&tmp);
         }
-        Ok((saved?, report))
+        let saved = saved?;
+        // Redacted text must not survive in earlier versions of the file.
+        if !plan.redactions.is_empty() {
+            self.forget_versions(&saved.id)?;
+        }
+        Ok((saved, report))
     }
 
     /// Removes OCR words under redaction boxes.
@@ -246,7 +251,7 @@ mod tests {
     use libreri_pdf_edit::Redaction;
 
     #[test]
-    fn redacting_scrubs_saved_ocr_and_keeps_a_version() {
+    fn redacting_scrubs_saved_ocr_and_keeps_no_earlier_version() {
         let (_dir, lib) = library();
         libreri_formats::test_text_pdf(
             &lib.layout().books_dir().join("memo.pdf"),
@@ -305,8 +310,10 @@ mod tests {
             .map(|w| w.text.clone())
             .collect();
         assert_eq!(words, ["The"]);
-        let versions = lib.versions(&new.id).unwrap();
-        assert_eq!(versions[0].reason, "Redacted");
+        // The unredacted file is not kept in the version history.
+        assert!(lib.versions(&new.id).unwrap().is_empty());
+        let kept = lib.layout().data_dir().join("versions");
+        assert!(!kept.join(new.id.as_str()).exists() && !kept.join(book.id.as_str()).exists());
         let path = lib.layout().resolve_relative(&new.rel_path).unwrap();
         let text = libreri_formats::pdftext::page_texts(&path).unwrap();
         assert!(!text[0].contains("lighthouse"));

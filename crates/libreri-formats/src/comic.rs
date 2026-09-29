@@ -36,13 +36,25 @@ fn sort_pages(pages: &mut [String]) {
 
 /// Everything in one pass over a sequential archive: every entry name,
 /// and the bytes of those `wanted` returns true for.
-fn scan(
+fn scan(path: &Path, kind: FileType, wanted: impl FnMut(&str) -> bool) -> Result<Scanned, String> {
+    let mut found = Vec::new();
+    let names = scan_each(path, kind, wanted, |name, bytes| {
+        found.push((name, bytes));
+        Ok(())
+    })?;
+    Ok((names, found))
+}
+
+/// One pass over an archive: returns every entry name, and hands each
+/// entry `wanted` returns true for to `found` as soon as it is read, so
+/// only one page is held in memory at a time.
+fn scan_each(
     path: &Path,
     kind: FileType,
     mut wanted: impl FnMut(&str) -> bool,
-) -> Result<Scanned, String> {
+    mut found: impl FnMut(String, Vec<u8>) -> Result<(), String>,
+) -> Result<Vec<String>, String> {
     let mut names = Vec::new();
-    let mut found = Vec::new();
     match kind {
         FileType::Cbz => {
             let mut zip = zip::ZipArchive::new(File::open(path).map_err(|e| e.to_string())?)
@@ -51,7 +63,7 @@ fn scan(
             for n in names.clone() {
                 if wanted(&n) {
                     if let Some(b) = zip_read(&mut zip, &n) {
-                        found.push((n, b));
+                        found(n, b)?;
                     }
                 }
             }
@@ -68,7 +80,7 @@ fn scan(
                 names.push(name.clone());
                 archive = if is_file && size <= MAX_PAGE && wanted(&name) {
                     let (bytes, rest) = header.read().map_err(|e| e.to_string())?;
-                    found.push((name, bytes));
+                    found(name, bytes)?;
                     rest
                 } else {
                     header.skip().map_err(|e| e.to_string())?
@@ -79,6 +91,7 @@ fn scan(
             let mut reader =
                 sevenz_rust2::ArchiveReader::open(path, sevenz_rust2::Password::empty())
                     .map_err(|e| format!("not a valid CB7 ({e})"))?;
+            let mut failed = None;
             reader
                 .for_each_entries(|entry, r| {
                     if entry.is_directory {
@@ -88,13 +101,19 @@ fn scan(
                     if entry.size <= MAX_PAGE && wanted(&entry.name) {
                         let mut buf = Vec::with_capacity(entry.size as usize);
                         r.read_to_end(&mut buf)?;
-                        found.push((entry.name.clone(), buf));
+                        if let Err(e) = found(entry.name.clone(), buf) {
+                            failed = Some(e);
+                            return Ok(false);
+                        }
                     } else {
                         std::io::copy(r, &mut std::io::sink())?;
                     }
                     Ok(true)
                 })
                 .map_err(|e| e.to_string())?;
+            if let Some(e) = failed {
+                return Err(e);
+            }
         }
         FileType::Cbt => {
             let mut archive = tar::Archive::new(File::open(path).map_err(|e| e.to_string())?);
@@ -114,14 +133,14 @@ fn scan(
                 if entry.size() <= MAX_PAGE && wanted(&name) {
                     let mut buf = Vec::new();
                     entry.read_to_end(&mut buf).map_err(|e| e.to_string())?;
-                    found.push((name, buf));
+                    found(name, buf)?;
                 }
             }
         }
-        FileType::Cba => return ace::scan(path, wanted),
+        FileType::Cba => return ace::scan_each(path, wanted, found),
         other => return Err(format!("{} is not a comic archive", other.as_str())),
     }
-    Ok((names, found))
+    Ok(names)
 }
 
 /// Details, page count and cover of any comic archive.
@@ -242,14 +261,21 @@ pub fn extract_pages(
         .map(|(i, n)| (n.as_str(), i))
         .collect();
     let files = page_files(&listed, dest);
-    let (_, found) = scan(path, kind, |n| position.contains_key(n))?;
-    for (name, bytes) in found {
-        if let Some(i) = position.get(name.as_str()) {
-            let tmp = files[*i].with_extension("part");
-            fs::write(&tmp, &bytes).map_err(|e| e.to_string())?;
-            fs::rename(&tmp, &files[*i]).map_err(|e| e.to_string())?;
-        }
-    }
+    // Each page goes to disk as soon as it is read: a large CBR or CB7
+    // never sits in memory whole.
+    scan_each(
+        path,
+        kind,
+        |n| position.contains_key(n),
+        |name, bytes| {
+            if let Some(i) = position.get(name.as_str()) {
+                let tmp = files[*i].with_extension("part");
+                fs::write(&tmp, &bytes).map_err(|e| e.to_string())?;
+                fs::rename(&tmp, &files[*i]).map_err(|e| e.to_string())?;
+            }
+            Ok(())
+        },
+    )?;
     let json = serde_json::to_string(&listed).map_err(|e| e.to_string())?;
     fs::write(&index, json).map_err(|e| e.to_string())?;
     Ok((listed, files))
@@ -269,12 +295,13 @@ fn page_files(pages: &ComicPages, dest: &Path) -> Vec<PathBuf> {
 
 /// ACE archives, through the `unar`/`lsar` helper when it is installed.
 mod ace {
-    use std::path::Path;
+    use std::path::{Component, Path};
 
-    pub fn scan(
+    pub fn scan_each(
         path: &Path,
         mut wanted: impl FnMut(&str) -> bool,
-    ) -> Result<super::Scanned, String> {
+        mut found: impl FnMut(String, Vec<u8>) -> Result<(), String>,
+    ) -> Result<Vec<String>, String> {
         let out = libreri_helpers::command("lsar")
             .ok_or("CBA comics need the unar helper; install it in Settings › Helpers")?
             .arg("-j")
@@ -293,7 +320,6 @@ mod ace {
             })
             .unwrap_or_default();
         let want: Vec<String> = names.iter().filter(|n| wanted(n)).cloned().collect();
-        let mut found = Vec::new();
         if !want.is_empty() {
             let tmp = std::env::temp_dir().join(format!(
                 "libreri-cba-{}-{}",
@@ -302,24 +328,44 @@ mod ace {
                     .duration_since(std::time::UNIX_EPOCH)
                     .map_or(0, |d| d.as_nanos())
             ));
+            // `-D`: no folder named after the archive around its contents;
+            // the folders inside the archive are kept.
             let status = libreri_helpers::command("unar")
                 .ok_or("CBA comics need the unar helper")?
                 .args(["-q", "-f", "-D", "-o"])
                 .arg(&tmp)
                 .arg(path)
                 .status()
-                .map_err(|e| e.to_string())?;
-            if status.success() {
+                .map_err(|e| e.to_string());
+            let mut result = Ok(());
+            if matches!(status, Ok(s) if s.success()) {
                 for n in want {
-                    let file = n.rsplit('/').next().unwrap_or(&n);
-                    if let Ok(bytes) = std::fs::read(tmp.join(file)) {
-                        found.push((n, bytes));
+                    // Looked up by its whole path, so `a/01.jpg` and
+                    // `b/01.jpg` stay different pages.
+                    let Some(file) = inside(&tmp, &n) else {
+                        continue;
+                    };
+                    if let Ok(bytes) = std::fs::read(file) {
+                        if let Err(e) = found(n, bytes) {
+                            result = Err(e);
+                            break;
+                        }
                     }
                 }
             }
             let _ = std::fs::remove_dir_all(&tmp);
+            status?;
+            result?;
         }
-        Ok((names, found))
+        Ok(names)
+    }
+
+    /// `name` (a path inside the archive) under `dir`, if it stays there.
+    pub(super) fn inside(dir: &Path, name: &str) -> Option<std::path::PathBuf> {
+        let rel = Path::new(name);
+        rel.components()
+            .all(|c| matches!(c, Component::Normal(_)))
+            .then(|| dir.join(rel))
     }
 }
 
@@ -471,5 +517,20 @@ mod tests {
         assert_eq!(e.metadata.pages, Some(2));
         assert_eq!(e.cover.as_deref(), Some(&b"A"[..]));
         assert!(!crate::list_pages(&pt, FileType::Cbt).unwrap().right_to_left);
+    }
+
+    #[test]
+    fn cba_pages_are_found_by_their_whole_path() {
+        let dir = std::path::Path::new("/tmp/x");
+        assert_eq!(
+            super::ace::inside(dir, "a/01.jpg"),
+            Some(dir.join("a").join("01.jpg"))
+        );
+        assert_ne!(
+            super::ace::inside(dir, "a/01.jpg"),
+            super::ace::inside(dir, "b/01.jpg")
+        );
+        assert_eq!(super::ace::inside(dir, "../01.jpg"), None);
+        assert_eq!(super::ace::inside(dir, "/etc/passwd"), None);
     }
 }

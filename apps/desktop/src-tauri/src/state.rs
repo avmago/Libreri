@@ -82,6 +82,12 @@ pub struct AppState {
     /// Comparisons open in the interface (newest last, a few kept).
     compares: Mutex<Vec<(String, Arc<CompareSession>)>>,
     library: Mutex<Option<Arc<Library>>>,
+    /// Held while a library is being opened, created or closed, so these
+    /// happen one at a time (opening runs on worker threads).
+    opening: Mutex<()>,
+    /// False while the library used last time is still being reopened at
+    /// startup; [`AppState::wait_for_reopen`] waits for it.
+    reopened: Arc<(Mutex<bool>, std::sync::Condvar)>,
     watcher: Mutex<Option<LibraryWatcher>>,
     pub jobs: JobQueue,
     /// A scan is queued and has not started yet; further requests are merged.
@@ -230,6 +236,17 @@ fn make_http() -> Arc<dyn Http + Send> {
     Arc::new(libreri_metadata::UreqHttp::default())
 }
 
+/// Clears a flag when dropped. Moved into a job, it clears the flag when
+/// the job finishes, fails, panics, or is cancelled before it ever ran
+/// (the queue then drops the job without running it).
+struct ClearOnDrop(Arc<AtomicBool>);
+
+impl Drop for ClearOnDrop {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
+}
+
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|p| p.into_inner())
 }
@@ -295,6 +312,8 @@ impl AppState {
             compares: Mutex::new(Vec::new()),
             speaker: Arc::default(),
             library: Mutex::new(None),
+            opening: Mutex::new(()),
+            reopened: Arc::new((Mutex::new(true), std::sync::Condvar::new())),
             watcher: Mutex::new(None),
             jobs,
             scan_queued: Arc::default(),
@@ -309,6 +328,11 @@ impl AppState {
 
     pub fn library_if_open(&self) -> Option<Arc<Library>> {
         lock(&self.library).clone()
+    }
+
+    /// Hold while opening, creating or closing a library.
+    pub fn opening(&self) -> MutexGuard<'_, ()> {
+        lock(&self.opening)
     }
 
     /// Updates settings in memory and on disk.
@@ -468,17 +492,60 @@ impl AppState {
         self.schedule_scan();
     }
 
-    /// Reopens the library used last time, like a book app should. Quietly
-    /// does nothing if it moved, is open elsewhere, or fails to open.
+    /// Reopens the library used last time, like a book app should, on a
+    /// worker thread so the window appears at once. Quietly does nothing if
+    /// it moved, is open elsewhere, or fails to open. Until it is done,
+    /// [`AppState::wait_for_reopen`] waits (the interface's first question
+    /// about the open library does).
     pub fn reopen_last_library(&self) {
-        let last = lock(&self.settings).recent_libraries.first().cloned();
-        if let Some(recent) = last {
-            if let Ok(library) =
-                Library::open(&recent.path, libreri_library::OpenOptions::default())
-            {
-                self.adopt(library);
-            }
+        let Some(recent) = lock(&self.settings).recent_libraries.first().cloned() else {
+            return;
+        };
+        *lock(&self.reopened.0) = false;
+        let handle = self.app.clone();
+        let reopened = Arc::clone(&self.reopened);
+        let done = move || {
+            *lock(&reopened.0) = true;
+            reopened.1.notify_all();
+        };
+        let spawned = std::thread::Builder::new()
+            .name("libreri-reopen".into())
+            .spawn(move || {
+                // Marks it done even if opening panics.
+                struct Done<F: FnMut()>(F);
+                impl<F: FnMut()> Drop for Done<F> {
+                    fn drop(&mut self) {
+                        (self.0)()
+                    }
+                }
+                let _done = Done(done);
+                let Some(state) = handle.try_state::<AppState>() else {
+                    return;
+                };
+                let _opening = state.opening();
+                // The person may have opened another library meanwhile.
+                if state.library_if_open().is_some() {
+                    return;
+                }
+                if let Ok(library) =
+                    Library::open(&recent.path, libreri_library::OpenOptions::default())
+                {
+                    state.adopt(library);
+                }
+            });
+        if spawned.is_err() {
+            *lock(&self.reopened.0) = true;
         }
+    }
+
+    /// Waits (up to a minute) for the library used last time to finish
+    /// reopening at startup. Returns at once afterwards.
+    pub fn wait_for_reopen(&self) {
+        let (done, signal) = &*self.reopened;
+        let guard = lock(done);
+        let _ = signal
+            .wait_timeout_while(guard, std::time::Duration::from_secs(60), |d| !*d)
+            .map(|(g, _)| drop(g));
     }
 
     /// Queues a scan of the library folder unless one is already waiting.
@@ -487,12 +554,13 @@ impl AppState {
         if self.scan_queued.swap(true, Ordering::SeqCst) {
             return None;
         }
-        let queued = Arc::clone(&self.scan_queued);
+        let queued = ClearOnDrop(Arc::clone(&self.scan_queued));
         let handle = self.app.clone();
         Some(
             self.jobs
                 .submit("Checking the library for changes", move |ctx| {
-                    queued.store(false, Ordering::SeqCst);
+                    // Changes seen from now on queue another scan.
+                    drop(queued);
                     let report = library.scan(&JobProgress(ctx)).map_err(job_error)?;
                     if report.changed_anything() {
                         let _ = LibraryChanged::default().emit(&handle);
@@ -627,7 +695,7 @@ impl AppState {
         if self.backup_running.swap(true, Ordering::SeqCst) {
             return Ok(None);
         }
-        let running = Arc::clone(&self.backup_running);
+        let running = ClearOnDrop(Arc::clone(&self.backup_running));
         let handle = self.app.clone();
         let started = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
         let _ = self.backups.update(&id, |s| s.last_attempt = Some(started));
@@ -644,7 +712,7 @@ impl AppState {
                 env!("CARGO_PKG_VERSION"),
                 &JobProgress(ctx),
             );
-            running.store(false, Ordering::SeqCst);
+            drop(running);
             let stamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
             let (path, error) = match &result {
                 Ok(r) => (Some(r.path.to_string_lossy().into_owned()), None),
@@ -906,5 +974,40 @@ impl AppState {
                 eprintln!("Libreri: failed to close library cleanly: {err}");
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn a_flag_is_cleared_when_a_queued_job_is_cancelled_before_it_runs() {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let tx = Mutex::new(tx);
+        let jobs = JobQueue::new(1, move |e| {
+            let _ = lock(&tx).send(e);
+        });
+        let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+        jobs.submit("block", move |_| {
+            let _ = release_rx.recv_timeout(Duration::from_secs(5));
+            Ok(())
+        });
+        let flag = Arc::new(AtomicBool::new(true));
+        let guard = ClearOnDrop(Arc::clone(&flag));
+        let id = jobs.submit("scan", move |_| {
+            drop(guard);
+            Ok(())
+        });
+        assert!(jobs.cancel(id));
+        release_tx.send(()).unwrap();
+        loop {
+            let e = rx.recv_timeout(Duration::from_secs(5)).unwrap();
+            if e == (libreri_jobs::JobEvent::Cancelled { id }) {
+                break;
+            }
+        }
+        assert!(!flag.load(Ordering::SeqCst));
     }
 }

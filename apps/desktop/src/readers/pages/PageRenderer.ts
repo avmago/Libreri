@@ -16,7 +16,8 @@ import { clipFrom, imageOf } from "../clip";
 import { glyphsOf } from "../math/layout";
 import { bookUrl, commands, unwrap, type Annotation, type WordDto } from "@/lib/ipc";
 import type { MarkupLayer } from "../markup/MarkupLayer";
-import { makeQuote } from "../quote";
+import { fitWordLayer, wordLayer } from "../ocrText";
+import { firstPagePart, makeQuote } from "../quote";
 import type { PageTheme } from "../themes";
 import {
   highlightFill,
@@ -88,6 +89,8 @@ export class PageRenderer implements Renderer {
   private spoken: { page: number; rects: SpeechBox[] } | null = null;
   private cleanup: (() => void)[] = [];
   private destroyed = false;
+  /** The last place shown (scroll mode), kept while the tab is hidden. */
+  private place: { page: number; top: number } | null = null;
 
   constructor(
     private readonly events: RendererEvents,
@@ -154,7 +157,23 @@ export class PageRenderer implements Renderer {
     });
     this.cleanup.push(() => this.observer?.disconnect());
 
-    const resize = new ResizeObserver(() => this.layout(true));
+    let size = "";
+    let hidden = false;
+    const resize = new ResizeObserver(() => {
+      const w = this.scroller.clientWidth;
+      const h = this.scroller.clientHeight;
+      // A hidden tab has no size: leave the pages and the place alone.
+      if (!w || !h) {
+        hidden = true;
+        return;
+      }
+      const now = `${w}x${h}`;
+      if (now === size && !hidden) return;
+      size = now;
+      // Shown again: go back to the place kept while hidden.
+      this.layout(hidden && this.place ? this.place : true);
+      hidden = false;
+    });
     resize.observe(this.scroller);
     this.cleanup.push(() => resize.disconnect());
     this.scroller.addEventListener("scroll", this.onScroll, { passive: true });
@@ -175,6 +194,7 @@ export class PageRenderer implements Renderer {
 
   destroy() {
     this.destroyed = true;
+    cancelAnimationFrame(this.frame);
     for (const f of this.cleanup) f();
     this.root?.remove();
   }
@@ -227,10 +247,19 @@ export class PageRenderer implements Renderer {
     return Math.max(80, fitWidth * z);
   }
 
-  private layout(keepPlace: boolean) {
+  /** Lays out the pages. `keepPlace`: stay where the reader is (or go to
+   * the place given), to the same point within the page. */
+  private layout(keepPlace: boolean | { page: number; top: number }) {
     if (!this.stage) return;
-    const place = keepPlace ? this.visiblePage() : this.current;
     const mode = this.layoutValue.mode;
+    // Only scrolling keeps a point within the page (the others show whole pages).
+    const kept =
+      mode !== "scroll" || !keepPlace
+        ? null
+        : typeof keepPlace === "object"
+          ? keepPlace
+          : this.placeNow();
+    const place = kept ? kept.page : keepPlace ? this.visiblePage() : this.current;
     this.stage.className = `lb-pages-stage lb-mode-${mode}${this.layoutValue.rightToLeft ? " lb-rtl" : ""}`;
     if (mode === "scroll") {
       if (this.stage.childElementCount !== this.slots.length) {
@@ -260,7 +289,32 @@ export class PageRenderer implements Renderer {
       }
     }
     this.drawAll();
-    if (keepPlace && mode === "scroll") this.scrollToPage(place, 0);
+    if (kept && mode === "scroll") {
+      this.scrollToPage(kept.page, kept.top, true);
+      // Pages shown now may need a sharper picture at the new size.
+      this.loadVisible();
+    }
+    this.fitText();
+  }
+
+  /** Loads the pictures of the pages on or near the screen (scroll mode). */
+  private loadVisible() {
+    const c = this.scroller.getBoundingClientRect();
+    if (!c.height) return;
+    const margin = c.height * 1.5;
+    for (const s of this.slots) {
+      if (!s.div.isConnected) continue;
+      const r = s.div.getBoundingClientRect();
+      if (r.bottom >= c.top - margin && r.top <= c.bottom + margin) this.load(s);
+    }
+  }
+
+  /** Fits the invisible words to the pages at their new size. */
+  private fitText() {
+    for (const s of this.slots) {
+      const layer = s.div.isConnected ? s.div.querySelector<HTMLElement>(".lb-page-text") : null;
+      if (layer) fitWordLayer(s.div, layer);
+    }
   }
 
   private urlFor(s: PageSlot): { url: string; width: number } {
@@ -344,26 +398,8 @@ export class PageRenderer implements Renderer {
     s.textDone = true;
     const words = await this.wordsOf(s.n);
     if (this.destroyed || !words.length) return;
-    const layer = document.createElement("div");
-    layer.className = "lb-page-text";
-    const h = s.div.clientHeight || 1000;
-    for (const w of words) {
-      const span = document.createElement("span");
-      const [x, y, ww, wh] = w.rect.map((v) => v ?? 0) as Rect;
-      span.textContent = `${w.text} `;
-      span.style.cssText = `left:${x * 100}%;top:${y * 100}%;height:${wh * 100}%;font-size:${wh * h * 0.85}px;--w:${ww}`;
-      layer.append(span);
-    }
-    s.div.append(layer);
-    // Stretch each word to its box.
-    requestAnimationFrame(() => {
-      const pw = s.div.clientWidth;
-      for (const span of Array.from(layer.children) as HTMLElement[]) {
-        const target = parseFloat(span.style.getPropertyValue("--w")) * pw;
-        const natural = span.offsetWidth;
-        if (natural > 0) span.style.transform = `scaleX(${target / natural})`;
-      }
-    });
+    // Each word stretched to its box (fitted again when the page is resized).
+    wordLayer(s.div, words, "lb-page-text");
     this.drawPage(s.n);
   }
 
@@ -372,6 +408,7 @@ export class PageRenderer implements Renderer {
   }
 
   private onSelection() {
+    if (this.destroyed) return;
     const sel = document.getSelection();
     if (!sel || sel.isCollapsed || !sel.rangeCount) return this.events.selection(null);
     const range = sel.getRangeAt(0);
@@ -380,8 +417,11 @@ export class PageRenderer implements Renderer {
     if (!pageDiv) return;
     const page = Number(pageDiv.dataset.page);
     const box = pageDiv.getBoundingClientRect();
+    // Only this page: a selection can run into the next one.
+    const layer = pageDiv.querySelector<HTMLElement>(".lb-page-text");
+    const part = layer ? firstPagePart(range, pageDiv, layer) : range;
     const rects: Rect[] = mergeRects(
-      Array.from(range.getClientRects())
+      Array.from(part.getClientRects())
         .filter((r) => r.width > 1 && r.height > 1)
         .filter((r) => r.top >= box.top - 2 && r.bottom <= box.bottom + 2)
         .map((r) => [
@@ -391,8 +431,8 @@ export class PageRenderer implements Renderer {
           r.height / box.height,
         ]),
     );
-    const exact = sel.toString().replace(/\s+/g, " ").trim();
-    const copy = range.cloneRange();
+    const exact = part.toString().replace(/\s+/g, " ").trim();
+    const copy = part.cloneRange();
     if (!exact || !rects.length) return this.events.selection(null);
     const text = this.pageText(page);
     const at = text.indexOf(exact);
@@ -577,16 +617,23 @@ export class PageRenderer implements Renderer {
     this.frame = requestAnimationFrame(() => this.emitLocation());
   };
 
+  /** The page at the top of the screen and how far down it is (scroll mode). */
+  private placeNow(): { page: number; top: number } {
+    const page = this.visiblePage();
+    const r = this.slots[page - 1]?.div.getBoundingClientRect();
+    const c = this.scroller.getBoundingClientRect();
+    const top = r?.height ? Math.min(1, Math.max(0, (c.top - r.top) / r.height)) : 0;
+    return { page, top };
+  }
+
   private emitLocation() {
     const pages = this.slots.length;
-    if (!pages) return;
-    const page = this.visiblePage();
-    let top = 0;
-    if (this.layoutValue.mode === "scroll") {
-      const r = this.slots[page - 1]!.div.getBoundingClientRect();
-      const c = this.scroller.getBoundingClientRect();
-      top = Math.min(1, Math.max(0, (c.top - r.top) / r.height));
-    }
+    if (!pages || this.destroyed) return;
+    const scroll = this.layoutValue.mode === "scroll";
+    // Nothing is on screen in a hidden tab: its place is kept as it was.
+    if (scroll && !this.scroller.clientHeight) return;
+    const { page, top } = scroll ? this.placeNow() : { page: this.visiblePage(), top: 0 };
+    if (scroll) this.place = { page, top };
     const shown =
       this.layoutValue.mode === "spread" ? this.group(page).sort((a, b) => a - b) : [page];
     const label = shown.length > 1 ? `${shown[0]}–${shown[1]}` : String(page);
@@ -614,12 +661,14 @@ export class PageRenderer implements Renderer {
     return found;
   }
 
-  private scrollToPage(page: number, top: number) {
+  /** Scrolls `top` (0–1) down `page` to the top of the screen; a little
+   * above it unless `exact` (going somewhere, rather than keeping the place). */
+  private scrollToPage(page: number, top: number, exact = false) {
     const s = this.slots[page - 1];
     if (!s) return;
     const r = s.div.getBoundingClientRect();
     const c = this.scroller.getBoundingClientRect();
-    this.scroller.scrollTop += r.top - c.top + r.height * top - (top > 0 ? 40 : 0);
+    this.scroller.scrollTop += r.top - c.top + r.height * top - (top > 0 && !exact ? 40 : 0);
   }
 
   private async showPage(page: number, top = 0) {

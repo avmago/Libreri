@@ -37,17 +37,30 @@ export function Floating({
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ left: rect.left, top: rect.bottom + 8 });
+  // Placed again whenever the card changes size (a comment box opening)
+  // or the window does, so it stays inside the window.
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const w = el.offsetWidth;
-    const h = el.offsetHeight;
-    let left = rect.left + rect.width / 2 - w / 2;
-    left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
-    let top = rect.bottom + 8;
-    if (top + h > window.innerHeight - 8) top = Math.max(8, rect.top - h - 8);
-    setPos({ left, top });
+    const place = () => {
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      let left = rect.left + rect.width / 2 - w / 2;
+      left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
+      let top = rect.bottom + 8;
+      if (top + h > window.innerHeight - 8) top = rect.top - h - 8;
+      top = Math.max(8, Math.min(top, window.innerHeight - h - 8));
+      el.style.left = `${left}px`;
+      el.style.top = `${top}px`;
+    };
+    place();
+    const resize = new ResizeObserver(place);
+    resize.observe(el);
+    window.addEventListener("resize", place);
+    return () => {
+      resize.disconnect();
+      window.removeEventListener("resize", place);
+    };
   }, [rect]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -68,8 +81,7 @@ export function Floating({
       ref={ref}
       role="dialog"
       aria-label="Highlight"
-      className="fixed z-50 flex flex-col gap-2 rounded-lg border bg-popover p-1.5 text-popover-foreground shadow-lg"
-      style={pos}
+      className="fixed z-50 flex max-h-[calc(100vh-16px)] flex-col gap-2 overflow-y-auto rounded-lg border bg-popover p-1.5 text-popover-foreground shadow-lg"
     >
       {children}
     </div>
@@ -129,6 +141,16 @@ export function SelectionMenu({
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Digits typed into a box (find, go to page, a note) are not colours.
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.tagName === "SELECT" ||
+          t.isContentEditable)
+      )
+        return;
       const n = Number(e.key);
       if (n >= 1 && n <= 4 && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();

@@ -294,7 +294,8 @@ export function SearchView() {
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => input.current?.focus(), []);
 
-  const text = useTextSearch(scope === "all" || scope === "text" ? q : "");
+  const wantText = q.length >= 2 && (scope === "all" || scope === "text");
+  const text = useTextSearch(wantText ? q : "");
   const wantDetails = q.length >= 2 && (scope === "all" || scope === "details");
   const details = useBooks({ search: q }, wantDetails);
   const { data: notes = [] } = useAllNotes();
@@ -306,11 +307,12 @@ export function SearchView() {
     [notes, q, scope],
   );
   const bookHits = wantDetails ? (details.data ?? []) : [];
-  const textHits = q.length >= 2 ? (text.data ?? []) : [];
+  // A switched-off search keeps its last results (placeholder): not shown.
+  const textHits = wantText ? (text.data ?? []) : [];
   const limit = scope === "all" ? 6 : 200;
   const nothing =
     q.length >= 2 &&
-    !text.isFetching &&
+    !(wantText && text.isFetching) &&
     !details.isFetching &&
     !textHits.length &&
     !bookHits.length &&

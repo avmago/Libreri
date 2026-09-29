@@ -161,12 +161,6 @@ fn union(a: &mut Vec<String>, b: &[String]) {
     }
 }
 
-fn family(authors: &[String]) -> Option<String> {
-    authors
-        .first()
-        .map(|a| libreri_export::split_name(a).family().to_lowercase())
-}
-
 /// A Zotero rectangle (PDF points, bottom-left origin) as a fraction of
 /// the page as it is shown (top-left origin, rotation applied).
 fn to_page_fraction(r: &[f64; 4], b: &PageBox) -> Option<[f64; 4]> {
@@ -256,7 +250,7 @@ fn convert(a: &ForeignAnnotation, book: &BookId, boxes: &[PageBox]) -> Option<An
 
 impl Library {
     /// A book here with the same ISBN, DOI or arXiv id, or title and first
-    /// author, that the signed-in profile can see.
+    /// author (see `same_work`), that the signed-in profile can see.
     fn find_same_book(&self, m: &BookMetadata) -> Result<Option<BookId>> {
         let by_id = self.with_db(|db| {
             db.find_book_by_identifiers(
@@ -268,14 +262,10 @@ impl Library {
         })?;
         let found = match by_id {
             Some(id) => Some(id),
+            // Title alone is not enough: the first author must match too.
             None if !m.title.trim().is_empty() => {
-                let want = family(&m.authors);
-                self.with_db(|db| db.books_titled(&m.title))?
-                    .into_iter()
-                    .find(|(_, authors, _)| {
-                        want.is_none() || authors.is_empty() || family(authors) == want
-                    })
-                    .map(|(id, _, _)| id)
+                let candidates = self.with_db(|db| db.books_titled(&m.title))?;
+                crate::archive::same_work(&m.authors, m.pages, &candidates)
             }
             None => None,
         };

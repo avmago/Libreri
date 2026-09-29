@@ -79,5 +79,8 @@ describe("edit pages", () => {
     expect(parseRanges("1-3, 5, 9-", 10)).toEqual([1, 2, 3, 5, 9, 10]);
     expect(parseRanges("12", 10)).toEqual([]);
     expect(parseRanges("two", 10)).toEqual([]);
+    expect(parseRanges("1 - 3", 10)).toEqual([1, 2, 3]);
+    expect(parseRanges("2 – 4, 7 —8", 10)).toEqual([2, 3, 4, 7, 8]);
+    expect(parseRanges("9 -", 10)).toEqual([9, 10]);
   });
 });

@@ -1,5 +1,6 @@
 //! Books: listing, details, editing, moving, trash, covers, opening.
 
+use super::blocking;
 use crate::dto::{BookDto, FacetsDto};
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
@@ -67,32 +68,48 @@ pub fn set_book_state(
 /// Moves books into a folder (relative to `Books/`). Returns how many moved.
 #[tauri::command]
 #[specta::specta]
-pub fn move_books(state: State<'_, AppState>, ids: Vec<String>, folder: String) -> AppResult<u32> {
-    let moved = state.library()?.move_books(&book_ids(&ids)?, &folder)?;
-    Ok(moved.len() as u32)
+pub async fn move_books(
+    state: State<'_, AppState>,
+    ids: Vec<String>,
+    folder: String,
+) -> AppResult<u32> {
+    let library = state.library()?;
+    let ids = book_ids(&ids)?;
+    blocking(move || Ok(library.move_books(&ids, &folder)?.len() as u32)).await
 }
 
 /// Moves books to the system trash. Returns how many were removed.
 #[tauri::command]
 #[specta::specta]
-pub fn trash_books(state: State<'_, AppState>, ids: Vec<String>) -> AppResult<u32> {
-    Ok(state.library()?.trash_books(&book_ids(&ids)?)? as u32)
+pub async fn trash_books(state: State<'_, AppState>, ids: Vec<String>) -> AppResult<u32> {
+    let library = state.library()?;
+    let ids = book_ids(&ids)?;
+    blocking(move || Ok(library.trash_books(&ids)? as u32)).await
 }
 
 /// Stores a cover sent by the interface (base64 of a JPEG or PNG), such as
 /// the first page of a PDF rendered with PDF.js.
 #[tauri::command]
 #[specta::specta]
-pub fn save_cover(state: State<'_, AppState>, id: String, image_base64: String) -> AppResult<()> {
-    let data = image_base64
-        .split_once(',')
-        .map(|(_, d)| d)
-        .unwrap_or(&image_base64);
-    let bytes = base64::engine::general_purpose::STANDARD
-        .decode(data.trim())
-        .map_err(|_| AppError::invalid("the image data is damaged"))?;
-    state.library()?.set_cover(&book_id(&id)?, &bytes)?;
-    Ok(())
+pub async fn save_cover(
+    state: State<'_, AppState>,
+    id: String,
+    image_base64: String,
+) -> AppResult<()> {
+    let library = state.library()?;
+    let id = book_id(&id)?;
+    blocking(move || {
+        let data = image_base64
+            .split_once(',')
+            .map(|(_, d)| d)
+            .unwrap_or(&image_base64);
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(data.trim())
+            .map_err(|_| AppError::invalid("the image data is damaged"))?;
+        library.set_cover(&id, &bytes)?;
+        Ok(())
+    })
+    .await
 }
 
 fn book_path(state: &AppState, id: &str) -> AppResult<std::path::PathBuf> {

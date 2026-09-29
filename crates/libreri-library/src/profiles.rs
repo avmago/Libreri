@@ -54,6 +54,25 @@ fn protect(secret: &str) -> Result<String> {
     hash_secret(secret).map_err(pin_error)
 }
 
+/// Refuses `name` when another profile (not `except`) has it, or when the
+/// two would share one `Notes/` folder.
+fn check_name_free(all: &[Profile], except: Option<&ProfileId>, name: &str) -> Result<()> {
+    for o in all.iter().filter(|o| Some(&o.id) != except) {
+        if o.name.to_lowercase() == name.to_lowercase() {
+            return Err(Error::InvalidInput(format!(
+                "there is already a profile called “{name}”"
+            )));
+        }
+        if crate::reading::same_notes_folder(&o.name, name) {
+            return Err(Error::InvalidInput(format!(
+                "“{name}” is too close to “{}”: they would share a notes folder; please choose another name",
+                o.name
+            )));
+        }
+    }
+    Ok(())
+}
+
 fn check_colour(colour: &str) -> Result<()> {
     if PROFILE_COLOURS.contains(&colour) {
         Ok(())
@@ -303,11 +322,7 @@ impl Library {
             }
             _ => {}
         }
-        if all.iter().any(|p| p.name.eq_ignore_ascii_case(&name)) {
-            return Err(Error::InvalidInput(format!(
-                "there is already a profile called “{name}”"
-            )));
-        }
+        check_name_free(&all, None, &name)?;
         let mut p = Profile::new(name, colour, kind, &now());
         if let Some(pin) = pin.filter(|p| !p.is_empty()) {
             if kind == ProfileKind::Guest {
@@ -359,15 +374,7 @@ impl Library {
         let name = validate_profile_name(name).map_err(|e| Error::InvalidInput(e.into()))?;
         check_colour(colour)?;
         if name != p.name {
-            if self
-                .profiles()?
-                .iter()
-                .any(|o| o.id != p.id && o.name.eq_ignore_ascii_case(&name))
-            {
-                return Err(Error::InvalidInput(format!(
-                    "there is already a profile called “{name}”"
-                )));
-            }
+            check_name_free(&self.profiles()?, Some(&p.id), &name)?;
             self.rename_notes_folder(&p, &name)?;
         }
         p.name = name;
@@ -391,6 +398,13 @@ impl Library {
         let old_dir = crate::reading::notes_folder_name(&p.name);
         let new_dir = crate::reading::notes_folder_name(new_name);
         if old_dir == new_dir {
+            return Ok(());
+        }
+        // Libraries from before names were checked this way may have two
+        // profiles sharing one folder. Then the folder stays for the other
+        // profile; this profile's notebooks stay where they are and new ones
+        // go to the new folder.
+        if self.notes_folder_shared(p)? {
             return Ok(());
         }
         let from = self.layout().notes_dir().join(&old_dir);
@@ -530,10 +544,19 @@ impl Library {
             .layout()
             .notes_dir()
             .join(crate::reading::notes_folder_name(&p.name));
-        if notes.is_dir() {
+        // Never trash a folder that another profile also uses.
+        if notes.is_dir() && !self.notes_folder_shared(&p)? {
             trash::delete(&notes).map_err(|e| Error::Trash(e.to_string()))?;
         }
         Ok(())
+    }
+
+    /// Whether another profile's notes folder is the same as `p`'s.
+    fn notes_folder_shared(&self, p: &Profile) -> Result<bool> {
+        Ok(self
+            .profiles()?
+            .iter()
+            .any(|o| o.id != p.id && crate::reading::same_notes_folder(&o.name, &p.name)))
     }
 
     /// Which folders (relative to `Books/`) a Kids profile may open.
@@ -550,6 +573,40 @@ impl Library {
         self.with_db(|db| db.save_profile(&p))?;
         self.profile_backup(&p)?;
         Ok(p)
+    }
+
+    /// Keeps Kids profiles' allowed folders pointing at the same folders
+    /// after `from` (relative to `Books/`) was renamed or moved to `to`, or
+    /// trashed (`to` = None: the folder is dropped from the list).
+    pub(crate) fn follow_folder_change(&self, from: &str, to: Option<&str>) -> Result<()> {
+        let from = from.trim_matches('/');
+        for mut p in self.profiles()? {
+            let mut changed = false;
+            let mut folders = Vec::with_capacity(p.allowed_folders.len());
+            for f in &p.allowed_folders {
+                let rest = if f == from {
+                    Some("")
+                } else {
+                    f.strip_prefix(from).filter(|r| r.starts_with('/'))
+                };
+                match (rest, to) {
+                    (None, _) => folders.push(f.clone()),
+                    (Some(rest), Some(to)) => {
+                        folders.push(format!("{}{rest}", to.trim_matches('/')));
+                        changed = true;
+                    }
+                    (Some(_), None) => changed = true,
+                }
+            }
+            if changed {
+                folders.sort();
+                folders.dedup();
+                p.allowed_folders = folders;
+                self.with_db(|db| db.save_profile(&p))?;
+                self.profile_backup(&p)?;
+            }
+        }
+        Ok(())
     }
 
     /// Saves the signed-in profile's interface preferences (JSON).
@@ -846,6 +903,67 @@ mod tests {
             moved.rel_path
         );
         assert_eq!(moved.content, nb.content);
+    }
+
+    #[test]
+    fn names_that_share_a_notes_folder_are_refused() {
+        let (_d, lib) = library();
+        let sam = lib
+            .create_profile("Sam", "teal", ProfileKind::Standard, None)
+            .unwrap();
+        for clash in ["sam", "Sam.", "SAM..", "Sam "] {
+            assert!(
+                lib.create_profile(clash, "blue", ProfileKind::Standard, None)
+                    .is_err(),
+                "{clash} should be refused"
+            );
+        }
+        lib.create_profile("Élise", "blue", ProfileKind::Standard, None)
+            .unwrap();
+        assert!(lib
+            .create_profile("élise", "blue", ProfileKind::Standard, None)
+            .is_err());
+        lib.create_profile("CON", "blue", ProfileKind::Standard, None)
+            .unwrap();
+        assert!(
+            lib.create_profile("AUX", "blue", ProfileKind::Standard, None)
+                .is_err(),
+            "both would be Notes/Untitled"
+        );
+        let other = lib
+            .create_profile("Samuel", "blue", ProfileKind::Standard, None)
+            .unwrap();
+        assert!(lib
+            .update_profile(&other.id, "sam.", "blue", ProfileKind::Standard)
+            .is_err());
+        // Renaming yourself to a different case of your own name is fine.
+        lib.update_profile(&sam.id, "SAM", "teal", ProfileKind::Standard)
+            .unwrap();
+    }
+
+    #[test]
+    fn deleting_a_profile_keeps_a_notes_folder_another_one_uses() {
+        let (_d, lib) = library();
+        let sam = lib
+            .create_profile("Sam", "teal", ProfileKind::Standard, None)
+            .unwrap();
+        // An older library could have "Sam." too, sharing Notes/Sam.
+        let twin = libreri_core::Profile::new("Sam.", "blue", ProfileKind::Standard, "now");
+        lib.with_db(|db| db.save_profile(&twin)).unwrap();
+        let dir = lib.layout().notes_dir().join("Sam");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("mine.md"), "Sam's notes").unwrap();
+
+        // Renaming the twin leaves the shared folder where it is.
+        lib.update_profile(&twin.id, "Sammy", "blue", ProfileKind::Standard)
+            .unwrap();
+        assert!(dir.join("mine.md").is_file());
+
+        let twin = libreri_core::Profile::new("Sam.", "blue", ProfileKind::Standard, "now");
+        lib.with_db(|db| db.save_profile(&twin)).unwrap();
+        lib.delete_profile(&twin.id).unwrap();
+        assert!(dir.join("mine.md").is_file(), "Sam's folder must stay");
+        assert!(lib.load_profile(&sam.id).is_ok());
     }
 
     #[test]

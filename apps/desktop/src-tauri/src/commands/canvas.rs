@@ -61,16 +61,15 @@ pub async fn canvases(
 /// Starts a canvas. Returns its path.
 #[tauri::command]
 #[specta::specta]
-pub fn create_canvas(
+pub async fn create_canvas(
     state: State<'_, AppState>,
     title: String,
     book: Option<String>,
     paper: String,
 ) -> AppResult<String> {
     let book = book.as_deref().map(book_id).transpose()?;
-    Ok(state
-        .library()?
-        .create_canvas(&title, book.as_ref(), &paper)?)
+    let library = state.library()?;
+    blocking(move || Ok(library.create_canvas(&title, book.as_ref(), &paper)?)).await
 }
 
 #[tauri::command]
@@ -93,21 +92,32 @@ pub async fn write_canvas(
 
 #[tauri::command]
 #[specta::specta]
-pub fn set_canvas_paper(state: State<'_, AppState>, path: String, paper: String) -> AppResult<()> {
-    Ok(state.library()?.set_canvas_paper(&path, &paper)?)
+pub async fn set_canvas_paper(
+    state: State<'_, AppState>,
+    path: String,
+    paper: String,
+) -> AppResult<()> {
+    let library = state.library()?;
+    blocking(move || Ok(library.set_canvas_paper(&path, &paper)?)).await
 }
 
 /// Renames a canvas; returns its new path.
 #[tauri::command]
 #[specta::specta]
-pub fn rename_canvas(state: State<'_, AppState>, path: String, title: String) -> AppResult<String> {
-    Ok(state.library()?.rename_canvas(&path, &title)?)
+pub async fn rename_canvas(
+    state: State<'_, AppState>,
+    path: String,
+    title: String,
+) -> AppResult<String> {
+    let library = state.library()?;
+    blocking(move || Ok(library.rename_canvas(&path, &title)?)).await
 }
 
 #[tauri::command]
 #[specta::specta]
-pub fn delete_canvas(state: State<'_, AppState>, path: String) -> AppResult<()> {
-    Ok(state.library()?.delete_canvas(&path)?)
+pub async fn delete_canvas(state: State<'_, AppState>, path: String) -> AppResult<()> {
+    let library = state.library()?;
+    blocking(move || Ok(library.delete_canvas(&path)?)).await
 }
 
 #[derive(Debug, Clone, Serialize, Type)]
@@ -124,7 +134,7 @@ fn ink_engine(state: &AppState) -> String {
     let chosen = state
         .settings
         .lock()
-        .expect("settings lock")
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
         .ink_engine
         .clone();
     match chosen.as_deref() {
@@ -214,7 +224,10 @@ pub async fn download_canvas_font(
     let dir = state.extras_dir.clone();
     let cancel: Arc<AtomicBool> = Arc::default();
     {
-        let mut running = state.font_downloads.lock().expect("downloads lock");
+        let mut running = state
+            .font_downloads
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         if running.contains_key(&id) {
             return Err(AppError::invalid("that font is already downloading"));
         }
@@ -252,7 +265,7 @@ pub async fn download_canvas_font(
     state
         .font_downloads
         .lock()
-        .expect("downloads lock")
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
         .remove(&id);
     result?;
     Ok(libreri_helpers::fonts::fonts(&state.extras_dir))
@@ -264,7 +277,7 @@ pub fn cancel_canvas_font_download(state: State<'_, AppState>, id: String) {
     if let Some(c) = state
         .font_downloads
         .lock()
-        .expect("downloads lock")
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
         .get(&id)
     {
         c.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -273,10 +286,14 @@ pub fn cancel_canvas_font_download(state: State<'_, AppState>, id: String) {
 
 #[tauri::command]
 #[specta::specta]
-pub fn remove_canvas_font(
+pub async fn remove_canvas_font(
     state: State<'_, AppState>,
     id: String,
 ) -> AppResult<Vec<libreri_helpers::fonts::ExtraFont>> {
-    libreri_helpers::fonts::remove(&state.extras_dir, &id).map_err(AppError::invalid)?;
-    Ok(libreri_helpers::fonts::fonts(&state.extras_dir))
+    let dir = state.extras_dir.clone();
+    blocking(move || {
+        libreri_helpers::fonts::remove(&dir, &id).map_err(AppError::invalid)?;
+        Ok(libreri_helpers::fonts::fonts(&dir))
+    })
+    .await
 }

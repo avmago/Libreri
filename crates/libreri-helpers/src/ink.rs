@@ -111,12 +111,85 @@ pub fn system_language(code: &str) -> Option<&'static str> {
     })
 }
 
-fn run(mut cmd: std::process::Command) -> Result<String, String> {
-    let out = cmd
-        .output()
+/// How long the system's recogniser may take.
+const RECOGNISE_TIME: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// A temporary script file with a name of its own, so two readings at once
+/// never share one; removed when dropped.
+struct TempScript(std::path::PathBuf);
+
+impl TempScript {
+    fn new(ext: &str, contents: &[u8]) -> Result<Self, String> {
+        static COUNT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let n = COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_nanos());
+        let path = std::env::temp_dir().join(format!(
+            "libreri-ink-{}-{nanos}-{n}.{ext}",
+            std::process::id()
+        ));
+        std::fs::write(&path, contents).map_err(|e| e.to_string())?;
+        Ok(Self(path))
+    }
+}
+
+impl Drop for TempScript {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+/// Runs `cmd` and returns what it printed, stopping it after `limit`.
+fn run(mut cmd: std::process::Command, limit: std::time::Duration) -> Result<String, String> {
+    use std::io::Read;
+    use std::process::Stdio;
+    let mut child = cmd
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .map_err(|e| format!("the system's handwriting recognition could not start: {e}"))?;
-    if !out.status.success() {
-        let err = String::from_utf8_lossy(&out.stderr);
+    let drain = |pipe: Option<Box<dyn Read + Send>>| {
+        std::thread::spawn(move || {
+            let mut buf = Vec::new();
+            if let Some(mut p) = pipe {
+                let _ = p.read_to_end(&mut buf);
+            }
+            buf
+        })
+    };
+    let stdout = drain(
+        child
+            .stdout
+            .take()
+            .map(|p| Box::new(p) as Box<dyn Read + Send>),
+    );
+    let stderr = drain(
+        child
+            .stderr
+            .take()
+            .map(|p| Box::new(p) as Box<dyn Read + Send>),
+    );
+    let until = std::time::Instant::now() + limit;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if std::time::Instant::now() < until => {
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err("the system's handwriting recognition took too long".into());
+            }
+            Err(e) => return Err(e.to_string()),
+        }
+    };
+    let out_bytes = stdout.join().unwrap_or_default();
+    let err_bytes = stderr.join().unwrap_or_default();
+    if !status.success() {
+        let err = String::from_utf8_lossy(&err_bytes);
         let line = err
             .lines()
             .rev()
@@ -127,28 +200,25 @@ fn run(mut cmd: std::process::Command) -> Result<String, String> {
             line.trim()
         ));
     }
-    Ok(String::from_utf8_lossy(&out.stdout).trim().to_owned())
+    Ok(String::from_utf8_lossy(&out_bytes).trim().to_owned())
 }
 
 /// Reads the text in an image with the system's recogniser.
 pub fn recognize_system(image: &Path, language: Option<&str>) -> Result<String, String> {
     let lang = language.and_then(system_language).unwrap_or("");
-    let dir = std::env::temp_dir();
     if cfg!(target_os = "macos") {
-        let script = dir.join("libreri-ink.js");
-        std::fs::write(&script, MAC_SCRIPT).map_err(|e| e.to_string())?;
+        let script = TempScript::new("js", MAC_SCRIPT.as_bytes())?;
         let mut cmd = std::process::Command::new("/usr/bin/osascript");
         cmd.args(["-l", "JavaScript"])
-            .arg(&script)
+            .arg(&script.0)
             .arg(image)
             .arg(lang);
-        run(cmd)
+        run(cmd, RECOGNISE_TIME)
     } else if cfg!(windows) {
-        let script = dir.join("libreri-ink.ps1");
         // A byte-order mark so Windows PowerShell reads the script as UTF-8.
         let mut bytes = vec![0xEF, 0xBB, 0xBF];
         bytes.extend_from_slice(WINDOWS_SCRIPT.as_bytes());
-        std::fs::write(&script, bytes).map_err(|e| e.to_string())?;
+        let script = TempScript::new("ps1", &bytes)?;
         let mut cmd = std::process::Command::new("powershell.exe");
         cmd.args([
             "-NoProfile",
@@ -157,7 +227,7 @@ pub fn recognize_system(image: &Path, language: Option<&str>) -> Result<String, 
             "Bypass",
             "-File",
         ])
-        .arg(&script)
+        .arg(&script.0)
         .arg(image)
         .arg(lang);
         #[cfg(windows)]
@@ -165,7 +235,7 @@ pub fn recognize_system(image: &Path, language: Option<&str>) -> Result<String, 
             use std::os::windows::process::CommandExt;
             cmd.creation_flags(0x0800_0000); // no console window
         }
-        run(cmd)
+        run(cmd, RECOGNISE_TIME)
     } else {
         Err("this system has no handwriting recognition of its own; use Tesseract".into())
     }
@@ -184,5 +254,29 @@ mod tests {
             assert!(system_name().is_none());
             assert!(recognize_system(Path::new("x.png"), None).is_err());
         }
+    }
+
+    #[test]
+    fn temporary_scripts_have_names_of_their_own() {
+        let a = TempScript::new("js", b"1").unwrap();
+        let b = TempScript::new("js", b"2").unwrap();
+        assert_ne!(a.0, b.0);
+        let path = a.0.clone();
+        drop(a);
+        assert!(!path.exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_recogniser_that_hangs_is_stopped() {
+        let mut cmd = std::process::Command::new("sleep");
+        cmd.arg("10");
+        let started = std::time::Instant::now();
+        let e = run(cmd, std::time::Duration::from_millis(200)).unwrap_err();
+        assert!(e.contains("too long"), "{e}");
+        assert!(started.elapsed() < std::time::Duration::from_secs(5));
+        let mut echo = std::process::Command::new("echo");
+        echo.arg("hello");
+        assert_eq!(run(echo, RECOGNISE_TIME).unwrap(), "hello");
     }
 }

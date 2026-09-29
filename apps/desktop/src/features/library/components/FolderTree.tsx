@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner";
 import { ContextMenu, menuContent, menuItem, menuSeparator } from "@/components/ui/menu";
 import { commands, unwrap, type FolderDto } from "@/lib/ipc";
+import { useTabs } from "@/lib/tabs";
 import { cn } from "@/lib/utils";
 import { useCreateFolder, useRenameFolder, useTrashFolder } from "../api";
 import { usePermissions } from "@/features/profiles";
@@ -74,7 +75,7 @@ function FolderRow({
   editing: Editing;
   setEditing: (e: Editing) => void;
 }) {
-  const { nav, setNav, expanded, setExpanded } = useLibraryView();
+  const { nav, setNav, expanded, setExpanded, folderMoved } = useLibraryView();
   const { editLibrary } = usePermissions();
   const over = useDrag((s) => s.item !== null && s.target === folder.path);
   const rename = useRenameFolder();
@@ -89,7 +90,8 @@ function FolderRow({
     if (!name || name === folder.name) return;
     try {
       const path = await rename.mutateAsync({ path: folder.path, name });
-      if (active) setNav({ kind: "folder", path });
+      // The folder shown may be this one or inside it.
+      folderMoved(folder.path, path);
     } catch (e) {
       toast.error("Could not rename the folder", { description: errorText(e) });
     }
@@ -117,7 +119,14 @@ function FolderRow({
     );
     if (!ok) return;
     try {
+      // The books inside, whose open tabs close with the folder.
+      const inside = useTabs.getState().tabs.length
+        ? await unwrap(commands.listBooks({ folder: folder.path, includeSubfolders: true })).catch(
+            () => [],
+          )
+        : [];
       await trash.mutateAsync(folder.path);
+      useTabs.getState().closeGone(inside.map((b) => b.id));
       if (
         nav.kind === "folder" &&
         (nav.path === folder.path || nav.path.startsWith(`${folder.path}/`))

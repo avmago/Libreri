@@ -7,7 +7,12 @@ use tauri::State;
 #[tauri::command]
 #[specta::specta]
 pub fn get_settings(state: State<'_, AppState>) -> SettingsDto {
-    SettingsDto::from(&*state.settings.lock().expect("settings lock poisoned"))
+    SettingsDto::from(
+        &*state
+            .settings
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+    )
 }
 
 #[tauri::command]

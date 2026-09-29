@@ -48,6 +48,7 @@ import {
   type ZoomValue,
 } from "@/readers";
 import {
+  positionKey,
   savePosition,
   useAnnotations,
   useDeleteAnnotation,
@@ -118,6 +119,19 @@ function quoteBlock(
 
 const newId = () => crypto.randomUUID();
 
+/** A bookmark in a book without pages is at the place shown: the same
+ * chapter position or text offset (or, failing that, very nearly the same
+ * point in the book, so a neighbour's bookmark is not taken for it). */
+function samePlace(saved: Locator | null, position: number | null, here: ReaderLocation) {
+  const now = here.locator;
+  if (saved && saved.type === now.type) {
+    if (saved.type === "cfi" && now.type === "cfi") return saved.cfi === now.cfi;
+    if (saved.type === "text" && now.type === "text") return saved.start === now.start;
+  }
+  return Math.abs((position ?? 0) - here.progress) < 0.0002;
+}
+const NO_TOC: TocItem[] = [];
+
 function countLabel(list: Annotation[]): string {
   const h = list.filter((a) => a.kind === "highlight").length;
   const b = list.filter((a) => a.kind === "bookmark").length;
@@ -161,10 +175,23 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
 
   const hostRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<Renderer | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [error, setError] = useState<string | null>(null);
+  // Bumped to open the book again (after installing a helper, undoing a
+  // form, or a new version of the file).
+  const [attempt, setAttempt] = useState(0);
+  // How the latest opening went. Kept with the opening it belongs to, so
+  // the reader counts as "loading" again while a new one is under way.
+  const openKey = `${bookId}:${attempt}`;
+  const [opened, setOpened] = useState<{
+    key: string;
+    status: "ready" | "error";
+    toc: TocItem[];
+    error: string | null;
+  } | null>(null);
+  const current = opened?.key === openKey ? opened : null;
+  const status = current?.status ?? "loading";
+  const error = current?.error ?? null;
+  const toc = current?.toc ?? NO_TOC;
   const [location, setLocation] = useState<ReaderLocation | null>(null);
-  const [toc, setToc] = useState<TocItem[]>([]);
   const [selection, setSelection] = useState<SelectionInfo | null>(null);
   const [menu, setMenu] = useState<{ id: string; rect: DOMRect; edit: boolean } | null>(null);
   const [left, setLeft] = useState<LeftPanel | null>("contents");
@@ -212,8 +239,6 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   const history = useRef<{ back: Locator[]; forward: Locator[] }>({ back: [], forward: [] });
   const [zoom, setZoom] = useState<ZoomValue>(1);
   const [pageLayout, setPageLayout] = useState<PageLayout | null>(null);
-  // Bumped to open the book again (after installing a helper).
-  const [attempt, setAttempt] = useState(0);
   const openHelper = useHelperDialog((s) => s.open);
   const [pageInput, setPageInput] = useState("");
   // Edit pages mode (PDF), filled-in forms, version history.
@@ -242,7 +267,10 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
     const loc = pending.current;
     pending.current = null;
     if (!loc) return;
-    void savePosition(bookId, JSON.stringify(loc.locator), loc.progress)
+    const locator = JSON.stringify(loc.locator);
+    // Keep the cached place current, so opening again comes back here.
+    qc.setQueryData(positionKey(bookId), locator);
+    void savePosition(bookId, locator, loc.progress)
       .then(() => {
         // Opening a book can mark it "Reading": refresh the library once.
         if (savedOnce.current) return;
@@ -297,12 +325,17 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
     let cancelled = false;
     let renderer: Renderer | null = null;
     const host = hostRef.current;
+    const key = `${bookId}:${attempt}`;
+    // The start page shown while the saved place is restored is not saved.
+    openedRef.current = false;
     void (async () => {
       try {
         renderer = await createRenderer(
           fileType,
           {
             relocate: (loc) => {
+              // A renderer being closed may still report a move: ignore it.
+              if (cancelled) return;
               setLocation(loc);
               useListening.getState().setPlace(bookId, {
                 locator: JSON.stringify(loc.locator),
@@ -316,6 +349,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
               saveTimer.current = setTimeout(flushPosition, 1200);
             },
             selection: (sel) => {
+              if (cancelled) return;
               setSelection(sel);
               if (sel) setMenu(null);
             },
@@ -328,7 +362,9 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
         );
         if (cancelled) return;
         const resume = useProfilePrefs.getState().prefs.reader.resume;
-        await renderer.open(host, bookUrl(relPath), resume ? parseLocator(position.data) : null);
+        // The latest saved place (the query is read only once).
+        const saved = qc.getQueryData<string | null>(positionKey(bookId)) ?? position.data;
+        await renderer.open(host, bookUrl(relPath), resume ? parseLocator(saved) : null);
         if (cancelled) {
           renderer.destroy();
           return;
@@ -338,14 +374,13 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
         const { reader } = useProfilePrefs.getState().prefs;
         renderer.setLineHeight(reader.lineHeight);
         if (!renderer.paged && reader.fontScale !== 100) renderer.setZoom(reader.fontScale / 100);
-        setToc(renderer.toc());
         setZoom(renderer.zoom());
         setPageLayout(renderer.layoutOptions?.() ?? null);
-        setStatus("ready");
+        setOpened({ key, status: "ready", toc: renderer.toc(), error: null });
       } catch (e) {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : String(e));
-          setStatus("error");
+          const error = e instanceof Error ? e.message : String(e);
+          setOpened({ key, status: "error", toc: [], error });
         }
       }
     })();
@@ -462,6 +497,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
     renderer: rendererRef,
     annotations,
     pages: location?.pages ?? 0,
+    tabActive: active,
     save: (a) =>
       saveAnnotation.mutate(a, {
         onError: (e) => toast.error("Could not save the markup", { description: String(e) }),
@@ -518,6 +554,8 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   const fileChanged = (next: { id: string }) => {
     setEditing(false);
     setFormDirty(false);
+    // Save the place first, so the book reopens where it was.
+    flushPosition();
     void qc.invalidateQueries({ queryKey: ["lib"] });
     if (next.id !== bookId) useTabs.getState().replaceBook(bookId, next.id);
     else setAttempt((a) => a + 1);
@@ -595,7 +633,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
       (location.page !== undefined
         ? parseLocator(a.locator)?.type === "pdf" &&
           (parseLocator(a.locator) as { page: number }).page === location.page
-        : Math.abs((a.position ?? 0) - location.progress) < 0.004),
+        : samePlace(parseLocator(a.locator), a.position, location)),
   );
 
   const toggleBookmark = () => {
@@ -958,17 +996,27 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
     const next = flatToc[i < 0 ? (dir > 0 ? 0 : flatToc.length - 1) : i + dir];
     if (next) jump(() => r()?.goTo(next.target));
   };
+  // The highlight last gone to with next/previous highlight.
+  const lastHighlight = useRef<string | null>(null);
   const nextHighlight = (dir: 1 | -1) => {
     const here = location?.progress ?? 0;
     const list = annotations
       .filter((a) => a.kind === "highlight")
       .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+    // Still at the highlight gone to last (showing it can stop a little
+    // before it): step from it in the list, not from the place shown.
+    const near = location?.pages ? 1 / location.pages : 0.01;
+    const last = list.findIndex((a) => a.id === lastHighlight.current);
     const target =
-      dir > 0
-        ? list.find((a) => (a.position ?? 0) > here + 0.0005)
-        : [...list].reverse().find((a) => (a.position ?? 0) < here - 0.0005);
-    if (target) jump(() => r()?.showAnnotation(target));
-    else toast(dir > 0 ? "No more highlights after this page" : "No highlights before this page");
+      last >= 0 && Math.abs((list[last]!.position ?? 0) - here) < near
+        ? list[last + dir]
+        : dir > 0
+          ? list.find((a) => (a.position ?? 0) > here + 0.0005)
+          : [...list].reverse().find((a) => (a.position ?? 0) < here - 0.0005);
+    if (target) {
+      lastHighlight.current = target.id;
+      jump(() => r()?.showAnnotation(target));
+    } else toast(dir > 0 ? "No more highlights after this page" : "No highlights before this page");
   };
   const cycleTheme = () => {
     const ids = PAGE_THEMES.map((t) => t.id);
@@ -1504,8 +1552,6 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
                   <Button
                     onClick={() =>
                       openHelper(/DjVuLibre/.test(error) ? "djvulibre" : "unar", () => {
-                        setError(null);
-                        setStatus("loading");
                         setAttempt((a) => a + 1);
                       })
                     }
@@ -1528,6 +1574,8 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
               onFind={(q, back) => r()?.find(q, back) ?? Promise.resolve({ current: 0, total: 0 })}
               onClose={() => {
                 setFindOpen(false);
+                // Opened again later, the bar must not repeat an old F3.
+                setFindStep({ backwards: false, seq: 0 });
                 r()?.clearFind();
               }}
             />

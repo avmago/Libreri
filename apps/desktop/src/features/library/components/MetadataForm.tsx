@@ -1,12 +1,19 @@
 import { useState, type KeyboardEvent, type ReactNode } from "react";
 import { X } from "lucide-react";
+import { ask } from "@tauri-apps/plugin-dialog";
 import { Button } from "@/components/ui/button";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import type { ContentType } from "@/lib/ipc";
 import { useShortcut } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
-import { CONTENT_TYPE_LABEL, type BookView, type EMPTY_METADATA } from "../model";
+import {
+  addListItems,
+  CONTENT_TYPE_LABEL,
+  parseNumberField,
+  type BookView,
+  type EMPTY_METADATA,
+} from "../model";
 
 type Metadata = typeof EMPTY_METADATA;
 
@@ -36,19 +43,23 @@ export function ListInput({
   onChange,
   placeholder,
   splitOnComma = true,
+  onDraft,
 }: {
   value: string[];
   onChange: (v: string[]) => void;
   placeholder: string;
   splitOnComma?: boolean;
+  /** Told what is typed but not added yet, so a save can include it. */
+  onDraft?: (text: string) => void;
 }) {
-  const [draft, setDraft] = useState("");
+  const [draft, setDraftState] = useState("");
+  const setDraft = (text: string) => {
+    setDraftState(text);
+    onDraft?.(text);
+  };
   const add = (text: string) => {
-    const items = text
-      .split(splitOnComma ? /[,;\n]/ : /[;\n]/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (items.length) onChange([...value, ...items.filter((i) => !value.includes(i))]);
+    const next = addListItems(value, text, splitOnComma);
+    if (next !== value) onChange(next);
     setDraft("");
   };
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -91,10 +102,22 @@ export function ListInput({
 
 const text = (v: string | null) => v ?? "";
 const orNull = (v: string) => (v.trim() === "" ? null : v);
-const numOrNull = (v: string) => {
-  const n = Number(v);
-  return v.trim() === "" || Number.isNaN(n) ? null : n;
-};
+
+/** Fields typed as numbers, kept as typed ("1." on the way to "1.5"). */
+const NUMBER_FIELDS = [
+  { key: "seriesNumber", label: "Series number", whole: false },
+  { key: "year", label: "Year", whole: true },
+  { key: "pages", label: "Pages", whole: true },
+] as const;
+type NumberKey = (typeof NUMBER_FIELDS)[number]["key"];
+/** Chip fields, whose typed text is added when saving. */
+const LIST_FIELDS = {
+  authors: false,
+  contributors: false,
+  tags: true,
+  categories: true,
+} as const;
+type ListKey = keyof typeof LIST_FIELDS;
 
 /** Every editable field of a book. Saving is validated in Rust. */
 export function MetadataForm({
@@ -111,30 +134,77 @@ export function MetadataForm({
   onCancel: () => void;
 }) {
   const [m, setM] = useState<Metadata>(book.metadata);
+  const [numbers, setNumbers] = useState<Record<NumberKey, string>>(() => ({
+    seriesNumber: String(book.metadata.seriesNumber ?? ""),
+    year: String(book.metadata.year ?? ""),
+    pages: String(book.metadata.pages ?? ""),
+  }));
+  const [problem, setProblem] = useState<string | null>(null);
+  /** Text typed in chip fields and not added yet. */
+  const [drafts, setDrafts] = useState<Partial<Record<ListKey, string>>>({});
   const set = <K extends keyof Metadata>(key: K, value: Metadata[K]) =>
     setM((p) => ({ ...p, [key]: value }));
-  useShortcut("details.save", () => onSave(m));
+  const draftFor = (key: ListKey) => (t: string) => setDrafts((d) => ({ ...d, [key]: t }));
+
+  /** What would be saved now (with text typed in chip fields), or what is wrong. */
+  const collect = (): { next: Metadata } | { problem: string } => {
+    const next = { ...m };
+    for (const { key, label, whole } of NUMBER_FIELDS) {
+      const n = parseNumberField(numbers[key]);
+      if (n === undefined || (whole && n !== null && !Number.isInteger(n))) {
+        return { problem: `${label} must be a ${whole ? "whole " : ""}number.` };
+      }
+      next[key] = n;
+    }
+    for (const key of Object.keys(LIST_FIELDS) as ListKey[]) {
+      const typed = drafts[key];
+      if (typed?.trim()) next[key] = addListItems(next[key], typed, LIST_FIELDS[key]);
+    }
+    return { next };
+  };
+  const save = () => {
+    const r = collect();
+    setProblem("problem" in r ? r.problem : null);
+    if ("next" in r) onSave(r.next);
+  };
+  const cancel = async () => {
+    const r = collect();
+    const dirty = !("next" in r) || JSON.stringify(r.next) !== JSON.stringify(book.metadata);
+    if (
+      dirty &&
+      !(await ask("The changes you made to these details are lost.", {
+        title: "Discard your changes?",
+        kind: "warning",
+        okLabel: "Discard",
+        cancelLabel: "Keep editing",
+      }))
+    ) {
+      return;
+    }
+    onCancel();
+  };
+  useShortcut("details.save", save);
 
   return (
     <form
       className="flex flex-col gap-3"
       onSubmit={(e) => {
         e.preventDefault();
-        onSave(m);
+        save();
       }}
       onKeyDown={(e) => {
         if (e.key === "Escape") {
           e.preventDefault();
-          onCancel();
+          void cancel();
         }
       }}
     >
-      {error && (
+      {(problem ?? error) && (
         <p
           role="alert"
           className="rounded-md border border-destructive/40 bg-destructive/10 px-2.5 py-2 text-destructive"
         >
-          {error}
+          {problem ?? error}
         </p>
       )}
       <Field label="Title">
@@ -147,6 +217,7 @@ export function MetadataForm({
         <ListInput
           value={m.authors}
           onChange={(v) => set("authors", v)}
+          onDraft={draftFor("authors")}
           placeholder="Type a name, press Enter"
           splitOnComma={false}
         />
@@ -155,6 +226,7 @@ export function MetadataForm({
         <ListInput
           value={m.contributors}
           onChange={(v) => set("contributors", v)}
+          onDraft={draftFor("contributors")}
           placeholder="e.g. Jane Smith (translator)"
           splitOnComma={false}
         />
@@ -175,6 +247,7 @@ export function MetadataForm({
         <ListInput
           value={m.tags}
           onChange={(v) => set("tags", v)}
+          onDraft={draftFor("tags")}
           placeholder="e.g. physics, quantum"
         />
       </Field>
@@ -182,6 +255,7 @@ export function MetadataForm({
         <ListInput
           value={m.categories}
           onChange={(v) => set("categories", v)}
+          onDraft={draftFor("categories")}
           placeholder="e.g. Science/Physics"
         />
       </Field>
@@ -192,8 +266,8 @@ export function MetadataForm({
         <Field label="No.">
           <Input
             inputMode="decimal"
-            value={m.seriesNumber ?? ""}
-            onChange={(e) => set("seriesNumber", numOrNull(e.target.value))}
+            value={numbers.seriesNumber}
+            onChange={(e) => setNumbers((p) => ({ ...p, seriesNumber: e.target.value }))}
           />
         </Field>
       </div>
@@ -201,15 +275,15 @@ export function MetadataForm({
         <Field label="Year">
           <Input
             inputMode="numeric"
-            value={m.year ?? ""}
-            onChange={(e) => set("year", numOrNull(e.target.value))}
+            value={numbers.year}
+            onChange={(e) => setNumbers((p) => ({ ...p, year: e.target.value }))}
           />
         </Field>
         <Field label="Pages">
           <Input
             inputMode="numeric"
-            value={m.pages ?? ""}
-            onChange={(e) => set("pages", numOrNull(e.target.value))}
+            value={numbers.pages}
+            onChange={(e) => setNumbers((p) => ({ ...p, pages: e.target.value }))}
           />
         </Field>
         <Field label="Publisher" className="col-span-2">

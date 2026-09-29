@@ -127,8 +127,26 @@ pub fn full_title(book: &Book) -> String {
     }
 }
 
+/// Longest file-name stem, in UTF-8 bytes, that names made here use. Most
+/// file systems allow 255 bytes; this leaves room for " (12)" and an
+/// extension.
+pub const MAX_NAME_BYTES: usize = 200;
+
+/// `s` cut to at most `max` UTF-8 bytes, never inside a character.
+pub fn truncate_bytes(s: &str, max: usize) -> &str {
+    if s.len() <= max {
+        return s;
+    }
+    let mut end = max;
+    while !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    &s[..end]
+}
+
 /// A file or folder name that is valid on every system: at most 100
-/// characters, no path separators or reserved characters.
+/// characters and [`MAX_NAME_BYTES`] bytes, no path separators or reserved
+/// characters.
 pub fn safe_file_name(s: &str) -> String {
     let cleaned: String = s
         .chars()
@@ -152,7 +170,9 @@ pub fn safe_file_name(s: &str) -> String {
         .chars()
         .take(100)
         .collect();
-    let cleaned = cleaned.trim().to_owned();
+    let cleaned = truncate_bytes(&cleaned, MAX_NAME_BYTES)
+        .trim_matches(|c: char| c == '.' || c.is_whitespace())
+        .to_owned();
     let reserved = [
         "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "LPT1", "LPT2", "LPT3",
     ];
@@ -265,6 +285,16 @@ pub(crate) mod testutil {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn long_names_fit_in_255_bytes() {
+        let cjk = "漢".repeat(100);
+        let name = safe_file_name(&cjk);
+        assert!(name.len() <= MAX_NAME_BYTES, "{} bytes", name.len());
+        assert!(name.chars().all(|c| c == '漢'));
+        assert_eq!(truncate_bytes("aé", 2), "a");
+        assert_eq!(truncate_bytes("abc", 10), "abc");
+    }
 
     #[test]
     fn file_names_are_safe_and_unique() {

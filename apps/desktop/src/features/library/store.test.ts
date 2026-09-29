@@ -62,3 +62,35 @@ describe("selection", () => {
     expect(useLibraryView.getState().descending).toBe(false);
   });
 });
+
+describe("folderMoved", () => {
+  beforeEach(() => useLibraryView.setState({ nav: { kind: "all" }, expanded: {} }));
+
+  it("follows the folder shown, when it or a folder above it moves", () => {
+    useLibraryView.setState({ nav: { kind: "folder", path: "Science/Physics" } });
+    useLibraryView.getState().folderMoved("Science/Physics", "Physics");
+    expect(useLibraryView.getState().nav).toEqual({ kind: "folder", path: "Physics" });
+
+    useLibraryView.setState({ nav: { kind: "folder", path: "Science/Physics/Quantum" } });
+    useLibraryView.getState().folderMoved("Science", "Archive/Sciences");
+    expect(useLibraryView.getState().nav).toEqual({
+      kind: "folder",
+      path: "Archive/Sciences/Physics/Quantum",
+    });
+  });
+
+  it("leaves other folders and similar names alone, and keeps folders open", () => {
+    useLibraryView.setState({
+      nav: { kind: "folder", path: "Science Fiction" },
+      expanded: { Science: true, "Science/Physics": true, "Science Fiction": false },
+    });
+    useLibraryView.getState().folderMoved("Science", "Sciences");
+    const s = useLibraryView.getState();
+    expect(s.nav).toEqual({ kind: "folder", path: "Science Fiction" });
+    expect(s.expanded).toEqual({
+      Sciences: true,
+      "Sciences/Physics": true,
+      "Science Fiction": false,
+    });
+  });
+});

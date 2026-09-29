@@ -335,13 +335,18 @@ export class EbookRenderer implements Renderer {
       const from = this.findFromSection;
       this.findFromSection = null;
       const at = this.findSections.findIndex((i) => i >= from);
-      if (at > 0 && !backwards) this.findIndex = at - 1;
+      // The next step lands on the first match in that chapter (or just before it).
+      if (at > 0) this.findIndex = backwards ? at : at - 1;
     }
     const total = this.findResults.length;
     if (!total) return { current: 0, total: 0 };
-    this.findIndex = backwards
-      ? (this.findIndex - 1 + total) % total
-      : (this.findIndex + 1) % total;
+    // The first step back from a new search goes to the last match.
+    this.findIndex =
+      this.findIndex < 0
+        ? backwards
+          ? total - 1
+          : 0
+        : (this.findIndex + (backwards ? -1 : 1) + total) % total;
     await this.view.goTo(this.findResults[this.findIndex]!);
     return { current: this.findIndex + 1, total };
   }

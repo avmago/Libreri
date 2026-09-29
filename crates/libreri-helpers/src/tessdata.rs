@@ -290,11 +290,11 @@ pub fn download(
         .replace("{code}", code);
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_connect(Some(Duration::from_secs(20)))
-        .timeout_recv_body(Some(Duration::from_secs(60)))
+        .timeout_recv_body(Some(crate::download::BODY_LIMIT))
         .max_redirects(5)
         .build()
         .into();
-    let mut res = agent.get(&url).call().map_err(|e| match e {
+    let res = agent.get(&url).call().map_err(|e| match e {
         ureq::Error::StatusCode(404) => "that language is not available".to_owned(),
         ureq::Error::StatusCode(c) => format!("the download failed (HTTP {c})"),
         ureq::Error::HostNotFound => "the download failed; check the internet connection".into(),
@@ -307,11 +307,12 @@ pub fn download(
         .and_then(|v| v.parse().ok());
     let tmp = dir.join(format!(".{code}.download"));
     let mut file = std::fs::File::create(&tmp).map_err(|e| e.to_string())?;
-    let mut reader = res
-        .body_mut()
-        .with_config()
+    let body = res
+        .into_body()
+        .into_with_config()
         .limit(200 * 1024 * 1024)
         .reader();
+    let mut reader = crate::download::StallReader::new(body, crate::download::STALL, None);
     let mut buf = vec![0u8; 64 * 1024];
     let mut done = 0u64;
     let mut head = Vec::new();

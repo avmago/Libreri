@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { commands, events } from "@/lib/ipc";
+import { report } from "@/lib/windows";
 import { summariseForeign, summariseImport } from "../model";
 import { usePortability } from "../store";
 
@@ -20,38 +21,45 @@ export function usePortabilityEvents() {
       events.exportFinished.listen(({ payload: r }) => {
         const what = r.books === 1 ? "1 book" : `${r.books} books`;
         const show = r.warnings.length ? toast.warning : toast.success;
-        show(`Exported ${what}`, {
-          description: [r.path, ...r.warnings.slice(0, 3)].join("\n"),
-          duration: 8_000,
-          action: { label: "Show", onClick: () => reveal(r.path) },
-        });
+        report(() =>
+          show(`Exported ${what}`, {
+            description: [r.path, ...r.warnings.slice(0, 3)].join("\n"),
+            duration: 8_000,
+            action: { label: "Show", onClick: () => reveal(r.path) },
+          }),
+        );
       }),
       events.archiveImported.listen(({ payload: r }) => {
         const { title, description } = summariseImport(r);
         const show = r.warnings.length ? toast.warning : toast.success;
-        show(title, {
-          description,
-          duration: 12_000,
-          action: r.missing ? { label: "Show missing files", onClick: showMissing } : undefined,
-        });
+        report(() =>
+          show(title, {
+            description,
+            duration: 12_000,
+            action: r.missing ? { label: "Show missing files", onClick: showMissing } : undefined,
+          }),
+        );
       }),
       events.foreignImported.listen(({ payload: r }) => {
         const { title, description } = summariseForeign(r);
         const show = r.failed.length ? toast.warning : toast.success;
-        show(title, { description: description || undefined, duration: 12_000 });
+        report(() => show(title, { description: description || undefined, duration: 12_000 }));
       }),
       events.backupFinished.listen(({ payload: r }) => {
         void qc.invalidateQueries({ queryKey: ["lib", "backups"] });
         if (r.error) {
           if (r.scheduled && shownErrors.has(r.error)) return;
           if (r.scheduled) shownErrors.add(r.error);
-          toast.error("The backup failed", { description: r.error, duration: 12_000 });
+          const error = r.error;
+          report(() => toast.error("The backup failed", { description: error, duration: 12_000 }));
         } else if (r.path && !r.scheduled) {
           const path = r.path;
-          toast.success("Backed up", {
-            description: path,
-            action: { label: "Show", onClick: () => reveal(path) },
-          });
+          report(() =>
+            toast.success("Backed up", {
+              description: path,
+              action: { label: "Show", onClick: () => reveal(path) },
+            }),
+          );
         }
       }),
     ];

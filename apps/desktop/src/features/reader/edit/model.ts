@@ -252,8 +252,10 @@ export function summary(s: EditState, pageCount: number): string[] {
 /** Parses "1-3, 5, 8-" into page numbers (1-based) up to `max`. */
 export function parseRanges(text: string, max: number): number[] {
   const out: number[] = [];
-  for (const part of text.split(/[,;\s]+/).filter(Boolean)) {
-    const m = /^(\d*)\s*[-–]\s*(\d*)$/.exec(part);
+  // "1 - 3" is one range: join the dash to its numbers before splitting.
+  const joined = text.replace(/\s*[-–—]\s*/g, "-");
+  for (const part of joined.split(/[,;\s]+/).filter(Boolean)) {
+    const m = /^(\d*)-(\d*)$/.exec(part);
     if (m) {
       const a = m[1] ? Number(m[1]) : 1;
       const b = m[2] ? Number(m[2]) : max;

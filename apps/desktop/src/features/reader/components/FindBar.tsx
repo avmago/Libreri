@@ -38,6 +38,8 @@ export function FindBar({
   useEffect(() => {
     runRef.current = run;
   });
+  // A step already there when the bar opens was asked for as it opened (F3,
+  // or a search result); the reader sets seq back to 0 when the bar closes.
   useEffect(() => {
     if (step && step.seq > 0) void runRef.current(step.backwards);
   }, [step]);

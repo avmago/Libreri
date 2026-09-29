@@ -11,7 +11,7 @@ use libreri_library::{Hit, OcrOptions, TextState};
 use libreri_search::IndexCounts;
 use serde::Serialize;
 use specta::Type;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 use tauri_specta::Event;
 
 fn book_id(id: &str) -> AppResult<BookId> {
@@ -190,41 +190,47 @@ pub fn update_search_index(state: State<'_, AppState>) -> AppResult<()> {
 /// the job id; the result arrives as `OcrFinished`.
 #[tauri::command]
 #[specta::specta]
-pub fn make_searchable(
-    state: State<'_, AppState>,
+pub async fn make_searchable(
+    app: AppHandle,
     ids: Vec<String>,
     languages: Vec<String>,
     redo: bool,
 ) -> AppResult<String> {
-    let library = state.library()?;
-    library.require_edit()?;
-    let ids = ids
-        .iter()
-        .map(|i| book_id(i))
-        .collect::<AppResult<Vec<_>>>()?;
-    if ids.is_empty() {
-        return Err(AppError::invalid("choose a book first"));
-    }
-    if libreri_helpers::find_program("tesseract").is_none() {
-        return Err(AppError::invalid(libreri_formats::ocr::NOT_INSTALLED));
-    }
-    let languages = if languages.is_empty() {
-        default_languages(&state)
-    } else {
-        languages
-    };
-    let tessdata_dir = tessdata::prepare(&state.tessdata, &languages).map_err(AppError::invalid)?;
-    let workers = std::thread::available_parallelism()
-        .map(|n| n.get() / 2)
-        .unwrap_or(2)
-        .clamp(1, 4);
-    let options = OcrOptions {
-        languages,
-        tessdata: tessdata_dir,
-        redo,
-        workers,
-    };
-    Ok(state.start_ocr(ids, options)?.to_string())
+    // Looking for Tesseract and preparing language files touches the disk.
+    blocking(move || {
+        let state = app.state::<AppState>();
+        let library = state.library()?;
+        library.require_edit()?;
+        let ids = ids
+            .iter()
+            .map(|i| book_id(i))
+            .collect::<AppResult<Vec<_>>>()?;
+        if ids.is_empty() {
+            return Err(AppError::invalid("choose a book first"));
+        }
+        if libreri_helpers::find_program("tesseract").is_none() {
+            return Err(AppError::invalid(libreri_formats::ocr::NOT_INSTALLED));
+        }
+        let languages = if languages.is_empty() {
+            default_languages(&state)
+        } else {
+            languages
+        };
+        let tessdata_dir =
+            tessdata::prepare(&state.tessdata, &languages).map_err(AppError::invalid)?;
+        let workers = std::thread::available_parallelism()
+            .map(|n| n.get() / 2)
+            .unwrap_or(2)
+            .clamp(1, 4);
+        let options = OcrOptions {
+            languages,
+            tessdata: tessdata_dir,
+            redo,
+            workers,
+        };
+        Ok(state.start_ocr(ids, options)?.to_string())
+    })
+    .await
 }
 
 #[derive(Debug, Clone, Serialize, Type)]
@@ -342,6 +348,7 @@ pub async fn download_ocr_language(
 
 #[tauri::command]
 #[specta::specta]
-pub fn remove_ocr_language(state: State<'_, AppState>, code: String) -> AppResult<()> {
-    tessdata::remove(&state.tessdata, &code).map_err(AppError::invalid)
+pub async fn remove_ocr_language(state: State<'_, AppState>, code: String) -> AppResult<()> {
+    let dir = state.tessdata.clone();
+    blocking(move || tessdata::remove(&dir, &code).map_err(AppError::invalid)).await
 }

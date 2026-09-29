@@ -13,7 +13,7 @@ import type { PDFDocumentProxy } from "pdfjs-dist";
 import { commands, unwrap, type Annotation, type WordDto } from "@/lib/ipc";
 import type { MarkupLayer } from "../markup/MarkupLayer";
 import { findHits, matchRects, wordLayer } from "../ocrText";
-import { makeQuote } from "../quote";
+import { firstPagePart, makeQuote } from "../quote";
 import { runWords, WordSpeech, type Box as SpeechBox, type PageWord } from "../speech/words";
 import type { SpeechSource } from "../speech/types";
 import type { PageTheme } from "../themes";
@@ -51,6 +51,8 @@ export class PdfRenderer implements Renderer {
   private doc!: PDFDocumentProxy;
   private destroyed = false;
   private tocItems: TocItem[] = [];
+  /** Contents entries with the page each starts on, in contents order. */
+  private sections: { page: number; label: string }[] = [];
   private dests = new Map<string, unknown>();
   private labels: string[] | null = null;
   private annotations: Annotation[] = [];
@@ -135,9 +137,19 @@ export class PdfRenderer implements Renderer {
     this.bus.on("pagechanging", () => this.emitLocation());
     // Refit when the window or panels change size (or a hidden tab is shown).
     let lastWidth = this.container.clientWidth;
+    let hidden = !lastWidth;
     const resize = new ResizeObserver(() => {
       const w = this.container.clientWidth;
-      if (!w || w === lastWidth) return;
+      if (!w) {
+        hidden = true;
+        return;
+      }
+      if (hidden) {
+        // Markup skipped pages while the tab was hidden: draw it now.
+        hidden = false;
+        if (this.markup) this.attachMarkup(this.markup);
+      }
+      if (w === lastWidth) return;
       lastWidth = w;
       if (typeof this.zoomValue === "string") {
         const page = this.viewer.currentPageNumber;
@@ -176,6 +188,18 @@ export class PdfRenderer implements Renderer {
       }
     };
     this.container.addEventListener("click", onClick);
+    // Web links in the PDF open in the browser (a new window does nothing here).
+    const onLink = (e: MouseEvent) => {
+      const a = (e.target as Element | null)?.closest?.<HTMLAnchorElement>(
+        ".annotationLayer a[href]",
+      );
+      const href = a?.getAttribute("href") ?? "";
+      if (!/^(https?:|mailto:|libreri:)/i.test(href)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this.events.externalLink?.(href);
+    };
+    this.container.addEventListener("click", onLink, true);
     // Highlights sit above the text layer but must not block selecting text.
     const onMove = (e: PointerEvent) => this.hoverHighlights(e);
     this.container.addEventListener("pointermove", onMove);
@@ -184,6 +208,7 @@ export class PdfRenderer implements Renderer {
       this.container.removeEventListener("pointerup", onUp);
       this.container.removeEventListener("keyup", onUp);
       this.container.removeEventListener("click", onClick);
+      this.container.removeEventListener("click", onLink, true);
       this.container.removeEventListener("pointermove", onMove);
     });
 
@@ -194,6 +219,7 @@ export class PdfRenderer implements Renderer {
 
   destroy() {
     this.destroyed = true;
+    cancelAnimationFrame(this.frame);
     for (const f of this.cleanup) f();
     this.viewer?.cleanup();
     this.root?.remove();
@@ -215,6 +241,48 @@ export class PdfRenderer implements Renderer {
         return { label: item.title, target: key, children: convert(item.items ?? []) };
       });
     this.tocItems = outline ? convert(outline) : [];
+    void this.loadSections();
+  }
+
+  /** Finds the page of each contents entry, so the chapter read can be named. */
+  private async loadSections() {
+    const out: { page: number; label: string }[] = [];
+    const walk = async (items: TocItem[]) => {
+      for (const item of items) {
+        const page = await this.pageOfDest(this.dests.get(item.target));
+        if (this.destroyed) return;
+        if (page) out.push({ page, label: item.label });
+        await walk(item.children);
+      }
+    };
+    await walk(this.tocItems);
+    if (this.destroyed || !out.length) return;
+    this.sections = out;
+    this.emitLocation();
+  }
+
+  private async pageOfDest(dest: unknown): Promise<number | null> {
+    try {
+      const explicit = typeof dest === "string" ? await this.doc.getDestination(dest) : dest;
+      if (!Array.isArray(explicit)) return null;
+      const ref = explicit[0] as unknown;
+      if (typeof ref === "number") return ref + 1;
+      if (ref && typeof ref === "object") {
+        return (await this.doc.getPageIndex(ref as { num: number; gen: number })) + 1;
+      }
+    } catch {
+      /* a broken link in the contents */
+    }
+    return null;
+  }
+
+  /** The contents entry being read on `page`: the last one starting on or before it. */
+  private sectionOf(page: number): string | undefined {
+    let found: { page: number; label: string } | undefined;
+    for (const s of this.sections) {
+      if (s.page <= page && (!found || s.page >= found.page)) found = s;
+    }
+    return found?.label;
   }
 
   toc() {
@@ -227,7 +295,8 @@ export class PdfRenderer implements Renderer {
   }
 
   private emitLocation() {
-    if (!this.viewer?.pagesCount) return;
+    // Nothing is on screen in a hidden tab: its place is kept as it was.
+    if (this.destroyed || !this.viewer?.pagesCount || !this.container.clientHeight) return;
     const page = this.viewer.currentPageNumber;
     const pages = this.viewer.pagesCount;
     const view = this.viewer.getPageView(page - 1);
@@ -246,6 +315,7 @@ export class PdfRenderer implements Renderer {
       shortLabel: `p. ${label}`,
       page,
       pages,
+      section: this.sectionOf(page),
     });
   }
 
@@ -299,6 +369,7 @@ export class PdfRenderer implements Renderer {
 
   /** Turns the current text selection into a highlight candidate. */
   private onSelection() {
+    if (this.destroyed) return;
     const sel = document.getSelection();
     if (!sel || sel.isCollapsed || !sel.rangeCount) return this.events.selection(null);
     const range = sel.getRangeAt(0);
@@ -311,8 +382,10 @@ export class PdfRenderer implements Renderer {
     if (!pageDiv || !layer) return;
     const page = Number(pageDiv.dataset.pageNumber);
     const box = pageDiv.getBoundingClientRect();
+    // Only this page: a selection can run into the next one.
+    const part = firstPagePart(range, pageDiv, layer);
     const rects: Rect[] = mergeRects(
-      Array.from(range.getClientRects())
+      Array.from(part.getClientRects())
         .filter((r) => r.width > 1 && r.height > 1)
         // Only this page (a selection can run into the next one).
         .filter((r) => r.top >= box.top - 2 && r.bottom <= box.bottom + 2)
@@ -323,8 +396,8 @@ export class PdfRenderer implements Renderer {
           r.height / box.height,
         ]),
     );
-    const exact = sel.toString().replace(/\s+/g, " ").trim();
-    const copy = range.cloneRange();
+    const exact = part.toString().replace(/\s+/g, " ").trim();
+    const copy = part.cloneRange();
     if (!exact || !rects.length) return this.events.selection(null);
     const pageText = (layer.textContent ?? "").replace(/\s+/g, " ");
     const at = pageText.indexOf(exact);
@@ -384,7 +457,8 @@ export class PdfRenderer implements Renderer {
     const div = view?.div as HTMLElement | undefined;
     if (!div) return;
     void this.drawOcr(pageNumber);
-    this.markup?.mount(pageNumber, div);
+    // A hidden tab has no page size; markup is mounted when it is shown.
+    if (div.clientWidth > 0) this.markup?.mount(pageNumber, div);
     this.drawSpoken(pageNumber);
     let layer = div.querySelector<HTMLElement>(".lb-pdf-hl-layer");
     if (!layer) {

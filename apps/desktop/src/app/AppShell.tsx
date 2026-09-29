@@ -54,7 +54,7 @@ import {
 } from "@/features/library";
 import { FindDetailsDialog, useDetailsEvents } from "@/features/details";
 import { HelperDialog } from "@/features/helpers";
-import { NotesHub } from "@/features/notes";
+import { NotesHub, flushNotes } from "@/features/notes";
 import { OcrDialog, SearchView, useSearchEvents } from "@/features/search";
 import { setSpeechSettingsOpener } from "@/features/speech";
 import {
@@ -96,13 +96,18 @@ import { useTabs } from "@/lib/tabs";
 import { isMainWindow } from "@/lib/windows";
 import { nextTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { resetProfileState } from "./profile-state";
 import { TabStrip } from "./TabStrip";
 import { useUi } from "./ui-store";
 import { useWindowActions } from "./windows";
 
 export function AppShell({ library, session }: { library: LibrarySummary; session: SessionDto }) {
-  // This profile's preferences, loaded before anything below renders.
-  useState(() => useProfilePrefs.getState().load(session.prefs, session.keepsData));
+  // Nothing of the previous profile (tabs, selection, dialogs), then this
+  // profile's preferences, before anything below renders.
+  useState(() => {
+    resetProfileState();
+    useProfilePrefs.getState().load(session.prefs, session.keepsData);
+  });
   const prefs = useProfilePrefs((s) => s.prefs);
   const updatePrefs = useProfilePrefs((s) => s.update);
   useEffect(
@@ -168,7 +173,7 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
   }, [ui.sidebarCollapsed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const lock = useCallback(async () => {
-    await Promise.allSettled([flushSession(), flushPrefs()]);
+    await Promise.allSettled([flushNotes(), flushSession(), flushPrefs()]);
     signOut.mutate();
   }, [signOut]);
   useAutoLock(session.profile.hasPin ? prefs.autoLockMinutes : 0, () => void lock());
@@ -178,7 +183,7 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
     [setTheme, settings?.theme],
   );
   const close = useCallback(async () => {
-    await Promise.allSettled([flushSession(), flushPrefs()]);
+    await Promise.allSettled([flushNotes(), flushSession(), flushPrefs()]);
     closeLibrary.mutate();
   }, [closeLibrary]);
   const rebuild = useCallback(async () => {
@@ -212,6 +217,16 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
     ui.closeSettings();
     setNav({ kind: "missing" });
   }, [showMissingRequest]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Choosing a tab (strip, shortcut, palette) shows it: Settings covers the
+  // tabs, so it closes rather than hiding the change.
+  useEffect(
+    () =>
+      useTabs.subscribe((s, prev) => {
+        if (s.active !== prev.active) useUi.getState().closeSettings();
+      }),
+    [],
+  );
 
   // "Settings" in the speech feature's messages (e.g. no model yet).
   useEffect(() => setSpeechSettingsOpener(() => useUi.getState().openSettings("speech")), []);

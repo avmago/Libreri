@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { create } from "zustand";
 import type { BookQuery, ContentType, FileType, ReadingStatus, SortKey } from "@/lib/ipc";
 
@@ -51,6 +52,8 @@ interface LibraryViewState {
   toggleDetails: () => void;
   setDetailsOpen: (open: boolean) => void;
   setExpanded: (path: string, open: boolean) => void;
+  /** A folder was renamed or moved: the view follows it (and its subfolders). */
+  folderMoved: (from: string, to: string) => void;
 }
 
 const toggle = <T>(list: T[], item: T) =>
@@ -106,7 +109,22 @@ export const useLibraryView = create<LibraryViewState>((set) => ({
   toggleDetails: () => set((s) => ({ detailsOpen: !s.detailsOpen })),
   setDetailsOpen: (detailsOpen) => set({ detailsOpen }),
   setExpanded: (path, open) => set((s) => ({ expanded: { ...s.expanded, [path]: open } })),
+  folderMoved: (from, to) =>
+    set((s) => {
+      const follow = (path: string) =>
+        path === from ? to : path.startsWith(`${from}/`) ? to + path.slice(from.length) : null;
+      const moved = s.nav.kind === "folder" ? follow(s.nav.path) : null;
+      const expanded: Record<string, boolean> = {};
+      for (const [path, open] of Object.entries(s.expanded)) expanded[follow(path) ?? path] = open;
+      return { expanded, ...(moved !== null && { nav: { kind: "folder" as const, path: moved } }) };
+    }),
 }));
+
+/** The selected ids as a set, for checking thousands of books quickly. */
+export function useSelectedIds(): Set<string> {
+  const selection = useLibraryView((s) => s.selection);
+  return useMemo(() => new Set(selection), [selection]);
+}
 
 type QueryInput = Pick<
   LibraryViewState,

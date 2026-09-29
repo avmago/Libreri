@@ -2,6 +2,7 @@
 //! are downloaded (per computer, into the app's data folder) and removed
 //! from Settings.
 
+use libreri_helpers::download;
 use serde::Serialize;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -210,25 +211,30 @@ fn fetch(
     cancel: &AtomicBool,
     progress: &mut dyn FnMut(u64),
 ) -> Result<Vec<u8>, String> {
-    let mut res = agent.get(url).call().map_err(|e| match e {
+    let res = agent.get(url).call().map_err(|e| match e {
         ureq::Error::StatusCode(c) => format!("the download failed (HTTP {c})"),
         ureq::Error::HostNotFound => "the download failed; check the internet connection".into(),
         other => format!("the download failed: {other}"),
     })?;
-    let mut reader = res
-        .body_mut()
-        .with_config()
+    let body = res
+        .into_body()
+        .into_with_config()
         .limit(200 * 1024 * 1024)
         .reader();
+    let mut reader = download::StallReader::new(body, download::STALL, Some(cancel));
     let mut out = Vec::new();
     let mut buf = vec![0u8; 64 * 1024];
     loop {
         if cancel.load(Ordering::SeqCst) {
             return Err("cancelled".into());
         }
-        let n = reader
-            .read(&mut buf)
-            .map_err(|e| format!("the download stopped: {e}"))?;
+        let n = reader.read(&mut buf).map_err(|e| {
+            if download::is_cancelled(&e) {
+                "cancelled".to_owned()
+            } else {
+                format!("the download stopped: {e}")
+            }
+        })?;
         if n == 0 {
             break;
         }
@@ -253,7 +259,7 @@ pub fn download(
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_connect(Some(Duration::from_secs(20)))
-        .timeout_recv_body(Some(Duration::from_secs(120)))
+        .timeout_recv_body(Some(download::BODY_LIMIT))
         .max_redirects(8)
         .build()
         .into();

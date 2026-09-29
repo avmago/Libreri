@@ -1,5 +1,6 @@
 //! The Notes hub.
 
+use super::blocking;
 use crate::error::AppResult;
 use crate::state::AppState;
 use libreri_core::Annotation;
@@ -31,36 +32,42 @@ pub struct NotebookEntryDto {
 /// All highlights, comments and bookmarks of the signed-in profile.
 #[tauri::command]
 #[specta::specta]
-pub fn list_all_notes(state: State<'_, AppState>) -> AppResult<Vec<NoteDto>> {
-    Ok(state
-        .library()?
-        .all_notes()?
-        .into_iter()
-        .map(|n| NoteDto {
-            annotation: n.annotation,
-            book_title: n.book_title,
-            file_type: n.file_type,
-        })
-        .collect())
+pub async fn list_all_notes(state: State<'_, AppState>) -> AppResult<Vec<NoteDto>> {
+    let library = state.library()?;
+    blocking(move || {
+        Ok(library
+            .all_notes()?
+            .into_iter()
+            .map(|n| NoteDto {
+                annotation: n.annotation,
+                book_title: n.book_title,
+                file_type: n.file_type,
+            })
+            .collect())
+    })
+    .await
 }
 
 /// All Markdown notes in the signed-in profile's notes folder.
 #[tauri::command]
 #[specta::specta]
-pub fn list_notebooks(state: State<'_, AppState>) -> AppResult<Vec<NotebookEntryDto>> {
-    Ok(state
-        .library()?
-        .notebooks()?
-        .into_iter()
-        .map(|n| NotebookEntryDto {
-            book_id: n.book_id.map(|b| b.to_string()),
-            title: n.title,
-            rel_path: n.rel_path,
-            modified: n.modified as f64,
-            excerpt: n.excerpt,
-            words: n.words,
-        })
-        .collect())
+pub async fn list_notebooks(state: State<'_, AppState>) -> AppResult<Vec<NotebookEntryDto>> {
+    let library = state.library()?;
+    blocking(move || {
+        Ok(library
+            .notebooks()?
+            .into_iter()
+            .map(|n| NotebookEntryDto {
+                book_id: n.book_id.map(|b| b.to_string()),
+                title: n.title,
+                rel_path: n.rel_path,
+                modified: n.modified as f64,
+                excerpt: n.excerpt,
+                words: n.words,
+            })
+            .collect())
+    })
+    .await
 }
 
 #[tauri::command]

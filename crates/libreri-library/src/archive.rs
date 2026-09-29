@@ -150,6 +150,49 @@ fn first_family(authors: &[String]) -> Option<String> {
     )
 }
 
+/// The book among `candidates` (same title) that is the same work as one
+/// with these `authors` and `pages`. The first author's family name must
+/// match, or the book here must be the only one with that title and have no
+/// authors yet. A title alone is not enough: a book without authors matches
+/// only the single same-titled book here that has no authors either, and
+/// only when both page counts are known and close.
+pub(crate) fn same_work(
+    authors: &[String],
+    pages: Option<u32>,
+    candidates: &[libreri_db::TitledBook],
+) -> Option<BookId> {
+    let similar = |a: Option<u32>, b: Option<u32>| match (a, b) {
+        (Some(a), Some(b)) => a.abs_diff(b) * 10 <= a.max(b),
+        _ => false,
+    };
+    let wanted = first_family(authors).filter(|f| !f.is_empty());
+    match wanted {
+        Some(wanted) => {
+            let length_fits = |p: Option<u32>| pages.is_none() || p.is_none() || similar(pages, p);
+            let by_author = candidates
+                .iter()
+                .find(|(_, a, p)| first_family(a).as_ref() == Some(&wanted) && length_fits(*p));
+            // A file here often has no authors read from it yet: it still
+            // counts when it is the only book with that title.
+            let lone_unknown = match candidates {
+                [(id, a, p)] if a.is_empty() && length_fits(*p) => Some(id),
+                _ => None,
+            };
+            by_author.map(|(id, _, _)| id).or(lone_unknown).cloned()
+        }
+        None => {
+            let unknown: Vec<_> = candidates
+                .iter()
+                .filter(|(_, a, _)| first_family(a).is_none_or(|f| f.is_empty()))
+                .collect();
+            match unknown.as_slice() {
+                [(id, _, p)] if candidates.len() == 1 && similar(pages, *p) => Some(id.clone()),
+                _ => None,
+            }
+        }
+    }
+}
+
 impl Library {
     // ---------- writing ----------
 
@@ -362,9 +405,12 @@ impl Library {
                 Some(list) if list.len() == 1 => Some(list[0]),
                 _ => None,
             };
+            // Without notes the copy holds only the catalogue: no one's
+            // profile, highlights, notebooks or collections.
             let scope = libreri_db::SnapshotScope {
                 only_profile: only,
                 strip_pins: opts.kind == ArchiveKind::Export,
+                no_personal_data: !opts.notes,
             };
             let made = self.with_db(|db| db.snapshot(&tmp, &scope));
             if made.is_ok() {
@@ -443,16 +489,9 @@ impl Library {
             return Ok(Match::OtherFile(found));
         }
         if !ab.title.trim().is_empty() {
-            let author = first_family(&ab.authors);
-            for (id, authors, pages) in self.with_db(|db| db.books_titled(&ab.title))? {
-                let same_author = author.is_none() || first_family(&authors) == author;
-                let similar_length = match (ab.pages, pages) {
-                    (Some(a), Some(b)) => a.abs_diff(b) * 10 <= a.max(b),
-                    _ => true,
-                };
-                if same_author && similar_length {
-                    return Ok(Match::OtherFile(id));
-                }
+            let candidates = self.with_db(|db| db.books_titled(&ab.title))?;
+            if let Some(id) = same_work(&ab.authors, ab.pages, &candidates) {
+                return Ok(Match::OtherFile(id));
             }
         }
         Ok(Match::Missing)
@@ -651,7 +690,10 @@ impl Library {
                     let here = self.with_db(|db| db.profiles())?;
                     let mut name = ap.name.clone();
                     let mut n = 2;
-                    while here.iter().any(|p| p.name.eq_ignore_ascii_case(&name)) {
+                    while here.iter().any(|p| {
+                        p.name.to_lowercase() == name.to_lowercase()
+                            || crate::reading::same_notes_folder(&p.name, &name)
+                    }) {
                         name = format!("{} ({n})", ap.name);
                         n += 1;
                     }
@@ -718,7 +760,9 @@ impl Library {
                 // Put the file back if it was missing here.
                 let here = self.record(&target)?;
                 if here.missing && ab.file_included {
-                    let dest = self.free_book_path(&here.rel_path, None)?;
+                    // The missing record owns its own path: that is where
+                    // the file goes back, not to "name (2)".
+                    let dest = self.free_book_path(&here.rel_path, None, Some(&target))?;
                     zip.extract(&ab.rel_path, &dest).map_err(archive_err)?;
                     if paths::hash_file(&dest)? == target {
                         let rel = paths::rel_of(self.layout(), &dest).ok_or(Error::BookNotFound)?;
@@ -748,7 +792,8 @@ impl Library {
                 Ok(target)
             }
             Match::WithFile => {
-                let dest = self.free_book_path(&ab.rel_path, Some(ab.file_type))?;
+                let local = libreri_export::archive::local_path(&ab.rel_path);
+                let dest = self.free_book_path(&local, Some(ab.file_type), None)?;
                 zip.extract(&ab.rel_path, &dest).map_err(archive_err)?;
                 let id = paths::hash_file(&dest)?;
                 if id != ab.id {
@@ -807,7 +852,8 @@ impl Library {
                     .as_ref()
                     .map(|s| s.metadata.clone())
                     .unwrap_or_else(|| metadata_from(ab));
-                let rel = self.free_book_path(&ab.rel_path, Some(ab.file_type))?;
+                let local = libreri_export::archive::local_path(&ab.rel_path);
+                let rel = self.free_book_path(&local, Some(ab.file_type), None)?;
                 let rel = paths::rel_of(self.layout(), &rel).ok_or(Error::BookNotFound)?;
                 let mut book = Book {
                     id: ab.id.clone(),
@@ -842,11 +888,13 @@ impl Library {
     }
 
     /// A path for a book file under `Books/` that is free on disk and in the
-    /// catalogue: the archive's own path if possible.
+    /// catalogue (a path held by `owner` itself counts as free): the
+    /// archive's own path if possible.
     fn free_book_path(
         &self,
         rel: &str,
         file_type: Option<libreri_core::FileType>,
+        owner: Option<&BookId>,
     ) -> Result<PathBuf> {
         let wanted = self
             .layout()
@@ -874,10 +922,8 @@ impl Library {
         // Also free in the catalogue (a missing book may own the path).
         let mut n = 2;
         while let Some(r) = paths::rel_of(self.layout(), &path) {
-            if self
-                .with_db(|db| db.book_by_path(&r, &self.viewer()))?
-                .is_none()
-            {
+            let holder = self.with_db(|db| db.book_by_path(&r, &self.viewer()))?;
+            if holder.is_none_or(|b| Some(&b.id) == owner) {
                 break;
             }
             let (stem, ext) = match name.rsplit_once('.') {
@@ -1110,10 +1156,14 @@ impl Library {
             } else {
                 dest
             };
-            if let Some(dir) = dest.parent() {
-                fs::create_dir_all(dir)?;
+            let written = dest
+                .parent()
+                .map_or(Ok(()), fs::create_dir_all)
+                .and_then(|()| write_atomic(&dest, &bytes_new));
+            if let Err(e) = written {
+                report.warnings.push(format!("{folder}/{inner}: {e}"));
+                continue;
             }
-            write_atomic(&dest, &bytes_new)?;
             report.note_files_added += 1;
             if dest.extension().is_some_and(|e| e == "md") {
                 let linked = crate::reading::linked_book(&String::from_utf8_lossy(&bytes_new))

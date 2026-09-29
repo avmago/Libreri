@@ -9,6 +9,7 @@
 //! (Homebrew, winget, apt, dnf, pacman, zypper). Libreri's own signed
 //! downloads replace the package managers in Phase 9 (user, 2026-09-28).
 
+pub mod download;
 pub mod fonts;
 pub mod ink;
 pub mod speech;
@@ -361,6 +362,13 @@ pub struct InstallPlan {
 /// How to install `helper` with `installer`; `None` if it has no package.
 pub fn install_plan(helper: Helper, installer: Installer) -> Option<InstallPlan> {
     let package = installer.package(helper)?;
+    // apt: refresh the package lists first, or a computer whose lists are
+    // old (or were never fetched) cannot find the package. One `pkexec`,
+    // so the password is asked for once. A failed refresh (one broken
+    // source) does not stop the install.
+    let apt_script = format!(
+        "apt-get update || true; DEBIAN_FRONTEND=noninteractive apt-get install -y {package}"
+    );
     let (program, args, needs_admin): (String, Vec<&str>, bool) = match installer {
         Installer::Homebrew => ("brew".into(), vec!["install", package], false),
         Installer::Winget => (
@@ -377,11 +385,7 @@ pub fn install_plan(helper: Helper, installer: Installer) -> Option<InstallPlan>
             false,
         ),
         // Linux: pkexec shows the desktop's own password prompt.
-        Installer::Apt => (
-            "pkexec".into(),
-            vec!["apt-get", "install", "-y", package],
-            true,
-        ),
+        Installer::Apt => ("pkexec".into(), vec!["sh", "-c", &apt_script], true),
         Installer::Dnf => ("pkexec".into(), vec!["dnf", "install", "-y", package], true),
         Installer::Pacman => (
             "pkexec".into(),
@@ -401,6 +405,9 @@ pub fn install_plan(helper: Helper, installer: Installer) -> Option<InstallPlan>
     };
     if installer == Installer::Winget {
         display = format!("winget install --id {package}");
+    }
+    if installer == Installer::Apt {
+        display = format!("sudo apt-get update && sudo apt-get install -y {package}");
     }
     Some(InstallPlan {
         helper,
@@ -513,7 +520,15 @@ mod tests {
         assert_eq!(p.display, "brew install djvulibre");
         assert!(!p.needs_admin);
         let p = install_plan(Helper::Tesseract, Installer::Apt).unwrap();
-        assert_eq!(p.display, "sudo apt-get install -y tesseract-ocr");
+        assert_eq!(
+            p.display,
+            "sudo apt-get update && sudo apt-get install -y tesseract-ocr"
+        );
+        // One password prompt: the refresh and the install run together.
+        assert_eq!(p.program, "pkexec");
+        assert_eq!(p.args[..2], ["sh", "-c"]);
+        assert!(p.args[2].starts_with("apt-get update"));
+        assert!(p.args[2].ends_with("apt-get install -y tesseract-ocr"));
         assert!(p.needs_admin);
         let p = install_plan(Helper::Tesseract, Installer::Winget).unwrap();
         assert_eq!(p.display, "winget install --id UB-Mannheim.TesseractOCR");

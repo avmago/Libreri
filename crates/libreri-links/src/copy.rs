@@ -11,6 +11,31 @@ use std::collections::HashMap;
 const MAX_PICTURES: usize = 60;
 const MAX_PICTURE_BYTES: u64 = 25 * 1024 * 1024;
 
+/// The page's writing direction: `ltr`, `rtl` or `auto`.
+fn page_dir(dir: Option<&str>) -> &'static str {
+    match dir.map(|d| d.trim().to_ascii_lowercase()).as_deref() {
+        Some("ltr") => "ltr",
+        Some("rtl") => "rtl",
+        _ => "auto",
+    }
+}
+
+/// The page's language if it looks like a language tag (`en`, `pt-BR`,
+/// `zh-Hant-TW`), else nothing.
+fn page_lang(lang: Option<&str>) -> &str {
+    let lang = lang.unwrap_or("").trim();
+    let ok = !lang.is_empty()
+        && lang.len() <= 35
+        && lang
+            .split('-')
+            .all(|p| !p.is_empty() && p.len() <= 8 && p.chars().all(|c| c.is_ascii_alphanumeric()));
+    if ok {
+        lang
+    } else {
+        ""
+    }
+}
+
 fn escape(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
@@ -99,8 +124,9 @@ pub fn make(
         .as_deref()
         .map(|b| format!("<p class=\"by\">{}</p>", escape(b)))
         .unwrap_or_default();
-    let dir = article.dir.as_deref().unwrap_or("auto");
-    let lang = article.lang.as_deref().unwrap_or("");
+    // Both come from the page: only well-formed values are kept.
+    let dir = page_dir(article.dir.as_deref());
+    let lang = page_lang(article.lang.as_deref());
     Ok(format!(
         r#"<!doctype html>
 <html lang="{lang}" dir="{dir}">
@@ -147,6 +173,18 @@ pub fn web_pictures() -> impl FnMut(&str) -> Option<(Vec<u8>, String)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn keeps_only_well_formed_language_and_direction() {
+        assert_eq!(page_lang(Some("en")), "en");
+        assert_eq!(page_lang(Some("zh-Hant-TW")), "zh-Hant-TW");
+        assert_eq!(page_lang(Some("en\"><script>alert(1)</script>")), "");
+        assert_eq!(page_lang(Some("en us")), "");
+        assert_eq!(page_lang(None), "");
+        assert_eq!(page_dir(Some("RTL")), "rtl");
+        assert_eq!(page_dir(Some("ltr\" onload=\"x")), "auto");
+        assert_eq!(page_dir(None), "auto");
+    }
 
     #[test]
     fn keeps_the_text_and_pictures_without_scripts() {

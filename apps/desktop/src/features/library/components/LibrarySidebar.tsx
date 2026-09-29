@@ -1,25 +1,26 @@
 import { useState } from "react";
+import { LibreriMark } from "@/components/LibreriMark";
 import {
   AlertTriangle,
-  BookOpen,
   Bookmark,
+  BookOpen,
   ChevronRight,
   CircleCheck,
+  FileSearch,
   Folder,
   FolderPlus,
   Headphones,
   Heart,
   Library,
   NotebookText,
-  FileSearch,
   Pencil,
   Plus,
   Shapes,
   Sparkles,
   Tags,
   Trash2,
-  X,
   type LucideIcon,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ContextMenu, menuContent, menuItem } from "@/components/ui/menu";
@@ -427,7 +428,7 @@ export function LibrarySidebar({
       </div>
       <JobsStrip />
       <div className="flex items-center gap-2.5 border-t px-4 py-2.5">
-        <Library className="size-4 shrink-0" aria-hidden />
+        <LibreriMark className="size-4 shrink-0" />
         <span className="flex min-w-0 flex-col">
           <span className="truncate font-medium">{library.name}</span>
           <span

@@ -39,4 +39,12 @@ describe("maths as LaTeX", () => {
     expect(textToLatex("E = mc²")).toBe("E = mc^2");
     expect(textToLatex("α ≤ β₁₂ → ∞")).toBe("\\alpha \\leq \\beta_{12} \\to \\infty");
   });
+
+  it("writes function names as commands", () => {
+    expect(textToLatex("sin x + cos y")).toBe("\\sin x + \\cos y");
+    expect(textToLatex("sinx")).toBe("\\sin x");
+    expect(textToLatex("log(x) ln 2")).toBe("\\log (x) \\ln 2");
+    expect(textToLatex("\\sin x")).toBe("\\sin x");
+    expect(textToLatex("sinxy maxima min")).toBe("sinxy maxima \\min");
+  });
 });

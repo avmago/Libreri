@@ -12,6 +12,7 @@ mod model;
 mod prepare;
 mod tokens;
 
+use libreri_helpers::download;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::io::{Read, Write};
@@ -55,16 +56,21 @@ pub fn download(
     let url = std::env::var("LIBRERI_MATHS_URL").unwrap_or_else(|_| URL.into());
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_connect(Some(Duration::from_secs(20)))
-        .timeout_recv_body(Some(Duration::from_secs(900)))
+        .timeout_recv_body(Some(download::BODY_LIMIT))
         .max_redirects(8)
         .build()
         .into();
-    let mut res = agent.get(&url).call().map_err(|e| match e {
+    let res = agent.get(&url).call().map_err(|e| match e {
         ureq::Error::StatusCode(c) => format!("the download failed (HTTP {c})"),
         ureq::Error::HostNotFound => "the download failed; check the internet connection".into(),
         other => format!("the download failed: {other}"),
     })?;
-    let mut body = res.body_mut().with_config().limit(SIZE + 1024).reader();
+    let body = res
+        .into_body()
+        .into_with_config()
+        .limit(SIZE + 1024)
+        .reader();
+    let mut body = download::StallReader::new(body, download::STALL, Some(cancel));
     let target = weights(dir);
     let folder = target.parent().ok_or("no folder")?;
     std::fs::create_dir_all(folder).map_err(|e| e.to_string())?;
@@ -82,9 +88,13 @@ pub fn download(
             drop(file);
             return Err(fail("cancelled".into()));
         }
-        let n = body
-            .read(&mut buf)
-            .map_err(|e| fail(format!("the download stopped: {e}")))?;
+        let n = body.read(&mut buf).map_err(|e| {
+            if download::is_cancelled(&e) {
+                fail("cancelled".into())
+            } else {
+                fail(format!("the download stopped: {e}"))
+            }
+        })?;
         if n == 0 {
             break;
         }

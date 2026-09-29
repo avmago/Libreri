@@ -1,5 +1,6 @@
 //! Barcode scanning: pictures from the camera or a file, and the phone page.
 
+use super::blocking;
 use crate::error::{AppError, AppErrorKind, AppResult};
 use crate::events::PhoneScan;
 use crate::state::AppState;
@@ -7,7 +8,7 @@ use base64::Engine;
 use serde::Serialize;
 use specta::Type;
 use std::time::Duration;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 
 /// How long the phone page works.
@@ -80,36 +81,45 @@ pub struct PhonePairingDto {
 /// `PhoneScan` events.
 #[tauri::command]
 #[specta::specta]
-pub fn start_phone_scan(app: AppHandle, state: State<'_, AppState>) -> AppResult<PhonePairingDto> {
-    state.library()?;
-    state.stop_phone_scan();
-    let scanner = libreri_scan::PhoneScanner::start(PHONE_LIFETIME, move |event| {
-        let payload = match event {
-            libreri_scan::PhoneEvent::Opened => PhoneScan {
-                kind: "opened".into(),
-                scanned: None,
-            },
-            libreri_scan::PhoneEvent::Scanned(s) => PhoneScan {
-                kind: "scanned".into(),
-                scanned: Some(s.into()),
-            },
-            libreri_scan::PhoneEvent::Page(_) => return,
-        };
-        let _ = payload.emit(&app);
+pub async fn start_phone_scan(app: AppHandle) -> AppResult<PhonePairingDto> {
+    blocking(move || {
+        let state = app.state::<AppState>();
+        let events = app.clone();
+        state.library()?;
+        state.stop_phone_scan();
+        let scanner = libreri_scan::PhoneScanner::start(PHONE_LIFETIME, move |event| {
+            let payload = match event {
+                libreri_scan::PhoneEvent::Opened => PhoneScan {
+                    kind: "opened".into(),
+                    scanned: None,
+                },
+                libreri_scan::PhoneEvent::Scanned(s) => PhoneScan {
+                    kind: "scanned".into(),
+                    scanned: Some(s.into()),
+                },
+                libreri_scan::PhoneEvent::Page(_) => return,
+            };
+            let _ = payload.emit(&events);
+        })
+        .map_err(AppError::invalid)?;
+        let p = scanner.pairing().clone();
+        state.set_phone_scanner(scanner);
+        Ok(PhonePairingDto {
+            url: p.url,
+            qr_svg: p.qr_svg,
+            expires_in: p.expires_in as u32,
+        })
     })
-    .map_err(AppError::invalid)?;
-    let p = scanner.pairing().clone();
-    state.set_phone_scanner(scanner);
-    Ok(PhonePairingDto {
-        url: p.url,
-        qr_svg: p.qr_svg,
-        expires_in: p.expires_in as u32,
-    })
+    .await
 }
 
 /// Stops the phone page.
 #[tauri::command]
 #[specta::specta]
-pub fn stop_phone_scan(state: State<'_, AppState>) {
-    state.stop_phone_scan();
+pub async fn stop_phone_scan(app: AppHandle) {
+    let _ = blocking(move || {
+        app.state::<AppState>().stop_phone_scan();
+        Ok(())
+    })
+    .await;
 }

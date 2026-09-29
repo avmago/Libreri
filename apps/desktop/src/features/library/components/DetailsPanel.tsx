@@ -34,7 +34,7 @@ import {
   STATUS_LABEL,
   type BookView,
 } from "../model";
-import { useLibraryView } from "../store";
+import { useLibraryView, useSelectedIds } from "../store";
 import { BookCover } from "./BookCover";
 import { MetadataForm } from "./MetadataForm";
 
@@ -373,8 +373,9 @@ function MissingFile({ book }: { book: BookView }) {
 
 /** The right-hand panel: details of the selected book, or of the selection. */
 export function DetailsPanel({ books }: { books: BookView[] }) {
-  const { selection, setDetailsOpen } = useLibraryView();
-  const selected = books.filter((b) => selection.includes(b.id));
+  const setDetailsOpen = useLibraryView((s) => s.setDetailsOpen);
+  const ids = useSelectedIds();
+  const selected = books.filter((b) => ids.has(b.id));
 
   return (
     <aside aria-label="Details" className="flex w-80 shrink-0 flex-col border-l bg-sidebar">

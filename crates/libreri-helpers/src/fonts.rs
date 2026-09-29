@@ -100,11 +100,11 @@ pub fn download(
     });
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_connect(Some(Duration::from_secs(20)))
-        .timeout_recv_body(Some(Duration::from_secs(300)))
+        .timeout_recv_body(Some(crate::download::BODY_LIMIT))
         .max_redirects(8)
         .build()
         .into();
-    let mut res = agent.get(&url).call().map_err(|e| match e {
+    let res = agent.get(&url).call().map_err(|e| match e {
         ureq::Error::StatusCode(c) => format!("the download failed (HTTP {c})"),
         ureq::Error::HostNotFound => "the download failed; check the internet connection".into(),
         other => format!("the download failed: {other}"),
@@ -114,11 +114,12 @@ pub fn download(
         .get("content-length")
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.parse().ok());
-    let reader = res
-        .body_mut()
-        .with_config()
+    let body = res
+        .into_body()
+        .into_with_config()
         .limit(200 * 1024 * 1024)
         .reader();
+    let reader = crate::download::StallReader::new(body, crate::download::STALL, Some(cancel));
     let counting = Counting {
         inner: reader,
         read: 0,

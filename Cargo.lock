@@ -3440,6 +3440,7 @@ dependencies = [
  "candle-core",
  "candle-nn",
  "image",
+ "libreri-helpers",
  "regex",
  "serde",
  "serde_json",
@@ -3518,6 +3519,7 @@ name = "libreri-speech"
 version = "0.1.0"
 dependencies = [
  "flacenc",
+ "libreri-helpers",
  "serde",
  "specta",
  "symphonia",
@@ -3530,6 +3532,7 @@ dependencies = [
 name = "libreri-spell"
 version = "0.1.0"
 dependencies = [
+ "libreri-helpers",
  "serde",
  "specta",
  "spellbook",

@@ -56,9 +56,8 @@ impl Library {
         if !path.exists() {
             return Ok(());
         }
-        trash::delete(&path)
-            .or_else(|_| fs::remove_file(&path))
-            .map_err(|e| Error::Trash(e.to_string()))
+        // No fallback to a permanent delete: if there is no trash, say so.
+        trash::delete(&path).map_err(|e| Error::Trash(e.to_string()))
     }
 
     /// Whether `rel` is in the signed-in profile's own notes folder (for

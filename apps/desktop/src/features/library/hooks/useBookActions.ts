@@ -69,6 +69,7 @@ export function useBookActions() {
       try {
         const n = await trash.mutateAsync(books.map((b) => b.id));
         setSelection([]);
+        useTabs.getState().closeGone(books.map((b) => b.id));
         toast.success(n === 1 ? "Moved 1 book to the Trash" : `Moved ${n} books to the Trash`);
       } catch (e) {
         toast.error("Could not move to the Trash", { description: errorText(e) });

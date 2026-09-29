@@ -76,7 +76,11 @@ pub async fn download_dictionary(
     let dir = state.spell.dir.clone();
     let cancel: Arc<AtomicBool> = Arc::default();
     {
-        let mut running = state.spell.downloads.lock().expect("downloads lock");
+        let mut running = state
+            .spell
+            .downloads
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         if running.contains_key(&code) {
             return Err(AppError::invalid("that dictionary is already downloading"));
         }
@@ -113,7 +117,7 @@ pub async fn download_dictionary(
         .spell
         .downloads
         .lock()
-        .expect("downloads lock")
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
         .remove(&code);
     result?;
     Ok(libreri_spell::dictionaries(&state.spell.dir))
@@ -126,7 +130,7 @@ pub fn cancel_dictionary_download(state: State<'_, AppState>, code: String) {
         .spell
         .downloads
         .lock()
-        .expect("downloads lock")
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
         .get(&code)
     {
         c.store(true, Ordering::SeqCst);
@@ -135,13 +139,17 @@ pub fn cancel_dictionary_download(state: State<'_, AppState>, code: String) {
 
 #[tauri::command]
 #[specta::specta]
-pub fn remove_dictionary(
+pub async fn remove_dictionary(
     state: State<'_, AppState>,
     code: String,
 ) -> AppResult<Vec<DictionaryInfo>> {
     state.spell.forget(&code);
-    libreri_spell::catalog::remove(&state.spell.dir, &code).map_err(AppError::invalid)?;
-    Ok(libreri_spell::dictionaries(&state.spell.dir))
+    let dir = state.spell.dir.clone();
+    blocking(move || {
+        libreri_spell::catalog::remove(&dir, &code).map_err(AppError::invalid)?;
+        Ok(libreri_spell::dictionaries(&dir))
+    })
+    .await
 }
 
 /// The words of `text` that look misspelt, in the chosen languages. The

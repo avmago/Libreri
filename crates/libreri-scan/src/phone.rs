@@ -12,14 +12,25 @@ use crate::Scanned;
 use rand_core::{OsRng, RngCore};
 use std::io::Read;
 use std::net::IpAddr;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use tiny_http::{Header, Method, Response, Server};
 
 /// Largest photo accepted (the page scales photos down before sending).
 const MAX_PHOTO: usize = 10 * 1024 * 1024;
+
+/// Requests answered at the same time. Each is answered on its own thread,
+/// so a phone that stops sending half-way through a photo holds up only
+/// its own request; more than this at once are turned away.
+const MAX_HANDLERS: usize = 4;
+
+/// How long a request's body may take to arrive.
+const BODY_TIME: Duration = Duration::from_secs(60);
+
+/// How long dropping a scanner waits for the server to stop.
+const STOP_WAIT: Duration = Duration::from_secs(1);
 
 /// What the phone page did.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -119,14 +130,43 @@ impl PhoneScanner {
         let stop = Arc::new(AtomicBool::new(false));
         let stopping = Arc::clone(&stop);
         let deadline = Instant::now() + lifetime;
+        let on_event: Arc<Mutex<dyn Fn(PhoneEvent) + Send>> = Arc::new(Mutex::new(on_event));
+        let token: Arc<str> = token.into();
+        let busy = Arc::new(AtomicUsize::new(0));
         let thread = std::thread::Builder::new()
             .name("libreri-phone-scan".into())
             .spawn(move || {
                 while !stopping.load(Ordering::SeqCst) && Instant::now() < deadline {
-                    match server.recv_timeout(Duration::from_millis(250)) {
-                        Ok(Some(req)) => handle(req, &token, mode, &on_event),
-                        Ok(None) => {}
+                    let req = match server.recv_timeout(Duration::from_millis(250)) {
+                        Ok(Some(req)) => req,
+                        Ok(None) => continue,
                         Err(_) => break,
+                    };
+                    if busy.fetch_add(1, Ordering::SeqCst) >= MAX_HANDLERS {
+                        busy.fetch_sub(1, Ordering::SeqCst);
+                        reply(req, 503, "text/plain", "Busy".into());
+                        continue;
+                    }
+                    let (token, on_event, done, stopping) = (
+                        Arc::clone(&token),
+                        Arc::clone(&on_event),
+                        Arc::clone(&busy),
+                        Arc::clone(&stopping),
+                    );
+                    let spawned = std::thread::Builder::new()
+                        .name("libreri-phone-request".into())
+                        .spawn(move || {
+                            let emit = |e: PhoneEvent| {
+                                // Nothing is reported once scanning has ended.
+                                if !stopping.load(Ordering::SeqCst) {
+                                    (on_event.lock().unwrap_or_else(|p| p.into_inner()))(e)
+                                }
+                            };
+                            handle(req, &token, mode, &emit);
+                            done.fetch_sub(1, Ordering::SeqCst);
+                        });
+                    if spawned.is_err() {
+                        busy.fetch_sub(1, Ordering::SeqCst);
                     }
                 }
             })
@@ -149,11 +189,37 @@ impl PhoneScanner {
 }
 
 impl Drop for PhoneScanner {
+    /// Stops the page. Waits a moment for the server to close, but never
+    /// longer: requests still being answered finish on their own.
     fn drop(&mut self) {
         self.stop.store(true, Ordering::SeqCst);
         if let Some(t) = self.thread.take() {
-            let _ = t.join();
+            let until = Instant::now() + STOP_WAIT;
+            while !t.is_finished() && Instant::now() < until {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            if t.is_finished() {
+                let _ = t.join();
+            }
         }
+    }
+}
+
+/// Reads a body, giving up when it takes longer than `limit` in all.
+struct Deadline<R> {
+    inner: R,
+    until: Instant,
+}
+
+impl<R: Read> Read for Deadline<R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        if Instant::now() > self.until {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "the photo took too long to arrive",
+            ));
+        }
+        self.inner.read(buf)
     }
 }
 
@@ -186,10 +252,13 @@ fn read_body(req: &mut tiny_http::Request, max: usize) -> Option<Vec<u8>> {
         return None;
     }
     let mut body = Vec::new();
-    req.as_reader()
-        .take(max as u64 + 1)
-        .read_to_end(&mut body)
-        .ok()?;
+    Deadline {
+        inner: req.as_reader(),
+        until: Instant::now() + BODY_TIME,
+    }
+    .take(max as u64 + 1)
+    .read_to_end(&mut body)
+    .ok()?;
     (body.len() <= max).then_some(body)
 }
 
@@ -529,5 +598,34 @@ mod tests {
         let events = seen.lock().unwrap().clone();
         assert_eq!(events.len(), 2);
         assert_eq!(events[1], PhoneEvent::Page(png));
+    }
+
+    #[test]
+    fn a_stalled_upload_holds_up_nothing() {
+        let scanner = PhoneScanner::start_on(
+            "127.0.0.1".parse().unwrap(),
+            PhoneMode::Barcode,
+            Duration::from_secs(30),
+            |_| {},
+        )
+        .unwrap();
+        let url = scanner.pairing().url.clone();
+        let rest = url.strip_prefix("http://").unwrap();
+        let (host, path) = rest.split_once('/').unwrap();
+        // A photo that promises 1000 bytes and sends 10, then stops.
+        let mut stalled = TcpStream::connect(host).unwrap();
+        write!(
+            stalled,
+            "POST /{path}/photo HTTP/1.1\r\nHost: {host}\r\nContent-Length: 1000\r\n\r\n0123456789"
+        )
+        .unwrap();
+        std::thread::sleep(Duration::from_millis(300));
+        // Others are still answered.
+        assert_eq!(request(&url, "GET", b"").0, 200);
+        // And stopping does not wait for the stalled upload.
+        let started = Instant::now();
+        drop(scanner);
+        assert!(started.elapsed() < Duration::from_secs(3));
+        drop(stalled);
     }
 }
