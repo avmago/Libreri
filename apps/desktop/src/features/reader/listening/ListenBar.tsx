@@ -1,0 +1,577 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import {
+  ChevronDown,
+  ExternalLink,
+  Loader2,
+  Minus,
+  Pause,
+  Play,
+  Plus,
+  SkipBack,
+  SkipForward,
+  Timer,
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, menuContent, menuItem } from "@/components/ui/menu";
+import { useHelperDialog } from "@/features/helpers";
+import { useProfilePrefs } from "@/features/profiles";
+import { bookUrl, commands, unwrap, type BookDto } from "@/lib/ipc";
+import { useTabs } from "@/lib/tabs";
+import { cn } from "@/lib/utils";
+import { savePosition } from "../api";
+import { getEngine } from "../speech/engine";
+import { SPEEDS } from "../speech/speeds";
+import type { ReadAloud } from "../speech/useReadAloud";
+import { useListening } from "./store";
+import { chapterAt, clock, progressAt, timeAt } from "./sync";
+
+export type ListenMode = "read" | "audio";
+
+const SLEEP = [5, 10, 15, 30, 45, 60];
+const isLinux = /Linux/.test(navigator.userAgent) && !/Android/.test(navigator.userAgent);
+
+/** One step faster or slower through the offered speeds. */
+function step(rate: number, dir: 1 | -1): number {
+  const i = SPEEDS.findIndex((s) => s >= rate - 0.001);
+  const at = i < 0 ? SPEEDS.length - 1 : i;
+  return SPEEDS[Math.min(SPEEDS.length - 1, Math.max(0, at + dir))]!;
+}
+
+/** Stops after some minutes (or at the end of the audiobook's chapter). */
+function useSleep(stop: () => void) {
+  const [until, setUntil] = useState<number | "chapter" | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const stopRef = useRef(stop);
+  useEffect(() => {
+    stopRef.current = stop;
+  });
+  useEffect(() => {
+    if (typeof until !== "number") return;
+    const id = setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      if (t >= until) {
+        setUntil(null);
+        stopRef.current();
+        toast("Sleep timer: stopped");
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [until]);
+  const left = typeof until === "number" ? Math.max(0, (until - now) / 1000) : null;
+  return { until, setUntil, left };
+}
+
+/**
+ * The floating player at the bottom of the page (board 4, "Read aloud ·
+ * Audiobook"): reads the book aloud with a system voice, or plays its
+ * linked audiobook from the place being read. Either way the book follows
+ * along and turns pages.
+ */
+export function ListenBar({
+  mode,
+  onMode,
+  onClose,
+  readAloud: r,
+  lang,
+  bookId,
+  audiobooks,
+  progress,
+}: {
+  mode: ListenMode;
+  onMode: (m: ListenMode) => void;
+  onClose: () => void;
+  readAloud: ReadAloud;
+  lang?: string;
+  bookId: string;
+  /** Audiobooks linked to this book (the first is played). */
+  audiobooks: BookDto[];
+  /** Where the reader is (0–1), to start the audiobook there. */
+  progress: number;
+}) {
+  const audio = audiobooks[0] ?? null;
+  return (
+    <div
+      role="toolbar"
+      aria-label={mode === "read" ? "Read aloud" : "Audiobook"}
+      className="absolute bottom-5 left-1/2 z-30 flex w-max max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-1.5 rounded-2xl border bg-popover/95 p-1.5 text-[12.5px] text-popover-foreground shadow-xl backdrop-blur"
+    >
+      <div
+        role="tablist"
+        aria-label="Listen with"
+        className="flex shrink-0 flex-col rounded-xl bg-muted p-0.5 sm:flex-row"
+      >
+        {(
+          [
+            ["read", "Read aloud"],
+            ["audio", "Audiobook"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={mode === id}
+            disabled={id === "audio" && !audio}
+            title={id === "audio" && !audio ? "Link an audiobook in Edit details" : undefined}
+            onClick={() => onMode(id)}
+            className={cn(
+              "rounded-[10px] px-2.5 py-1 leading-tight font-medium disabled:opacity-40",
+              mode === id
+                ? "bg-background shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {mode === "read" ? (
+        <ReadPart r={r} lang={lang} onClose={onClose} />
+      ) : audio ? (
+        <AudioPart
+          key={audio.id}
+          audio={audio}
+          bookId={bookId}
+          progress={progress}
+          onClose={onClose}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function SleepMenu({ sleep, chapters }: { sleep: ReturnType<typeof useSleep>; chapters: boolean }) {
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <Button
+          variant={sleep.until ? "outline" : "ghost"}
+          size={sleep.until ? "sm" : "icon"}
+          aria-label="Sleep timer"
+          title="Sleep timer"
+        >
+          <Timer />
+          {sleep.left !== null ? clock(sleep.left) : sleep.until === "chapter" ? "Chapter" : null}
+        </Button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content className={menuContent} sideOffset={6} side="top">
+          {SLEEP.map((m) => (
+            <DropdownMenu.Item
+              key={m}
+              className={menuItem}
+              onSelect={() => sleep.setUntil(Date.now() + m * 60_000)}
+            >
+              Stop in {m} minutes
+            </DropdownMenu.Item>
+          ))}
+          {chapters && (
+            <DropdownMenu.Item className={menuItem} onSelect={() => sleep.setUntil("chapter")}>
+              Stop at the end of this chapter
+            </DropdownMenu.Item>
+          )}
+          {sleep.until && (
+            <DropdownMenu.Item className={menuItem} onSelect={() => sleep.setUntil(null)}>
+              Turn off
+            </DropdownMenu.Item>
+          )}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
+}
+
+function Speed({ rate, onChange }: { rate: number; onChange: (r: number) => void }) {
+  return (
+    <div className="flex shrink-0 items-center rounded-lg border">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-7"
+        aria-label="Slower"
+        disabled={rate <= SPEEDS[0]!}
+        onClick={() => onChange(step(rate, -1))}
+      >
+        <Minus />
+      </Button>
+      <span className="w-12 text-center font-mono text-[12.5px] tabular-nums" aria-live="polite">
+        {rate}×
+      </span>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-7"
+        aria-label="Faster"
+        disabled={rate >= SPEEDS[SPEEDS.length - 1]!}
+        onClick={() => onChange(step(rate, 1))}
+      >
+        <Plus />
+      </Button>
+    </div>
+  );
+}
+
+function FollowToggle() {
+  const follow = useProfilePrefs((s) => s.prefs.listening.follow);
+  const update = useProfilePrefs((s) => s.update);
+  return (
+    <button
+      type="button"
+      className="hover:text-foreground hover:underline"
+      title="Turn pages to follow along (click to change)"
+      onClick={() => update({ listening: { follow: !follow } })}
+    >
+      {follow ? "follows along and turns pages" : "not following the page"}
+    </button>
+  );
+}
+
+function PlayControls({
+  playing,
+  busy,
+  onToggle,
+  onBack,
+  onForward,
+  back,
+  forward,
+}: {
+  playing: boolean;
+  busy?: boolean;
+  onToggle: () => void;
+  onBack: () => void;
+  onForward: () => void;
+  back: string;
+  forward: string;
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-0.5">
+      <Button variant="ghost" size="icon" aria-label={back} title={back} onClick={onBack}>
+        <SkipBack />
+      </Button>
+      <Button
+        size="icon"
+        className="size-9 rounded-full"
+        aria-label={playing ? "Pause" : "Play"}
+        onClick={onToggle}
+        disabled={busy}
+      >
+        {busy ? <Loader2 className="animate-spin" /> : playing ? <Pause /> : <Play />}
+      </Button>
+      <Button variant="ghost" size="icon" aria-label={forward} title={forward} onClick={onForward}>
+        <SkipForward />
+      </Button>
+    </div>
+  );
+}
+
+/** Reading aloud with a system voice. */
+function ReadPart({ r, lang, onClose }: { r: ReadAloud; lang?: string; onClose: () => void }) {
+  const listening = useProfilePrefs((s) => s.prefs.listening);
+  const update = useProfilePrefs((s) => s.update);
+  const openHelper = useHelperDialog((s) => s.open);
+  const sleep = useSleep(() => r.pause());
+
+  // The book's language first, then the rest.
+  const voices = useMemo(() => {
+    const list = [...(r.engine?.voices ?? [])];
+    const want = (lang || navigator.language || "en").slice(0, 2).toLowerCase();
+    return list.sort(
+      (a, b) =>
+        Number(!a.lang.toLowerCase().startsWith(want)) -
+          Number(!b.lang.toLowerCase().startsWith(want)) || a.name.localeCompare(b.name),
+    );
+  }, [r.engine, lang]);
+  const voice = voices.find((v) => v.id === listening.voice);
+
+  if (r.status === "noVoices")
+    return (
+      <>
+        <span className="max-w-80 px-2">
+          {isLinux
+            ? "This system has no voices to read aloud with. Libreri can use eSpeak NG instead."
+            : "No voices were found. Add a voice in your system's speech settings, then try again."}
+        </span>
+        {isLinux && (
+          <Button
+            size="sm"
+            onClick={() =>
+              openHelper("espeak", () => {
+                void getEngine(true).then(() => void r.start());
+              })
+            }
+          >
+            Install eSpeak NG…
+          </Button>
+        )}
+        <Button variant="ghost" size="icon" aria-label="Close" onClick={onClose}>
+          <X />
+        </Button>
+      </>
+    );
+
+  const playing = r.status === "playing";
+  return (
+    <>
+      <PlayControls
+        playing={playing}
+        busy={r.status === "starting"}
+        onToggle={() => (playing ? r.pause() : r.status === "off" ? void r.start() : r.resume())}
+        onBack={() => r.skip(-1)}
+        onForward={() => r.skip(1)}
+        back="Previous sentence"
+        forward="Next sentence"
+      />
+      <div className="flex min-w-0 flex-col px-1 leading-tight">
+        <label className="relative flex items-center gap-1 font-medium">
+          <span className="truncate">
+            Voice: {voice ? voice.name : "Default"}
+            {voice && <span className="font-normal text-muted-foreground"> ({voice.lang})</span>}
+          </span>
+          <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          <select
+            aria-label="Voice"
+            className="absolute inset-0 cursor-pointer opacity-0"
+            value={listening.voice ?? ""}
+            onChange={(e) => {
+              update({ listening: { voice: e.target.value || null } });
+              setTimeout(r.restart, 0);
+            }}
+          >
+            <option value="">Default voice</option>
+            {voices.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name} ({v.lang})
+              </option>
+            ))}
+          </select>
+        </label>
+        <span className="truncate text-[11.5px] text-muted-foreground">
+          {r.number > 0 ? `Sentence ${r.number} · ` : ""}
+          <FollowToggle />
+        </span>
+      </div>
+      <Speed
+        rate={listening.speechRate}
+        onChange={(v) => {
+          update({ listening: { speechRate: v } });
+          setTimeout(r.restart, 0);
+        }}
+      />
+      <SleepMenu sleep={sleep} chapters={false} />
+      <Button variant="ghost" size="icon" aria-label="Stop reading aloud" onClick={onClose}>
+        <X />
+      </Button>
+    </>
+  );
+}
+
+/**
+ * The linked audiobook, from the place being read. The book follows the
+ * audio through the sync points, and the audiobook's own place is saved
+ * as it plays (so its player carries on from here).
+ */
+function AudioPart({
+  audio: book,
+  bookId,
+  progress,
+  onClose,
+}: {
+  audio: BookDto;
+  bookId: string;
+  progress: number;
+  onClose: () => void;
+}) {
+  const listening = useProfilePrefs((s) => s.prefs.listening);
+  const update = useProfilePrefs((s) => s.update);
+  const el = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [time, setTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const { data: link } = useQuery({
+    queryKey: ["lib", "reader", book.id, "audio-link"],
+    queryFn: () => unwrap(commands.getAudioLink(book.id)),
+  });
+  const { data: info } = useQuery({
+    queryKey: ["lib", "reader", book.id, "audio-info"],
+    queryFn: () => unwrap(commands.audioInfo(book.id)),
+    staleTime: Infinity,
+  });
+  const points = useMemo(
+    () => (link?.points ?? []).map((p) => ({ t: p.t ?? 0, progress: p.progress ?? 0 })),
+    [link],
+  );
+  const chapters = useMemo(
+    () => (info?.chapters ?? []).map((c) => ({ start: c.start ?? 0, title: c.title })),
+    [info],
+  );
+  const total = duration || info?.duration || 0;
+  const chapter = chapterAt(chapters, time);
+  const sleepChapter = useRef<number | null>(null);
+  const sleep = useSleep(() => el.current?.pause());
+
+  // Start where the reader is, once the audio and its sync points are known.
+  const startAt = useRef(progress);
+  const started = useRef(false);
+  const begin = useCallback(() => {
+    const a = el.current;
+    if (!a || started.current || !link || a.readyState < 1) return;
+    const d = Number.isFinite(a.duration) ? a.duration : info?.duration || 0;
+    started.current = true;
+    a.currentTime = d ? timeAt(points, startAt.current, d) : 0;
+    a.playbackRate = useProfilePrefs.getState().prefs.listening.audioRate;
+    void a
+      .play()
+      .catch((e: Error) => toast.error("Could not play the audiobook", { description: e.message }));
+  }, [link, points, info]);
+  useEffect(() => begin(), [begin]);
+
+  useEffect(() => {
+    if (el.current) el.current.playbackRate = listening.audioRate;
+  }, [listening.audioRate]);
+
+  // The book follows the audio (every two seconds is plenty).
+  const lastFollow = useRef(0);
+  const onTime = () => {
+    const a = el.current;
+    if (!a) return;
+    setTime(a.currentTime);
+    if (sleep.until === "chapter") {
+      if (sleepChapter.current === null) sleepChapter.current = chapter;
+      else if (chapter !== sleepChapter.current) {
+        a.pause();
+        sleep.setUntil(null);
+        sleepChapter.current = null;
+        toast("Sleep timer: stopped at the end of the chapter");
+      }
+    }
+    const now = Date.now();
+    if (!total || now - lastFollow.current < 2000) return;
+    lastFollow.current = now;
+    if (useProfilePrefs.getState().prefs.listening.follow)
+      useListening.getState().followTo(bookId, progressAt(points, a.currentTime, total));
+  };
+
+  // Keep the audiobook's own place.
+  const save = useCallback(
+    (a: HTMLAudioElement | null) => {
+      if (!a || !started.current) return;
+      const t = a.currentTime;
+      void savePosition(
+        book.id,
+        JSON.stringify({ type: "audio", t: Math.round(t * 10) / 10 }),
+        a.duration ? t / a.duration : 0,
+      ).catch(() => {});
+    },
+    [book.id],
+  );
+  useEffect(() => {
+    if (!playing) return;
+    const id = setInterval(() => save(el.current), 5000);
+    return () => clearInterval(id);
+  }, [playing, save]);
+  useEffect(() => {
+    const a = el.current;
+    return () => save(a);
+  }, [save]);
+
+  const seek = (t: number) => {
+    const a = el.current;
+    if (!a) return;
+    a.currentTime = Math.max(0, Math.min(t, (a.duration || total) - 0.2));
+    setTime(a.currentTime);
+    lastFollow.current = 0;
+  };
+  const goChapter = (dir: 1 | -1) => {
+    const t = el.current?.currentTime ?? 0;
+    if (!chapters.length) return seek(t + dir * 30);
+    const target =
+      dir > 0
+        ? chapters[chapter + 1]
+        : t - (chapters[chapter]?.start ?? 0) > 3
+          ? chapters[chapter]
+          : chapters[chapter - 1];
+    if (target) seek(target.start);
+  };
+  const openPlayer = () => {
+    const t = el.current?.currentTime ?? 0;
+    el.current?.pause();
+    useListening.getState().requestPlay(book.id, t);
+    useTabs.getState().openBeside({
+      bookId: book.id,
+      title: book.metadata.title ?? "Audiobook",
+      fileType: book.fileType,
+    });
+    onClose();
+  };
+
+  return (
+    <>
+      <audio
+        ref={el}
+        src={bookUrl(book.relPath)}
+        preload="metadata"
+        onLoadedMetadata={(e) => {
+          const d = e.currentTarget.duration;
+          setDuration(Number.isFinite(d) ? d : 0);
+          begin();
+        }}
+        onTimeUpdate={onTime}
+        onPlay={() => setPlaying(true)}
+        onPause={() => {
+          setPlaying(false);
+          save(el.current);
+        }}
+        onError={() => toast.error("The audiobook could not be played")}
+      />
+      <PlayControls
+        playing={playing}
+        busy={!link}
+        onToggle={() => {
+          const a = el.current;
+          if (!a) return;
+          if (a.paused) void a.play().catch(() => {});
+          else a.pause();
+        }}
+        onBack={() => goChapter(-1)}
+        onForward={() => goChapter(1)}
+        back={chapters.length ? "Previous chapter" : "Back 30 seconds"}
+        forward={chapters.length ? "Next chapter" : "Forward 30 seconds"}
+      />
+      <div className="flex min-w-0 max-w-64 flex-col px-1 leading-tight">
+        <span className="truncate font-medium" title={book.metadata.title ?? ""}>
+          {chapters[chapter]?.title || book.metadata.title}
+        </span>
+        <span className="truncate text-[11.5px] text-muted-foreground tabular-nums">
+          {clock(time)}
+          {total ? ` / ${clock(total)}` : ""}
+          {" · "}
+          {points.length ? (
+            <FollowToggle />
+          ) : (
+            <span title="Add sync points in the audiobook player for an exact match">
+              follows along roughly
+            </span>
+          )}
+        </span>
+      </div>
+      <Speed rate={listening.audioRate} onChange={(v) => update({ listening: { audioRate: v } })} />
+      <SleepMenu sleep={sleep} chapters={chapters.length > 0} />
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Open the audiobook player"
+        title="Open the full player (chapters, bookmarks, sync points)"
+        onClick={openPlayer}
+      >
+        <ExternalLink />
+      </Button>
+      <Button variant="ghost" size="icon" aria-label="Stop the audiobook" onClick={onClose}>
+        <X />
+      </Button>
+    </>
+  );
+}

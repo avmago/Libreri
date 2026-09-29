@@ -90,8 +90,7 @@ import { CaptureDialog, CaptureViewer } from "../capture";
 import { mathsFromPicture, useMathsSettings } from "../maths/api";
 import { AddLinkDialog, CopyViewer, LinksPanel, linkOf, type LinkInfo } from "../weblinks";
 import { useListening } from "../listening/store";
-import { timeAt } from "../listening/sync";
-import { ReadAloudBar } from "../speech/ReadAloudBar";
+import { ListenBar, type ListenMode } from "../listening/ListenBar";
 import { pdfAnnots } from "@/readers";
 import { useQuery } from "@tanstack/react-query";
 import { unwrap } from "@/lib/ipc";
@@ -513,8 +512,27 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   const r = () => rendererRef.current;
   const isPdf = isPaged(fileType);
   const readAloud = useReadAloud(rendererRef);
-  const toggleReadAloud = () =>
-    readAloud.status === "off" ? void readAloud.start() : readAloud.stop();
+  // The floating player: read aloud, or the linked audiobook.
+  const [listen, setListen] = useState<ListenMode | null>(null);
+  const toggleReadAloud = () => {
+    if (listen === "read" && readAloud.status !== "off") {
+      readAloud.stop();
+      setListen(null);
+    } else {
+      setListen("read");
+      void readAloud.start();
+    }
+  };
+  const listenWith = (m: ListenMode) => {
+    if (m === "audio") readAloud.stop();
+    else void readAloud.start();
+    setListen(m);
+  };
+  const stopListening = () => {
+    readAloud.stop();
+    setListen(null);
+  };
+  const showListenBar = listen === "audio" || (listen === "read" && readAloud.status !== "off");
 
   // An audiobook of this book is playing: follow it.
   const followTo = useListening((s) => s.follow[bookId]);
@@ -528,22 +546,10 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
     queryFn: () => unwrap(commands.audiobooksFor(bookId)),
     enabled: status === "ready",
   });
-  /** Opens the linked audiobook at the place being read. */
-  const listenHere = async () => {
-    const audio = audiobooks[0];
-    if (!audio) return;
-    const [link, info] = await Promise.all([
-      unwrap(commands.getAudioLink(audio.id)),
-      unwrap(commands.audioInfo(audio.id)),
-    ]).catch(() => [null, null] as const);
-    const pts = (link?.points ?? []).map((p) => ({ t: p.t ?? 0, progress: p.progress ?? 0 }));
-    const t = info?.duration ? timeAt(pts, location?.progress ?? 0, info.duration) : 0;
-    useListening.getState().requestPlay(audio.id, t);
-    useTabs.getState().openBeside({
-      bookId: audio.id,
-      title: audio.metadata.title ?? "Audiobook",
-      fileType: audio.fileType,
-    });
+  /** Plays the linked audiobook from the place being read, in the
+   * floating player (the full player opens from there). */
+  const listenHere = () => {
+    if (audiobooks.length) listenWith("audio");
   };
 
   // Markup mode (fixed pages): drawings kept like highlights.
@@ -1283,7 +1289,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
               variant="ghost"
               size="icon"
               aria-label="Read aloud"
-              aria-pressed={readAloud.status !== "off"}
+              aria-pressed={listen === "read" && readAloud.status !== "off"}
               title={`Read aloud from here (${keys("reader.readAloud")})`}
               onClick={toggleReadAloud}
             >
@@ -1296,7 +1302,8 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
             size="icon"
             aria-label="Listen from here"
             title={`Listen from here: ${audiobooks[0]!.metadata.title}`}
-            onClick={() => void listenHere()}
+            aria-pressed={listen === "audio"}
+            onClick={() => (listen === "audio" ? stopListening() : listenHere())}
           >
             <Headphones />
           </Button>
@@ -1420,9 +1427,6 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
         onDone={saveVoice}
         className="h-10 shrink-0 border-b bg-muted/40 px-3"
       />
-      {!bare && !comparing && !editing && (
-        <ReadAloudBar r={readAloud} lang={book?.metadata.language ?? undefined} />
-      )}
       {comparing && (
         <CompareView
           key={JSON.stringify(comparing)}
@@ -1594,6 +1598,18 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
                 />
               )}
             </div>
+          )}
+          {showListenBar && !comparing && !editing && status === "ready" && (
+            <ListenBar
+              mode={listen ?? "read"}
+              onMode={listenWith}
+              onClose={stopListening}
+              readAloud={readAloud}
+              lang={book?.metadata.language ?? undefined}
+              bookId={bookId}
+              audiobooks={audiobooks}
+              progress={location?.progress ?? 0}
+            />
           )}
           {!comparing && !editing && status === "ready" && (
             <button

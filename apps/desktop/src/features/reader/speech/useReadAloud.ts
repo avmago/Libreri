@@ -13,6 +13,8 @@ export type ReadAloudStatus = "off" | "starting" | "playing" | "paused" | "noVoi
 export function useReadAloud(renderer: React.RefObject<Renderer | null>) {
   const [status, setStatus] = useState<ReadAloudStatus>("off");
   const [sentence, setSentence] = useState<string>("");
+  /** Which sentence is being read, counting from 1 where reading began. */
+  const [number, setNumber] = useState(0);
   const [engine, setEngine] = useState<Engine | null>(null);
   const source = useRef<SpeechSource | null>(null);
   const pieces = useRef<SpeechPiece[]>([]);
@@ -43,6 +45,7 @@ export function useReadAloud(renderer: React.RefObject<Renderer | null>) {
       const { listening } = useProfilePrefs.getState().prefs;
       src.show(p, listening.follow);
       setSentence(p.text);
+      setNumber(index.current + 1);
       const finished = await e.speak(p.text, {
         voice: listening.voice,
         rate: listening.speechRate,
@@ -130,7 +133,7 @@ export function useReadAloud(renderer: React.RefObject<Renderer | null>) {
     [],
   );
 
-  return { status, sentence, engine, start, pause, resume, skip, stop, restart };
+  return { status, sentence, number, engine, start, pause, resume, skip, stop, restart };
 }
 
 export type ReadAloud = ReturnType<typeof useReadAloud>;
