@@ -24,8 +24,8 @@ export function WelcomeScreen() {
   return (
     <main className="flex h-full items-center justify-center gap-14 overflow-auto bg-sidebar px-6 py-10">
       <section className="flex w-[440px] max-w-full flex-col gap-6">
-        <div className="flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-          <LibreriMark className="size-6" />
+        <div className="flex size-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+          <LibreriMark className="size-10" />
         </div>
         <div className="flex flex-col gap-2">
           <h1 className="text-[28px] font-semibold tracking-tight">Welcome to Libreri</h1>
@@ -75,7 +75,7 @@ export function WelcomeScreen() {
                     onClick={() => openPath(r.path)}
                     className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:opacity-50"
                   >
-                    <LibreriMark className="size-4 shrink-0" />
+                    <LibreriMark className="size-5 shrink-0" />
                     <span className="flex min-w-0 flex-col">
                       <span className="font-medium">{r.name}</span>
                       <span className="truncate font-mono text-[11px] text-muted-foreground">

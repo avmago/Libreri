@@ -52,7 +52,7 @@ export function ProfilePicker({
         <>
           <div className="flex flex-col items-center gap-2 text-center">
             <span className="flex items-center gap-2 text-[13px] text-muted-foreground">
-              <LibreriMark className="size-4" /> {library.name}
+              <LibreriMark className="size-5" /> {library.name}
             </span>
             <h1 className="text-[28px] font-semibold tracking-tight">Who's reading?</h1>
           </div>

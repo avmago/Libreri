@@ -35,7 +35,7 @@ export function TabStrip({ onMoveToWindow }: { onMoveToWindow: (bookId: string) 
         onClick={() => activate(null)}
         className={cn(tabClass(active === null), "shrink-0")}
       >
-        <LibreriMark className="size-4 shrink-0" /> Library
+        <LibreriMark className="-my-1 size-6 shrink-0" /> Library
       </button>
       {tabs.map((t) => {
         const isActive = active === t.bookId;

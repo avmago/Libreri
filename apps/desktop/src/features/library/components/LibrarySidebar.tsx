@@ -428,7 +428,7 @@ export function LibrarySidebar({
       </div>
       <JobsStrip />
       <div className="flex items-center gap-2.5 border-t px-4 py-2.5">
-        <LibreriMark className="size-4 shrink-0" />
+        <LibreriMark className="size-5 shrink-0" />
         <span className="flex min-w-0 flex-col">
           <span className="truncate font-medium">{library.name}</span>
           <span
