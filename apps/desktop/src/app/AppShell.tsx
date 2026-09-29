@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { toggleReadingFullscreen, useFullscreen, useFullscreenSync } from "@/lib/fullscreen";
 import {
   Archive,
   BookOpen,
@@ -246,7 +247,11 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
   useShortcut("library.backup", () => isOwner && void backUpNow());
   useShortcut("library.importForeign", () => session.canEditLibrary && openForeign());
   useShortcut("library.importArchive", () => isOwner && void pickArchiveToImport());
+  // With a book shown, full screen is full-screen reading (only the page).
+  const readingFullscreen = useFullscreen((s) => s.reading);
+  useFullscreenSync(activeTab !== null);
   useShortcut("app.fullscreen", () => {
+    if (activeTab !== null) return toggleReadingFullscreen();
     const w = getCurrentWindow();
     void w.isFullscreen().then((f) => w.setFullscreen(!f));
   });
@@ -570,7 +575,12 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
   return (
     <div className="flex h-full flex-col">
       {/* Tab strip */}
-      <div className="flex h-10 shrink-0 items-end gap-2 border-b bg-sidebar px-3">
+      <div
+        className={cn(
+          "flex h-10 shrink-0 items-end gap-2 border-b bg-sidebar px-3",
+          readingFullscreen && "hidden",
+        )}
+      >
         <TabStrip onMoveToWindow={(id) => void windows.moveTabToWindow(id)} />
         <button
           type="button"
@@ -592,7 +602,7 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
         </div>
       </div>
 
-      {!session.keepsData && (
+      {!session.keepsData && !readingFullscreen && (
         <div className="flex h-8 shrink-0 items-center justify-center gap-3 border-b bg-muted text-[12.5px]">
           <UserRound className="size-3.5" aria-hidden />
           You are a guest. Nothing you read, highlight or change here is kept.

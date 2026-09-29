@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { setReadingFullscreen, toggleReadingFullscreen, useFullscreen } from "@/lib/fullscreen";
 import {
   AlertTriangle,
   Bookmark,
@@ -15,6 +16,8 @@ import {
   Search,
   Loader2,
   Link2,
+  Maximize,
+  Minimize,
   SquareSigma,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -235,6 +238,49 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   });
   const [lastQuery, setLastQuery] = useState("");
   const [focusMode, setFocusMode] = useState(false);
+  // Full-screen reading: only the page; toolbar and page bar come back at
+  // the top and bottom edges of the screen.
+  const immersive = useFullscreen((s) => s.reading) && active;
+  const bare = focusMode || immersive;
+  const [edge, setEdge] = useState<"top" | "bottom" | null>(null);
+  useEffect(() => {
+    if (!immersive) return;
+    const menuOpen = () => !!document.querySelector("[data-radix-popper-content-wrapper]");
+    const onMove = (e: PointerEvent) => {
+      const h = window.innerHeight;
+      setEdge((now) => {
+        if (e.clientY <= 4) return "top";
+        if (e.clientY >= h - 4) return "bottom";
+        if (menuOpen()) return now;
+        if (now === "top" && e.clientY > 76) return null;
+        if (now === "bottom" && e.clientY < h - 56) return null;
+        return now;
+      });
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest("input, textarea, select, [contenteditable='true']")) return;
+      if (document.querySelector("[role='dialog'], [data-radix-popper-content-wrapper]")) return;
+      setReadingFullscreen(false);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("keydown", onKey);
+      setEdge(null);
+    };
+  }, [immersive]);
+  // The full-screen button shows while the pointer moves over the page.
+  const [pointerActive, setPointerActive] = useState(false);
+  const pointerTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const pointerMoved = () => {
+    setPointerActive(true);
+    clearTimeout(pointerTimer.current);
+    pointerTimer.current = setTimeout(() => setPointerActive(false), 2500);
+  };
+  useEffect(() => () => clearTimeout(pointerTimer.current), []);
   // Jumps made from the app (contents, marks, links) can be undone with Back.
   const history = useRef<{ back: Locator[]; forward: Locator[] }>({ back: [], forward: [] });
   const [zoom, setZoom] = useState<ZoomValue>(1);
@@ -1134,10 +1180,16 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="relative flex h-full min-h-0 flex-col">
       {/* Toolbar */}
       <div
-        className={cn("flex h-11 shrink-0 items-center gap-1 border-b px-2", focusMode && "hidden")}
+        className={cn(
+          "flex h-11 shrink-0 items-center gap-1 border-b bg-background px-2",
+          focusMode && "hidden",
+          immersive &&
+            "absolute inset-x-0 top-0 z-40 shadow-md transition-[translate,opacity] duration-150",
+          immersive && edge !== "top" && "pointer-events-none -translate-y-full opacity-0",
+        )}
       >
         <Button
           variant="ghost"
@@ -1368,7 +1420,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
         onDone={saveVoice}
         className="h-10 shrink-0 border-b bg-muted/40 px-3"
       />
-      {!focusMode && !comparing && !editing && (
+      {!bare && !comparing && !editing && (
         <ReadAloudBar r={readAloud} lang={book?.metadata.language ?? undefined} />
       )}
       {comparing && (
@@ -1403,7 +1455,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
         </div>
       )}
 
-      {markup.active && !focusMode && !editing && !comparing && (
+      {markup.active && !bare && !editing && !comparing && (
         <MarkupToolbar
           m={markup}
           onPickImage={() => void pickImage()}
@@ -1431,7 +1483,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
         />
       )}
       <div className={cn("flex min-h-0 flex-1", (editing || comparing) && "hidden")}>
-        {left && !focusMode && (
+        {left && !bare && (
           <ContentsPanel
             panel={left}
             setPanel={(p) => {
@@ -1483,7 +1535,11 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
           />
         )}
 
-        <div className="relative min-w-0 flex-1" style={{ background: theme.surround }}>
+        <div
+          className="relative min-w-0 flex-1"
+          style={{ background: theme.surround }}
+          onPointerMove={pointerMoved}
+        >
           <div
             ref={hostRef}
             className="absolute inset-0"
@@ -1539,7 +1595,22 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
               )}
             </div>
           )}
-          {focusMode && (
+          {!comparing && !editing && status === "ready" && (
+            <button
+              type="button"
+              aria-label={immersive ? "Leave full screen" : "Read full screen"}
+              title={`${immersive ? "Leave full screen" : "Read full screen"} (${keys("app.fullscreen")}${immersive ? " or Esc" : ""})`}
+              onClick={toggleReadingFullscreen}
+              className={cn(
+                "absolute right-5 bottom-5 z-20 flex size-9 items-center justify-center rounded-full border bg-background/90 text-foreground shadow-md backdrop-blur-sm transition-opacity duration-300 hover:opacity-100 focus-visible:opacity-100 [&_svg]:size-4",
+                pointerActive ? "opacity-80" : "opacity-0",
+                immersive && edge === "bottom" && "bottom-14",
+              )}
+            >
+              {immersive ? <Minimize /> : <Maximize />}
+            </button>
+          )}
+          {focusMode && !immersive && (
             <Button
               variant="outline"
               size="sm"
@@ -1594,7 +1665,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
           )}
         </div>
 
-        {notebookOpen && !focusMode && (
+        {notebookOpen && !bare && (
           <NotebookPanel
             bookId={bookId}
             insert={notebookInsert}
@@ -1604,7 +1675,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
             lang={book?.metadata.language}
           />
         )}
-        {canvasOpen && !focusMode && (
+        {canvasOpen && !bare && (
           <CanvasPanel
             bookId={bookId}
             dark={appDark}
@@ -1676,8 +1747,11 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
       {/* Status bar */}
       <div
         className={cn(
-          "flex h-7 shrink-0 items-center gap-3 border-t px-3 text-[11.5px] text-muted-foreground",
-          (focusMode || comparing) && "hidden",
+          "flex h-7 shrink-0 items-center gap-3 border-t bg-background px-3 text-[11.5px] text-muted-foreground",
+          ((focusMode && !immersive) || comparing) && "hidden",
+          immersive &&
+            "absolute inset-x-0 bottom-0 z-40 h-9 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] transition-[translate,opacity] duration-150",
+          immersive && edge !== "bottom" && "pointer-events-none translate-y-full opacity-0",
         )}
       >
         <span className="tabular-nums">{location?.label ?? ""}</span>
