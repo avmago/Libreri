@@ -1,0 +1,9 @@
+/* Excalidraw inside Libreri: its links to the Excalidraw project's own
+   sites (docs, blog, GitHub, the shared library site, publishing a
+   library) are not part of the app. The keyboard shortcuts in Help stay.
+   Not scoped to the canvas: Excalidraw shows its dialogs outside it. */
+.HelpDialog__header,
+.library-menu-browse-button,
+[data-testid="lib-dropdown--remove"] {
+  display: none !important;
+}

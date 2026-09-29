@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CaptureUpdateAction,
   Excalidraw,
+  MainMenu,
   convertToExcalidrawElements,
   exportToBlob,
   getCommonBounds,
@@ -21,6 +22,7 @@ import type {
 } from "@excalidraw/excalidraw/types";
 import type { FileId } from "@excalidraw/excalidraw/element/types";
 import "@excalidraw/excalidraw/index.css";
+import "./canvas.css";
 import { paperStyle } from "./paper";
 import type { Paper } from "./api";
 import type { PageClip } from "@/readers";
@@ -250,7 +252,16 @@ export default function ExcalidrawHost({
           },
         }}
         langCode="en"
-      />
+      >
+        {/* Libreri's own menu: Excalidraw's default one also links to its
+            GitHub, X and Discord. */}
+        <MainMenu>
+          <MainMenu.DefaultItems.SearchMenu />
+          <MainMenu.DefaultItems.SaveAsImage />
+          <MainMenu.DefaultItems.Help />
+          <MainMenu.DefaultItems.ClearCanvas />
+        </MainMenu>
+      </Excalidraw>
     </div>
   );
 }

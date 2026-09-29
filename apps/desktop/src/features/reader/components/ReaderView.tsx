@@ -398,9 +398,21 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
     if (status === "ready") rendererRef.current?.setAnnotations(annotations);
   }, [annotations, status]);
 
+  // A theme change repaints the book's pages, which is slow for big PDFs:
+  // tabs in the background catch up when they are shown, and the shown
+  // one repaints after the app has switched colours.
+  const themed = useRef<string | null>(null);
   useEffect(() => {
-    if (status === "ready") rendererRef.current?.setTheme(theme, prefs.pdfMode);
-  }, [theme, prefs.pdfMode, status]);
+    if (status !== "ready" || !active) return;
+    // Keyed by the open renderer too: a reopened book is themed afresh.
+    const key = `${current?.key}|${JSON.stringify(theme)}|${prefs.pdfMode}`;
+    if (themed.current === key) return;
+    const id = requestAnimationFrame(() => {
+      themed.current = key;
+      rendererRef.current?.setTheme(theme, prefs.pdfMode);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [theme, prefs.pdfMode, status, active, current?.key]);
 
   // Jump to an annotation when the tab was opened from a link.
   useEffect(() => {

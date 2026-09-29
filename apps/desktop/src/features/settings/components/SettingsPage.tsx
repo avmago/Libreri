@@ -116,7 +116,9 @@ export function SettingsPage({
       <main className="min-w-0 flex-1 overflow-y-auto" aria-label={current.label}>
         <div className="mx-auto flex max-w-3xl flex-col gap-8 px-8 pt-8 pb-16">
           <h1 className="text-[20px] font-semibold tracking-tight">{current.label}</h1>
-          {section === "general" && <GeneralSettings session={session} />}
+          {section === "general" && (
+            <GeneralSettings session={session} onSetPin={() => onSection("profiles")} />
+          )}
           {section === "library" && <LibrarySettings library={library} session={session} />}
           {section === "export" && <ExportImportSettings session={session} />}
           {section === "profiles" && <ProfileSettings session={session} />}

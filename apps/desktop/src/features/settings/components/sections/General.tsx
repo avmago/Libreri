@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/input";
 import { useProfilePrefs } from "@/features/profiles";
 import type { SessionDto } from "@/lib/ipc";
@@ -5,7 +6,14 @@ import { Group, Row, Switch } from "../parts";
 
 const LOCK_OPTIONS = [0, 1, 5, 15, 30, 60];
 
-export function GeneralSettings({ session }: { session: SessionDto }) {
+export function GeneralSettings({
+  session,
+  onSetPin,
+}: {
+  session: SessionDto;
+  /** Opens Profiles & security, where a PIN is set. */
+  onSetPin: () => void;
+}) {
   const prefs = useProfilePrefs((s) => s.prefs);
   const update = useProfilePrefs((s) => s.update);
   return (
@@ -13,26 +21,31 @@ export function GeneralSettings({ session }: { session: SessionDto }) {
       <Group title="When you step away" scope="yours">
         <Row
           label="Lock after"
-          htmlFor="autolock"
+          htmlFor={session.profile.hasPin ? "autolock" : undefined}
           help={
             session.profile.hasPin
               ? "Libreri goes back to the profile picker after this long without use."
-              : "Set a PIN in Profiles & security to lock your profile."
+              : "Locking needs a PIN, so that only you can open your profile again. Set one first, then choose how long to wait."
           }
         >
-          <NativeSelect
-            id="autolock"
-            value={prefs.autoLockMinutes}
-            disabled={!session.profile.hasPin}
-            onChange={(e) => update({ autoLockMinutes: Number(e.target.value) })}
-            className="w-40"
-          >
-            {LOCK_OPTIONS.map((m) => (
-              <option key={m} value={m}>
-                {m === 0 ? "Never" : m === 1 ? "1 minute" : `${m} minutes`}
-              </option>
-            ))}
-          </NativeSelect>
+          {session.profile.hasPin ? (
+            <NativeSelect
+              id="autolock"
+              value={prefs.autoLockMinutes}
+              onChange={(e) => update({ autoLockMinutes: Number(e.target.value) })}
+              className="w-40"
+            >
+              {LOCK_OPTIONS.map((m) => (
+                <option key={m} value={m}>
+                  {m === 0 ? "Never" : m === 1 ? "1 minute" : `${m} minutes`}
+                </option>
+              ))}
+            </NativeSelect>
+          ) : (
+            <Button variant="outline" size="sm" onClick={onSetPin}>
+              Set a PIN…
+            </Button>
+          )}
         </Row>
       </Group>
       <Group title="Library" scope="yours">

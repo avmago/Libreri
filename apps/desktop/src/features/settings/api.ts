@@ -11,6 +11,15 @@ export function useSetTheme() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (theme: Theme) => unwrap(commands.setTheme(theme)),
+    // Switch at once; the saved settings follow.
+    onMutate: (theme: Theme) => {
+      const before = qc.getQueryData<SettingsDto>(settingsKey);
+      if (before) qc.setQueryData(settingsKey, { ...before, theme });
+      return { before };
+    },
+    onError: (_e, _t, ctx) => {
+      if (ctx?.before) qc.setQueryData(settingsKey, ctx.before);
+    },
     onSuccess: (settings: SettingsDto) => qc.setQueryData(settingsKey, settings),
   });
 }
