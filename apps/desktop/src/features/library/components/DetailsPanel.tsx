@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { AudioLinks } from "./AudioLinks";
 import {
   AlertTriangle,
   BookOpen,
@@ -126,6 +127,9 @@ function SingleBook({ book }: { book: BookView }) {
             )
           }
         />
+        <div className="border-t pt-3 pb-4">
+          <AudioLinks book={book} editable />
+        </div>
       </div>
     );
   }
@@ -141,6 +145,7 @@ function SingleBook({ book }: { book: BookView }) {
         <p className="text-muted-foreground">{m.authors.join(", ") || "Unknown author"}</p>
       </div>
       {book.missing && <MissingFile book={book} />}
+      <AudioLinks book={book} editable={false} />
       <div className="flex items-center justify-center gap-1.5">
         <Button size="sm" onClick={() => void actions.open(book)} disabled={book.missing}>
           <BookOpen /> Open
