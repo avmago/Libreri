@@ -34,6 +34,13 @@
   * {
     @apply border-border;
   }
+  /* Selected text: Libreri's own colour. Left to the system, WebKit uses
+     the Mac's selection colours, which follow the Mac's appearance, not
+     Libreri's theme (white text in light mode when the Mac is dark). With
+     only a background set here, the text keeps its own colour. */
+  ::selection {
+    background-color: rgb(59 130 246 / 0.3);
+  }
   /* Sliders, checkboxes and radio buttons take the chosen accent colour
      (otherwise the system's blue). */
   input[type="range"],

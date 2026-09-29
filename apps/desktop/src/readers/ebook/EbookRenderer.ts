@@ -444,6 +444,7 @@ export class EbookRenderer implements Renderer {
       }
       body { line-height: ${this.lineHeight}; hyphens: auto; }
       img, svg, video { max-width: 100%; }
+      ::selection { background-color: rgba(59, 130, 246, 0.3); }
     `;
     // Fixed-layout books (comics, some EPUBs) have no reflowable text to style.
     if (typeof this.view.renderer.setStyles === "function") this.view.renderer.setStyles(css);

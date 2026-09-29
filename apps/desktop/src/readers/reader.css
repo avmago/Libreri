@@ -345,6 +345,13 @@ mark.lb-find-current {
 }
 .lb-page-text span::selection {
   background: rgba(59, 130, 246, 0.3);
+  color: transparent;
+}
+/* PDF.js colours the selection with the system's AccentColor, which
+   WebKit may not know or may take from the Mac's appearance. */
+.lb-pdf .textLayer ::selection {
+  background: rgba(59, 130, 246, 0.3);
+  color: transparent;
 }
 .lb-page-find {
   position: absolute;
