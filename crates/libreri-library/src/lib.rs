@@ -23,6 +23,7 @@ mod covers;
 mod details;
 mod edit;
 mod export;
+mod feeds;
 mod folders;
 mod foreign;
 mod health;
@@ -354,6 +355,10 @@ impl Library {
         if rel_path.starts_with(&format!("{}/", libreri_core::layout::NOTES_DIR)) {
             // Only the signed-in profile's own recordings and notes.
             return self.is_own_note(rel_path);
+        }
+        if rel_path.starts_with(&format!("{}/", libreri_core::layout::FEEDS_DIR)) {
+            // Only the signed-in profile's own downloads.
+            return self.is_own_feed_file(rel_path);
         }
         if !rel_path.starts_with("Books/") {
             return false;

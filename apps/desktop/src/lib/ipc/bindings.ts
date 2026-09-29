@@ -475,6 +475,55 @@ export const commands = {
 	 *  app the system uses for it.
 	 */
 	linkOpenFile: (file: string) => typedError<null, AppError>(__TAURI_INVOKE("link_open_file", { file })),
+	/**  The folders and feeds, with counts. */
+	feedsOverview: () => typedError<FeedsDto, AppError>(__TAURI_INVOKE("feeds_overview")),
+	/**  The items that match, newest first. */
+	feedItems: (filter: ItemFilter) => typedError<ItemsDto, AppError>(__TAURI_INVOKE("feed_items", { filter })),
+	/**  Finds the feed for an address (a feed's, or a site's). */
+	feedFind: (address: string) => typedError<FeedPreviewDto, AppError>(__TAURI_INVOKE("feed_find", { address })),
+	/**  Follows a feed. Its items are fetched by [`feeds_refresh`]. */
+	feedAdd: (url: string, title: string, folder: string | null, autoDownload: boolean) => typedError<string, AppError>(__TAURI_INVOKE("feed_add", { url, title, folder, autoDownload })),
+	arxivCategories: () => __TAURI_INVOKE<ArxivGroup[]>("arxiv_categories"),
+	suggestedFeeds: () => __TAURI_INVOKE<Suggested[]>("suggested_feeds"),
+	/**
+	 *  Follows arXiv categories (each in "arXiv › <group>") and, optionally,
+	 *  a search. Returns the new feeds' ids.
+	 */
+	feedsAddArxiv: (codes: string[], search: string | null, autoDownload: boolean) => typedError<string[], AppError>(__TAURI_INVOKE("feeds_add_arxiv", { codes, search, autoDownload })),
+	feedChange: (id: string, changeTo: FeedChange) => typedError<null, AppError>(__TAURI_INVOKE("feed_change", { id, changeTo })),
+	/**  Stops following a feed. Downloads stay. */
+	feedRemove: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("feed_remove", { id })),
+	feedFolderAdd: (name: string, parent: string | null) => typedError<string, AppError>(__TAURI_INVOKE("feed_folder_add", { name, parent })),
+	feedFolderChange: (id: string, changeTo: FolderChange) => typedError<null, AppError>(__TAURI_INVOKE("feed_folder_change", { id, changeTo })),
+	/**  Removes a folder; its feeds and folders move up a level. */
+	feedFolderRemove: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("feed_folder_remove", { id })),
+	feedsSettingsSet: (settings: FeedSettings) => typedError<null, AppError>(__TAURI_INVOKE("feeds_settings_set", { settings })),
+	/**
+	 *  Looks for new items in every feed (or those given), then downloads the
+	 *  new items of feeds set to download by themselves.
+	 */
+	feedsRefresh: (ids: string[] | null) => typedError<RefreshReport, AppError>(__TAURI_INVOKE("feeds_refresh", { ids })),
+	feedItemDownload: (id: string) => typedError<FeedItem, AppError>(__TAURI_INVOKE("feed_item_download", { id })),
+	/**  Deletes items (and their downloads). They do not come back. */
+	feedItemsDelete: (ids: string[]) => typedError<null, AppError>(__TAURI_INVOKE("feed_items_delete", { ids })),
+	/**  Deletes an item's download only (the item stays, to download again). */
+	feedItemForgetFile: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("feed_item_forget_file", { id })),
+	feedItemsRead: (ids: string[], readNow: boolean) => typedError<null, AppError>(__TAURI_INVOKE("feed_items_read", { ids, readNow })),
+	/**  Marks everything shown by a folder or feed (or all) as read. */
+	feedAllRead: (folder: string | null, feed: string | null) => typedError<null, AppError>(__TAURI_INVOKE("feed_all_read", { folder, feed })),
+	/**
+	 *  Adds an item to the library, in `folder` (relative to `Books/`),
+	 *  downloading it first if need be. Returns the book's id.
+	 */
+	feedItemToLibrary: (id: string, folder: string) => typedError<string, AppError>(__TAURI_INVOKE("feed_item_to_library", { id, folder })),
+	/**  Adds the feeds of an OPML file (in `parent`, or at the top level). */
+	feedsImportOpml: (path: string, parent: string | null) => typedError<[number, number], AppError>(__TAURI_INVOKE("feeds_import_opml", { path, parent })),
+	/**  Writes the folders and feeds to an OPML file. */
+	feedsExportOpml: (path: string) => typedError<null, AppError>(__TAURI_INVOKE("feeds_export_opml", { path })),
+	/**  Shows the feeds folder, or a download, in the file manager. */
+	feedsReveal: (file: string | null) => typedError<null, AppError>(__TAURI_INVOKE("feeds_reveal", { file })),
+	/**  Opens a download in the app the system uses for it. */
+	feedOpenFile: (file: string) => typedError<null, AppError>(__TAURI_INVOKE("feed_open_file", { file })),
 	mathsSettings: () => __TAURI_INVOKE<MathsSettingsDto>("maths_settings"),
 	/**
 	 *  Turns reading maths from pictures on or off (the model stays until
@@ -525,6 +574,7 @@ export const events = {
 	detailsFilled: makeEvent<DetailsFilled>("details-filled"),
 	dictionaryDownload: makeEvent<DictionaryDownload>("dictionary-download"),
 	exportFinished: makeEvent<ExportFinished>("export-finished"),
+	feedsChanged: makeEvent<FeedsChanged>("feeds-changed"),
 	foreignImported: makeEvent<ForeignImported>("foreign-imported"),
 	helperInstall: makeEvent<HelperInstall>("helper-install"),
 	importFinished: makeEvent<ImportFinished>("import-finished"),
@@ -660,6 +710,19 @@ export type ArchiveSummaryDto = {
 	otherFile: number,
 	missing: number,
 	profiles: ArchiveProfileDto[],
+};
+
+export type ArxivCategory = {
+	/**  "cs.AI" */
+	code: string,
+	/**  "Artificial Intelligence" */
+	name: string,
+};
+
+/**  A group of arXiv categories ("Computer Science"). */
+export type ArxivGroup = {
+	name: string,
+	categories: ArxivCategory[],
 };
 
 export type AudioInfoDto = {
@@ -1195,8 +1258,125 @@ export type FailedFileDto = {
 	reason: string,
 };
 
+export type FeedChange = {
+	title: string | null,
+	/**  Move to this folder ("" = the top level). */
+	folder: string | null,
+	autoDownload: boolean | null,
+};
+
+export type FeedDto = {
+	id: string,
+	url: string,
+	title: string,
+	site: string | null,
+	folder: string | null,
+	autoDownload: boolean,
+	/**  Downloaded by itself because a folder it is in says so. */
+	autoFromFolder: boolean,
+	checkedAt: string | null,
+	error: string | null,
+	unread: number,
+	total: number,
+};
+
+/**  One entry of a feed. */
+export type FeedEntry = {
+	/**  Stays the same for this entry each time the feed is read. */
+	key: string,
+	title: string,
+	/**  The entry's page. */
+	link: string | null,
+	authors: string[],
+	/**  The abstract or summary, as plain text. */
+	summary: string,
+	/**  When it was published (RFC 3339). */
+	published: string | null,
+	/**  Topics given by the feed (arXiv: "cs.AI", "math.PR"). */
+	topics: string[],
+	/**  A PDF of it, when there is one. */
+	pdf: string | null,
+	doi: string | null,
+	arxivId: string | null,
+	/**  arXiv: "new", "cross", "replace" or "replace-cross". */
+	announce: string | null,
+};
+
+export type FeedFolder = {
+	id: string,
+	name: string,
+	/**  The folder it is in (none: top level). */
+	parent: string | null,
+	/**  Download new items of every feed in it (and its subfolders). */
+	autoDownload?: boolean,
+};
+
+export type FeedItem = {
+	id: string,
+	feed: string,
+	/**  The feed's title when it came in (kept if the feed is removed). */
+	source: string,
+	/**  When it came in (RFC 3339). */
+	foundAt: string,
+	read?: boolean,
+	/**  The downloaded file (library-relative, under `Feeds/`). */
+	file: string | null,
+	/**  The book it became when added to the library. */
+	book: string | null,
+	downloadError: string | null,
+} & FeedEntry;
+
+export type FeedPreviewDto = {
+	/**  The feed's own address (found from a site's address if need be). */
+	url: string,
+	title: string,
+	site: string | null,
+	count: number,
+	/**  The newest few titles. */
+	sample: string[],
+	/**  Already followed, under this title. */
+	followed: string | null,
+};
+
+export type FeedSettings = {
+	/**
+	 *  Check for new items every this many minutes while Libreri is open
+	 *  (0: only when asked).
+	 */
+	refreshMinutes?: number,
+	/**  Items not downloaded are removed after this many days. */
+	keepDays?: number,
+};
+
+/**
+ *  Feeds changed: new items came in, a download started or finished, or
+ *  subscriptions were edited. The interface refetches its lists.
+ */
+export type FeedsChanged = {
+	newItems: number,
+};
+
+export type FeedsDto = {
+	folders: FeedFolder[],
+	feeds: FeedDto[],
+	settings: FeedSettings,
+	unread: number,
+	total: number,
+	downloaded: number,
+	refreshing: boolean,
+	/**  Items being downloaded now. */
+	downloading: string[],
+};
+
 /**  Every file format Libreri accepts, detected from the file extension. */
 export type FileType = "pdf" | "epub" | "mobi" | "azw3" | "fb2" | "txt" | "md" | "djvu" | "cbz" | "cbr" | "cb7" | "cba" | "cbt" | "mp3" | "m4b" | "m4a" | "aac" | "ogg" | "opus" | "flac";
+
+export type FolderChange = {
+	name: string | null,
+	/**  Move into this folder ("" = the top level). */
+	parent: string | null,
+	autoDownload: boolean | null,
+};
 
 export type FolderDto = {
 	name: string,
@@ -1392,6 +1572,28 @@ export type InstallPlan = {
 
 /**  The package manager Libreri can use on this computer. */
 export type Installer = "homebrew" | "winget" | "apt" | "dnf" | "pacman" | "zypper";
+
+export type ItemFilter = {
+	/**  A folder (with its subfolders) or a feed; neither: everything. */
+	folder: string | null,
+	feed: string | null,
+	/**  "all", "unread", "downloaded" or "library". */
+	show: string,
+	/**  Items with this topic (arXiv: "cs.AI"). */
+	topic: string | null,
+	search: string | null,
+};
+
+export type ItemsDto = {
+	items: FeedItem[],
+	/**  How many match, when more than are listed. */
+	total: number,
+	/**
+	 *  Topics of the items shown by folder or feed (before the topic and
+	 *  search filters), most common first.
+	 */
+	topics: TopicDto[],
+};
 
 /**  Progress of a background job, forwarded from `libreri-jobs`. */
 export type JobEventPayload = {
@@ -1778,6 +1980,14 @@ export type Redaction = {
 	color?: string,
 };
 
+export type RefreshReport = {
+	newItems: number,
+	failed: number,
+	downloaded: number,
+	/**  Another check was already running. */
+	busy: boolean,
+};
+
 export type RestoredLibrary = {
 	library: LibrarySummary,
 	jobId: string,
@@ -1871,6 +2081,15 @@ export type StorageDto = {
 	data: number | null,
 };
 
+/**  A source offered in "Suggested". */
+export type Suggested = {
+	title: string,
+	url: string,
+	/**  "Preprints", "Journals", "Science news", … */
+	group: string,
+	about: string,
+};
+
 export type SyncPointDto = {
 	t: number | null,
 	locator: string,
@@ -1930,6 +2149,13 @@ export type TextStatusDto = {
 };
 
 export type Theme = "system" | "light" | "dark" | "highContrast";
+
+export type TopicDto = {
+	code: string,
+	/**  arXiv's name for it, when it is an arXiv category. */
+	name: string | null,
+	count: number,
+};
 
 export type UnsearchableDto = {
 	id: string,

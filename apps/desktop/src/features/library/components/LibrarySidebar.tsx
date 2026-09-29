@@ -13,6 +13,7 @@ import {
   Heart,
   Library,
   NotebookText,
+  Rss,
   Pencil,
   Plus,
   Shapes,
@@ -24,6 +25,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ContextMenu, menuContent, menuItem } from "@/components/ui/menu";
+import { useFeedsOverview } from "@/features/feeds";
 import { usePermissions } from "@/features/profiles";
 import { commands, type FacetsDto, type LibrarySummary } from "@/lib/ipc";
 import { useShortcut } from "@/lib/shortcuts";
@@ -74,6 +76,12 @@ function NavItem({
       <span className="text-[11px] text-muted-foreground">{count || ""}</span>
     </button>
   );
+}
+
+/** Feeds, with how many items are new. */
+function FeedsNavItem() {
+  const { data } = useFeedsOverview();
+  return <NavItem nav={{ kind: "feeds" }} label="Feeds" Icon={Rss} count={data?.unread ?? 0} />;
 }
 
 function JobsStrip() {
@@ -171,7 +179,7 @@ function SectionTitle({
 function Rail() {
   const { data: facets } = useFacets();
   const { nav: current, setNav } = useLibraryView();
-  const { editLibrary } = usePermissions();
+  const { editLibrary, keepsData } = usePermissions();
   const items: { nav: Nav; label: string; Icon: LucideIcon }[] = [
     ...LIBRARY_NAV,
     ...(facets?.missing
@@ -179,6 +187,7 @@ function Rail() {
       : []),
     { nav: { kind: "search" }, label: "Search", Icon: FileSearch },
     { nav: { kind: "notes" }, label: "Notes", Icon: NotebookText },
+    ...(keepsData ? [{ nav: { kind: "feeds" } as Nav, label: "Feeds", Icon: Rss }] : []),
     ...(editLibrary ? [{ nav: { kind: "organize" } as Nav, label: "Organize", Icon: Tags }] : []),
     { nav: { kind: "folder", path: "" }, label: "Folders", Icon: Folder },
   ];
@@ -393,6 +402,7 @@ export function LibrarySidebar({
           <SectionTitle>YOURS</SectionTitle>
           <NavItem nav={{ kind: "search" }} label="Search" Icon={FileSearch} count={0} />
           <NavItem nav={{ kind: "notes" }} label="Notes" Icon={NotebookText} count={0} />
+          {keepsData && <FeedsNavItem />}
           {editLibrary && (
             <NavItem nav={{ kind: "organize" }} label="Organize" Icon={Tags} count={0} />
           )}

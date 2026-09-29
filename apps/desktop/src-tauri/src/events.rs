@@ -415,3 +415,11 @@ pub struct DictionaryDownload {
     pub finished: bool,
     pub error: Option<String>,
 }
+
+/// Feeds changed: new items came in, a download started or finished, or
+/// subscriptions were edited. The interface refetches its lists.
+#[derive(Debug, Clone, Default, Serialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct FeedsChanged {
+    pub new_items: u32,
+}

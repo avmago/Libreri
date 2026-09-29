@@ -4,6 +4,7 @@
 //! MyLibrary/
 //!   Books/            the user's books, audiobooks and folders
 //!   Notes/<profile>/  Markdown notebooks, canvases, attachments
+//!   Feeds/<profile>/  papers and articles downloaded from feeds
 //!   .library-data/    everything Libreri manages
 //! ```
 //!
@@ -16,6 +17,8 @@ use std::path::{Path, PathBuf};
 pub const BOOKS_DIR: &str = "Books";
 /// Name of the folder that holds per-profile notes.
 pub const NOTES_DIR: &str = "Notes";
+/// Name of the folder that holds per-profile feed downloads.
+pub const FEEDS_DIR: &str = "Feeds";
 /// Name of the hidden folder that Libreri manages.
 pub const DATA_DIR: &str = ".library-data";
 
@@ -53,6 +56,10 @@ impl LibraryLayout {
 
     pub fn notes_dir(&self) -> PathBuf {
         self.root.join(NOTES_DIR)
+    }
+
+    pub fn feeds_dir(&self) -> PathBuf {
+        self.root.join(FEEDS_DIR)
     }
 
     pub fn data_dir(&self) -> PathBuf {

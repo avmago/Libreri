@@ -14,6 +14,7 @@ pub mod capture;
 pub mod compare;
 pub mod details;
 pub mod edit;
+pub mod feeds;
 pub mod folders;
 pub mod library;
 pub mod links;

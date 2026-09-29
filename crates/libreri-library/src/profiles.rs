@@ -407,6 +407,7 @@ impl Library {
         if self.notes_folder_shared(p)? {
             return Ok(());
         }
+        self.rename_feeds_folder(&p.name, new_name)?;
         let from = self.layout().notes_dir().join(&old_dir);
         let to = self.layout().notes_dir().join(&new_dir);
         if from.is_dir() {
@@ -547,6 +548,13 @@ impl Library {
         // Never trash a folder that another profile also uses.
         if notes.is_dir() && !self.notes_folder_shared(&p)? {
             trash::delete(&notes).map_err(|e| Error::Trash(e.to_string()))?;
+        }
+        let feeds = self
+            .layout()
+            .feeds_dir()
+            .join(crate::reading::notes_folder_name(&p.name));
+        if feeds.is_dir() && !self.notes_folder_shared(&p)? {
+            trash::delete(&feeds).map_err(|e| Error::Trash(e.to_string()))?;
         }
         Ok(())
     }

@@ -57,6 +57,11 @@ pub struct AppState {
     pub media_files: Mutex<std::collections::HashMap<String, std::path::PathBuf>>,
     pub player: Mutex<Option<Arc<libreri_links::PlayerServer>>>,
     pub fetched_links: Mutex<std::collections::HashMap<String, Arc<libreri_links::Fetched>>>,
+    /// Feeds (ADR 0027): one change to a profile's feeds file at a time,
+    /// a check for new items running, and items being downloaded.
+    pub feeds_lock: Mutex<()>,
+    pub feeds_refreshing: AtomicBool,
+    pub feed_downloads: Mutex<std::collections::HashSet<String>>,
     /// The maths model (app data `maths/`), loaded once when used, and
     /// its download, to cancel it.
     pub maths_dir: std::path::PathBuf,
@@ -300,6 +305,9 @@ impl AppState {
             media_files: Mutex::default(),
             player: Mutex::default(),
             fetched_links: Mutex::default(),
+            feeds_lock: Mutex::default(),
+            feeds_refreshing: AtomicBool::new(false),
+            feed_downloads: Mutex::default(),
             maths_download: Mutex::default(),
             capture_photos: Mutex::default(),
             font_downloads: Mutex::default(),

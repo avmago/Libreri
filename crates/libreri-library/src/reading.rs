@@ -30,7 +30,7 @@ fn annotations_file(lib: &Library, profile: &ProfileId, book: &BookId) -> PathBu
 }
 
 /// Characters allowed in a file name on every OS; the rest become spaces.
-fn safe_file_name(s: &str) -> String {
+pub(crate) fn safe_file_name(s: &str) -> String {
     let cleaned: String = s
         .chars()
         .map(|c| {

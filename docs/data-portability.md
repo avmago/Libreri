@@ -88,3 +88,8 @@ Requirement (user, 2026-09-27): when the database, metadata and every kind of no
 - Round-trip tests: create library → add books + every note type → export → import into an empty library on a different path → assert every link opens the same page / paragraph / timestamp.
 - Tests for moved files, renamed files, edited PDFs, and "same book, different file".
 - Library health check reports any broken or re-anchored link.
+- Feeds (ADR 0027) live in `Feeds/<profile>/`, apart from `Books/` and `Notes/`.
+  - `.feeds.json` holds the folders, feeds, items and settings (plain JSON). Subscriptions also export and import as standard OPML.
+  - Downloads are ordinary PDFs and Markdown files (front matter with title, authors, date, publisher, address, DOI, tags and abstract), in folders named like the feed folders.
+  - Adding an item to the library moves the file into `Books/` as a normal book with the feed's details.
+  - Backups and archives do not hold `Feeds/` yet; export the subscriptions to OPML to keep them.

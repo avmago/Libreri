@@ -22,6 +22,7 @@ import {
   Lock,
   Moon,
   NotebookText,
+  Rss,
   FileSearch,
   PanelLeft,
   RefreshCw,
@@ -56,6 +57,7 @@ import {
 import { FindDetailsDialog, useDetailsEvents } from "@/features/details";
 import { HelperDialog } from "@/features/helpers";
 import { NotesHub, flushNotes } from "@/features/notes";
+import { FeedsView, useFeedsBackground } from "@/features/feeds";
 import { OcrDialog, SearchView, useSearchEvents } from "@/features/search";
 import { setSpeechSettingsOpener } from "@/features/speech";
 import {
@@ -199,11 +201,16 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
     }
   }, []);
   const goHome = useCallback(
-    (kind: "all" | "notes" | "organize" | "search", query?: string) => {
+    (kind: "all" | "notes" | "feeds" | "organize" | "search", query?: string) => {
       tabs.activate(null);
       ui.closeSettings();
       if (kind === "all") {
-        if (nav.kind === "notes" || nav.kind === "organize" || nav.kind === "search")
+        if (
+          nav.kind === "notes" ||
+          nav.kind === "feeds" ||
+          nav.kind === "organize" ||
+          nav.kind === "search"
+        )
           setNav({ kind: "all" });
       } else if (kind === "search") setNav({ kind: "search", query });
       else setNav({ kind });
@@ -241,6 +248,9 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
   useShortcut("library.close", () => void close());
   useShortcut("go.library", () => goHome("all"));
   useShortcut("go.notes", () => goHome("notes"));
+  useShortcut("go.feeds", () => goHome("feeds"));
+  // Feeds: new items are looked for while the library is open.
+  useFeedsBackground(session.keepsData);
   useShortcut("go.search", () => goHome("search"));
   useShortcut("go.organize", () => session.canEditLibrary && goHome("organize"));
   useShortcut("library.health", () => session.canEditLibrary && setHealth(true));
@@ -295,6 +305,14 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
         icon: NotebookText,
         shortcut: k("go.notes"),
         run: () => goHome("notes"),
+      },
+      {
+        id: "go.feeds",
+        group: "Go to",
+        label: "Feeds: new papers and articles",
+        icon: Rss,
+        shortcut: k("go.feeds"),
+        run: () => goHome("feeds"),
       },
       {
         id: "go.search",
@@ -564,6 +582,8 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
   const home =
     nav.kind === "notes" ? (
       <NotesHub />
+    ) : nav.kind === "feeds" ? (
+      <FeedsView />
     ) : nav.kind === "search" ? (
       <SearchView key={nav.query ?? ""} />
     ) : nav.kind === "organize" ? (

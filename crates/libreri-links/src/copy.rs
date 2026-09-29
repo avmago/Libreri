@@ -54,21 +54,34 @@ pub struct Source<'a> {
 
 /// Makes the copy from a fetched page. `pictures` fetches a picture (or
 /// not); it is given absolute addresses only.
-pub fn make(
+/// The readable part of a page: cleaned, links absolute, pictures inside
+/// as data (up to the limits).
+pub struct Readable {
+    pub title: String,
+    pub byline: Option<String>,
+    /// Clean HTML: no scripts, styles, frames, forms or handlers.
+    pub body: String,
+    pub dir: Option<String>,
+    pub lang: Option<String>,
+}
+
+/// Picks out the readable part of a page. `pictures` fetches a picture
+/// (or not); it is given absolute addresses only.
+pub fn readable(
     page: &str,
-    src: &Source,
+    url: &str,
     mut pictures: impl FnMut(&str) -> Option<(Vec<u8>, String)>,
-) -> Result<String, String> {
+) -> Result<Readable, String> {
     let cfg = dom_smoothie::Config {
         max_elements_to_parse: 60_000,
         ..Default::default()
     };
-    let mut r = dom_smoothie::Readability::new(page, Some(src.url), Some(cfg))
+    let mut r = dom_smoothie::Readability::new(page, Some(url), Some(cfg))
         .map_err(|e| format!("the page could not be read: {e}"))?;
     let article = r
         .parse()
         .map_err(|_| "no readable text was found on the page".to_owned())?;
-    let base = url::Url::parse(src.url).map_err(|e| e.to_string())?;
+    let base = url::Url::parse(url).map_err(|e| e.to_string())?;
     // Only plain content: no scripts, styles, frames, forms or handlers;
     // links and pictures made absolute.
     let clean = ammonia::Builder::default()
@@ -85,14 +98,14 @@ pub fn make(
     let (mut count, mut bytes) = (0usize, 0u64);
     let body = re
         .replace_all(&clean, |c: &regex::Captures| {
-            let url = c[2].replace("&amp;", "&");
+            let src = c[2].replace("&amp;", "&");
             let data = cache
-                .entry(url.clone())
+                .entry(src.clone())
                 .or_insert_with(|| {
                     if count >= MAX_PICTURES || bytes >= MAX_PICTURE_BYTES {
                         return None;
                     }
-                    let (b, kind) = pictures(&url)?;
+                    let (b, kind) = pictures(&src)?;
                     if b.len() as u64 > MAX_PICTURE
                         || !kind.starts_with("image/")
                         || kind.contains("svg")
@@ -115,6 +128,22 @@ pub fn make(
             }
         })
         .into_owned();
+    Ok(Readable {
+        title: article.title.clone(),
+        byline: article.byline.clone(),
+        body,
+        dir: article.dir.clone(),
+        lang: article.lang.clone(),
+    })
+}
+
+pub fn make(
+    page: &str,
+    src: &Source,
+    pictures: impl FnMut(&str) -> Option<(Vec<u8>, String)>,
+) -> Result<String, String> {
+    let article = readable(page, src.url, pictures)?;
+    let body = article.body;
     let title = src
         .title
         .map(str::to_owned)
