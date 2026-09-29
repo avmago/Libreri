@@ -3,7 +3,9 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, menuContent, menuLabel, menuSeparator } from "@/components/ui/menu";
 import { PAGE_THEMES, type PageLayout, type PdfDarkMode, type PageThemeId } from "@/readers";
 import { cn } from "@/lib/utils";
+import { useProfilePrefs } from "@/features/profiles";
 import { useReaderPrefs } from "../prefs";
+import { adhdTools, useAdhd, useAdhdPause } from "../adhd/state";
 
 const LAYOUTS: [PageLayout["mode"], string][] = [
   ["single", "One page"],
@@ -28,8 +30,11 @@ export function AppearanceMenu({
   onZoom,
   pageLayout,
   onPageLayout,
+  bionicHere,
 }: {
   isPdf: boolean;
+  /** Bionic reading can change this book's text. */
+  bionicHere: boolean;
   zoomLabel: string;
   onZoom: (step: 1 | -1 | 0) => void;
   /** Comics only. */
@@ -37,6 +42,9 @@ export function AppearanceMenu({
   onPageLayout?: (change: Partial<PageLayout>) => void;
 }) {
   const prefs = useReaderPrefs();
+  const adhd = useAdhd();
+  const setPaused = useAdhdPause((s) => s.setPaused);
+  const updatePrefs = useProfilePrefs((s) => s.update);
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
@@ -132,6 +140,52 @@ export function AppearanceMenu({
             </span>
             Dark pages when the app is dark
           </DropdownMenu.CheckboxItem>
+          {adhd.enabled && (
+            <>
+              <DropdownMenu.Separator className={menuSeparator} />
+              <DropdownMenu.Label className={menuLabel}>ADHD READING</DropdownMenu.Label>
+              <DropdownMenu.CheckboxItem
+                checked={!adhd.paused}
+                onCheckedChange={(v) => setPaused(!v)}
+                onSelect={(e) => e.preventDefault()}
+                className={cn(itemClass, "h-auto min-h-8 py-1")}
+              >
+                <span className="flex size-4 shrink-0 items-center justify-center">
+                  {!adhd.paused && <Check className="size-4" />}
+                </span>
+                <span className="flex flex-col">
+                  ADHD reading
+                  <span className="text-[11.5px] text-muted-foreground">
+                    {adhdTools({ ...adhd, bionic: adhd.bionic && bionicHere })}
+                    {adhd.bionic && !bionicHere && (
+                      <>
+                        {adhd.line || adhd.mask ? " · " : ""}Bionic reading is not available for
+                        this book
+                      </>
+                    )}
+                  </span>
+                </span>
+              </DropdownMenu.CheckboxItem>
+              {adhd.mask && (
+                <label className="flex items-center gap-2.5 px-2 py-1.5">
+                  <span className="shrink-0 text-muted-foreground">Mask opening</span>
+                  <input
+                    type="range"
+                    min={40}
+                    max={360}
+                    step={10}
+                    value={adhd.maskHeight}
+                    disabled={adhd.paused}
+                    aria-label="Height of the strip the reading mask leaves clear"
+                    onChange={(e) => updatePrefs({ adhd: { maskHeight: Number(e.target.value) } })}
+                    // The menu would take the arrow keys to move between items.
+                    onKeyDown={(e) => e.stopPropagation()}
+                    className="min-w-0 flex-1 disabled:opacity-50"
+                  />
+                </label>
+              )}
+            </>
+          )}
           {isPdf && (
             <>
               <DropdownMenu.Separator className={menuSeparator} />

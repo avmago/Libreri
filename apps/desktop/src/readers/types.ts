@@ -10,6 +10,7 @@ import type { PageTheme } from "./themes";
 import type { SpeechSource } from "./speech/types";
 import type { PageClip } from "./clip";
 import type { Glyph } from "./math/layout";
+import type { BionicOptions, LineBox } from "./focus";
 
 /** A place in a book. Stored as JSON (`locator` in the database). */
 export type Locator =
@@ -74,6 +75,9 @@ export interface RendererEvents {
   mathClick?: (latex: string, rect: DOMRect) => void;
   /** PDF forms: fields were filled in (true) or put back (false). */
   formChanged?: (dirty: boolean) => void;
+  /** The pointer moved over a page drawn in its own frame (EPUB), in
+   * window coordinates: the app does not see those moves. */
+  pointer?: (x: number, y: number) => void;
 }
 
 export interface Renderer {
@@ -128,6 +132,12 @@ export interface Renderer {
   clipPicture?(rect: DOMRect): Promise<PageClip | null>;
   /** Goes to a place given as 0–1 through the book (audiobook sync). */
   goToFraction?(fraction: number): Promise<void>;
+  /** ADHD reading: the start of each word bold (null takes it off).
+   * Only books whose text Libreri lays out. */
+  setBionic?(options: BionicOptions | null): void;
+  /** The line of text at a point in the window, for books drawn in
+   * frames (others are looked up in the window's own document). */
+  lineAt?(x: number, y: number): LineBox | null;
 }
 
 /** How comic pages are shown. */

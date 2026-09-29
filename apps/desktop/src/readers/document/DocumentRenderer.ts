@@ -10,6 +10,7 @@ import { renderMarkdown, renderMermaid } from "@/lib/markdown";
 import type { Annotation } from "@/lib/ipc";
 import { findQuote, makeQuote } from "../quote";
 import { DomSpeech } from "../speech/dom";
+import { applyBionic, removeBionic, type BionicOptions } from "../focus";
 import type { SpeechSource } from "../speech/types";
 import type { PageTheme } from "../themes";
 import {
@@ -113,6 +114,7 @@ export class DocumentRenderer implements Renderer {
   /** Diagram drawing, one run after another. */
   private drawing: Promise<void> = Promise.resolve();
   private diagramsDark: boolean | null = null;
+  private bionic: BionicOptions | null = null;
 
   constructor(
     private readonly kind: "md" | "txt",
@@ -331,6 +333,18 @@ export class DocumentRenderer implements Renderer {
     }
     if (!a.quote) return null;
     return findQuote(all, a.quote, loc?.type === "text" ? loc.start : 0);
+  }
+
+  setBionic(options: BionicOptions | null) {
+    if (JSON.stringify(options) === JSON.stringify(this.bionic) || !this.article) return;
+    this.bionic = options;
+    // Stay on the same text: the lines get longer or shorter.
+    const s = this.scroller;
+    const fraction =
+      s.scrollHeight > s.clientHeight ? s.scrollTop / (s.scrollHeight - s.clientHeight) : 0;
+    removeBionic(this.article);
+    if (options) applyBionic(this.article, options);
+    s.scrollTop = fraction * (s.scrollHeight - s.clientHeight);
   }
 
   setAnnotations(list: Annotation[]) {

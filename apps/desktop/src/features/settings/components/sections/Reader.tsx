@@ -15,6 +15,7 @@ const PDF_MODES: { value: PdfDarkMode; label: string }[] = [
 export function ReaderSettings() {
   const reader = useReaderPrefs();
   const prefs = useProfilePrefs((s) => s.prefs.reader);
+  const adhd = useProfilePrefs((s) => s.prefs.adhd);
   const update = useProfilePrefs((s) => s.update);
   return (
     <>
@@ -110,6 +111,81 @@ export function ReaderSettings() {
             format={(v) => v.toFixed(2)}
           />
         </Row>
+      </Group>
+      <Group
+        title="ADHD reading"
+        scope="yours"
+        description="Help to keep your place while reading. When one is on, the reader's Aa menu can pause them for a while."
+      >
+        <Row
+          label="Bionic reading"
+          help="The start of each word is bold, so the eye jumps from word to word. For EPUB, MOBI, FB2, Markdown and text books, not PDFs or scans."
+        >
+          <Switch
+            label="Bionic reading"
+            checked={adhd.bionic}
+            onChange={(v) => update({ adhd: { bionic: v } })}
+          />
+        </Row>
+        {adhd.bionic && (
+          <>
+            <Row label="Bold part of each word" help="Short words always have one bold letter.">
+              <Slider
+                label="Bold part of each word"
+                min={0.3}
+                max={0.7}
+                step={0.05}
+                value={adhd.fixation}
+                onChange={(v) => update({ adhd: { fixation: v } })}
+                format={(v) => `${Math.round(v * 100)}%`}
+              />
+            </Row>
+            <Row label="Rest of the word" help="Lighter makes the bold starts stand out more.">
+              <Slider
+                label="Rest of the word"
+                min={0.4}
+                max={1}
+                step={0.05}
+                value={adhd.fade}
+                onChange={(v) => update({ adhd: { fade: v } })}
+                format={(v) => `${Math.round(v * 100)}%`}
+              />
+            </Row>
+          </>
+        )}
+        <Row
+          label="Line highlight"
+          help="Highlights the line of text under the pointer, in every book with text."
+        >
+          <Switch
+            label="Line highlight"
+            checked={adhd.line}
+            onChange={(v) => update({ adhd: { line: v } })}
+          />
+        </Row>
+        <Row
+          label="Reading mask"
+          help="Dims the page except a strip around the pointer. Works in every book."
+        >
+          <Switch
+            label="Reading mask"
+            checked={adhd.mask}
+            onChange={(v) => update({ adhd: { mask: v } })}
+          />
+        </Row>
+        {adhd.mask && (
+          <Row label="Mask opening" help="Also in the reader's Aa menu.">
+            <Slider
+              label="Mask opening"
+              min={40}
+              max={360}
+              step={10}
+              value={adhd.maskHeight}
+              onChange={(v) => update({ adhd: { maskHeight: v } })}
+              format={(v) => `${v} px`}
+            />
+          </Row>
+        )}
       </Group>
     </>
   );

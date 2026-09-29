@@ -26,6 +26,13 @@
 .lb-doc-txt {
   white-space: pre-wrap;
 }
+/* ADHD reading: bionic reading (readers/focus.ts). */
+.lb-doc lb-b {
+  font-weight: bolder;
+}
+.lb-doc lb-r {
+  opacity: var(--lb-bn-fade, 1);
+}
 .lb-doc h1,
 .lb-doc h2,
 .lb-doc h3,

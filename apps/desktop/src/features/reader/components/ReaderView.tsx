@@ -33,8 +33,10 @@ import { keysLabel, platform, shortcutFor, useShortcut, type ActionId } from "@/
 import { useTabs, type BookTab } from "@/lib/tabs";
 import { cn } from "@/lib/utils";
 import {
+  canBionic,
   createRenderer,
   isAudio,
+  lineAt,
   isPaged,
   PAGE_THEMES,
   pageTheme,
@@ -91,6 +93,8 @@ import { mathsFromPicture, useMathsSettings } from "../maths/api";
 import { AddLinkDialog, CopyViewer, LinksPanel, linkOf, type LinkInfo } from "../weblinks";
 import { useListening } from "../listening/store";
 import { ListenBar, type ListenMode } from "../listening/ListenBar";
+import { FocusOverlay } from "../adhd/FocusOverlay";
+import { useAdhd, useAdhdPause } from "../adhd/state";
 import { pdfAnnots } from "@/readers";
 import { useQuery } from "@tanstack/react-query";
 import { unwrap } from "@/lib/ipc";
@@ -280,6 +284,15 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
     pointerTimer.current = setTimeout(() => setPointerActive(false), 2500);
   };
   useEffect(() => () => clearTimeout(pointerTimer.current), []);
+  // Pointer moves over pages in frames (EPUB) reach these through the renderer.
+  const pointerMovedRef = useRef(pointerMoved);
+  useEffect(() => {
+    pointerMovedRef.current = pointerMoved;
+  });
+  const pointerSink = useRef<((x: number, y: number) => void) | null>(null);
+  const setPointerSink = useCallback((look: ((x: number, y: number) => void) | null) => {
+    pointerSink.current = look;
+  }, []);
   // Jumps made from the app (contents, marks, links) can be undone with Back.
   const history = useRef<{ back: Locator[]; forward: Locator[] }>({ back: [], forward: [] });
   const [zoom, setZoom] = useState<ZoomValue>(1);
@@ -402,6 +415,10 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
             mathClick: (latex, rect) => setMath({ latex, rect, from: "book" }),
             externalLink: (href) => linkRef.current(href),
             formChanged: (dirty) => setFormDirty(dirty),
+            pointer: (x, y) => {
+              pointerSink.current?.(x, y);
+              pointerMovedRef.current();
+            },
           },
           bookId,
         );
@@ -508,6 +525,22 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   useEffect(() => {
     if (status === "ready") rendererRef.current?.setLineHeight(profilePrefs.reader.lineHeight);
   }, [profilePrefs.reader.lineHeight, status]);
+
+  // ADHD reading (Settings › Reader), unless paused for now. Only the tab
+  // shown is changed; the others catch up when shown.
+  const adhd = useAdhd();
+  const setAdhdPaused = useAdhdPause((s) => s.setPaused);
+  const bionicHere = canBionic(fileType);
+  const bionic = adhd.live && adhd.bionic && bionicHere;
+  useEffect(() => {
+    if (status !== "ready" || !active) return;
+    rendererRef.current?.setBionic?.(bionic ? { fixation: adhd.fixation, fade: adhd.fade } : null);
+  }, [bionic, adhd.fixation, adhd.fade, status, active, current?.key]);
+  const findLine = useCallback((x: number, y: number) => {
+    const renderer = rendererRef.current;
+    if (!renderer) return null;
+    return renderer.lineAt ? renderer.lineAt(x, y) : lineAt(document, x, y);
+  }, []);
 
   const r = () => rendererRef.current;
   const isPdf = isPaged(fileType);
@@ -1323,6 +1356,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
           onZoom={changeZoom}
           pageLayout={pageLayout}
           onPageLayout={changeLayout}
+          bionicHere={bionicHere}
         />
         <Button
           variant="ghost"
@@ -1555,6 +1589,21 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
                 : undefined
             }
           />
+          {adhd.live &&
+            (adhd.line || adhd.mask) &&
+            status === "ready" &&
+            !editing &&
+            !comparing &&
+            !markup.active && (
+              <FocusOverlay
+                line={adhd.line}
+                mask={adhd.mask}
+                maskHeight={adhd.maskHeight}
+                findLine={findLine}
+                onSink={setPointerSink}
+                refresh={location}
+              />
+            )}
           {clipping && (
             <div
               className="absolute inset-0 z-20 cursor-crosshair bg-black/10"
@@ -1779,6 +1828,25 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
         </div>
         <span className="tabular-nums">{Math.round((location?.progress ?? 0) * 100)}%</span>
         <span className="flex-1" />
+        {adhd.enabled && (
+          <button
+            type="button"
+            className={cn("hover:text-foreground", adhd.live && "text-foreground")}
+            aria-pressed={adhd.live}
+            title={
+              adhd.live
+                ? "Pause ADHD reading for now (Settings › Reader keeps it on)"
+                : "Turn ADHD reading back on"
+            }
+            onClick={() => setAdhdPaused(adhd.live)}
+          >
+            {!adhd.live
+              ? "ADHD reading: Paused"
+              : adhd.line || adhd.mask || bionicHere
+                ? "ADHD reading: On"
+                : "ADHD reading: not available for this book"}
+          </button>
+        )}
         {pageLinks > 0 && (
           <button
             type="button"

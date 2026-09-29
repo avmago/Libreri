@@ -3,6 +3,7 @@ import type { Renderer, RendererEvents } from "./types";
 
 export * from "./types";
 export { PAGE_THEMES, pageTheme, type PageTheme, type PageThemeId } from "./themes";
+export { lineAt, type BionicOptions, type LineBox } from "./focus";
 
 const PAGE_IMAGES: FileType[] = ["djvu", "cbz", "cbr", "cb7", "cbt", "cba"];
 
@@ -23,6 +24,11 @@ export function isAudio(type: FileType | undefined): boolean {
 /** Books with real pages (zoom, fit, go to page): PDF, DjVu and comics. */
 export function isPaged(type: FileType | undefined): boolean {
   return type === "pdf" || (type !== undefined && PAGE_IMAGES.includes(type));
+}
+
+/** Books whose text Libreri lays out, so bionic reading can change it. */
+export function canBionic(type: FileType | undefined): boolean {
+  return type !== undefined && ["epub", "mobi", "azw3", "fb2", "md", "txt"].includes(type);
 }
 
 /** Loads the renderer for a format (each is its own chunk). */

@@ -22,6 +22,16 @@ import type {
 } from "../types";
 import { isDrawn } from "../types";
 import { mathmlToLatex } from "../math/latex";
+import {
+  applyBionic,
+  BIONIC_CSS,
+  bionicFilter,
+  lineAt,
+  liftBoundary,
+  removeBionic,
+  type BionicOptions,
+  type LineBox,
+} from "../focus";
 
 interface FoliateTocItem {
   label: string;
@@ -75,6 +85,7 @@ const OPAQUE: Record<HighlightColor, string> = {
 };
 
 let loaded: Promise<unknown> | null = null;
+let epubcfi: Promise<typeof import("foliate-js/epubcfi.js")> | null = null;
 let overlayer: Promise<{ Overlayer: { highlight: unknown; underline: unknown } }> | null = null;
 
 export class EbookRenderer implements Renderer {
@@ -92,6 +103,7 @@ export class EbookRenderer implements Renderer {
   private findIndex = -1;
   private lastQuery = "";
   private cleanup: (() => void)[] = [];
+  private bionic: BionicOptions | null = null;
 
   constructor(private readonly events: RendererEvents) {}
 
@@ -100,8 +112,10 @@ export class EbookRenderer implements Renderer {
     overlayer ??= import("foliate-js/overlayer.js") as Promise<{
       Overlayer: { highlight: unknown; underline: unknown };
     }>;
+    epubcfi ??= import("foliate-js/epubcfi.js");
     await loaded;
     const { Overlayer } = await overlayer;
+    const CFI = await epubcfi;
 
     // foliate-js recognises formats by file name, so keep the extension.
     const res = await fetch(url);
@@ -113,6 +127,7 @@ export class EbookRenderer implements Renderer {
     this.view.className = "lb-ebook";
     container.append(this.view);
     await this.view.open(file);
+    this.positionsIgnoreBionic(CFI);
     this.view.renderer.setAttribute("flow", "paginated");
     this.view.renderer.setAttribute("margin", "48px");
     this.view.renderer.setAttribute("gap", "6%");
@@ -151,6 +166,11 @@ export class EbookRenderer implements Renderer {
       this.attachToSection(doc, index),
     );
 
+    // A chapter shown again gets its highlights back.
+    on<{ index: number }>("create-overlay", () => {
+      for (const cfi of this.annotations.keys()) void this.view.addAnnotation({ value: cfi });
+    });
+
     on<{ draw: (f: unknown, opts: unknown) => void; annotation: { value: string } }>(
       "draw-annotation",
       ({ draw, annotation }) => {
@@ -175,6 +195,44 @@ export class EbookRenderer implements Renderer {
     await this.view.init({ lastLocation: start, showTextStart: !start });
   }
 
+  /**
+   * Positions (CFIs) are made and read as if bionic reading's wrappers
+   * were not there, so they are the same with it on or off.
+   */
+  private positionsIgnoreBionic(CFI: typeof import("foliate-js/epubcfi.js")) {
+    const view = this.view as unknown as {
+      getCFI(index: number, range?: Range): string;
+      resolveCFI(cfi: string): { index: number; anchor: unknown };
+    };
+    const base = view.getCFI.bind(view);
+    view.getCFI = (index, range) => {
+      if (!range) return base(index);
+      const start = liftBoundary(range.startContainer, range.startOffset);
+      const end = liftBoundary(range.endContainer, range.endOffset);
+      const inner = CFI.fromRange(
+        {
+          startContainer: start.node,
+          startOffset: start.offset,
+          endContainer: end.node,
+          endOffset: end.offset,
+          collapsed: range.collapsed,
+        },
+        bionicFilter,
+      );
+      return CFI.joinIndir(base(index), inner);
+    };
+    const resolve = view.resolveCFI.bind(view);
+    view.resolveCFI = (cfi) => {
+      const found = resolve(cfi);
+      const parts = CFI.parse(cfi);
+      (parts.parent ?? parts).shift();
+      return {
+        index: found.index,
+        anchor: (doc: Document) => CFI.toRange(doc, parts, bionicFilter),
+      };
+    };
+  }
+
   /** A rectangle inside a book page, in window coordinates. */
   private toScreen(r: DOMRect, frame: Element | null | undefined): DOMRect {
     const f = frame?.getBoundingClientRect();
@@ -182,6 +240,12 @@ export class EbookRenderer implements Renderer {
   }
 
   private attachToSection(doc: Document, index: number) {
+    if (this.bionic) this.bionicIn(doc, this.bionic);
+    // The app does not see the pointer over the page's frame: pass it on.
+    doc.addEventListener("pointermove", (e) => {
+      const f = doc.defaultView?.frameElement?.getBoundingClientRect();
+      this.events.pointer?.(e.clientX + (f?.left ?? 0), e.clientY + (f?.top ?? 0));
+    });
     // Keys pressed while the book has focus still reach the app's shortcuts.
     doc.addEventListener("keydown", (e) => {
       window.dispatchEvent(
@@ -416,6 +480,49 @@ export class EbookRenderer implements Renderer {
         return next && next.index !== before ? next.doc.body : null;
       },
     );
+  }
+
+  private bionicIn(doc: Document, options: BionicOptions | null) {
+    // Fixed-layout books (comics, some EPUBs) are laid out by the book.
+    if (!doc.body || typeof this.view.renderer.setStyles !== "function") return;
+    removeBionic(doc.body);
+    let style = doc.getElementById("lb-bionic-css");
+    if (options) {
+      if (!style) {
+        style = doc.createElement("style");
+        style.id = "lb-bionic-css";
+        style.textContent = BIONIC_CSS;
+        (doc.head ?? doc.documentElement).append(style);
+      }
+      applyBionic(doc.body, options);
+    } else style?.remove();
+  }
+
+  setBionic(options: BionicOptions | null) {
+    if (JSON.stringify(options) === JSON.stringify(this.bionic)) return;
+    this.bionic = options;
+    if (!this.view?.renderer) return;
+    const here = this.view.lastLocation?.cfi;
+    for (const { doc } of this.view.renderer.getContents()) this.bionicIn(doc, options);
+    // The text moved: draw highlights again and stay at the same place.
+    for (const cfi of this.annotations.keys()) void this.view.addAnnotation({ value: cfi });
+    if (here) void this.view.goTo(here);
+  }
+
+  lineAt(x: number, y: number): LineBox | null {
+    for (const { doc } of this.view?.renderer?.getContents() ?? []) {
+      const f = doc.defaultView?.frameElement?.getBoundingClientRect();
+      if (!f || x < f.left || x > f.right || y < f.top || y > f.bottom) continue;
+      const box = lineAt(doc, x - f.left, y - f.top);
+      if (!box) return null;
+      return {
+        top: box.top + f.top,
+        bottom: box.bottom + f.top,
+        left: box.left + f.left,
+        right: box.right + f.left,
+      };
+    }
+    return null;
   }
 
   async goToFraction(fraction: number) {

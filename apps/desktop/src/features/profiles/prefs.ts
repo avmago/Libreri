@@ -32,6 +32,22 @@ export interface ProfilePrefs {
     /** Open books where you stopped reading. */
     resume: boolean;
   };
+  /** ADHD reading (Settings › Reader). The reader's Aa menu can pause it
+   * for a while without changing these. */
+  adhd: {
+    /** The start of each word bold (books whose text Libreri lays out). */
+    bionic: boolean;
+    /** Share of each word made bold, 0.3–0.7. */
+    fixation: number;
+    /** Opacity of the rest of the word, 0.4–1. */
+    fade: number;
+    /** Highlights the line under the pointer. */
+    line: boolean;
+    /** Dims the page except a strip around the pointer. */
+    mask: boolean;
+    /** Height of that strip in pixels. */
+    maskHeight: number;
+  };
   notes: {
     defaultColor: HighlightColor;
     /** Add a link back to the page when quoting into the notebook. */
@@ -82,6 +98,7 @@ export const DEFAULT_PROFILE_PREFS: ProfilePrefs = {
   vimKeys: false,
   library: { view: "grid", sidebarCollapsed: false, confirmTrash: true },
   reader: { brightness: 100, contrast: 100, fontScale: 100, lineHeight: 1.55, resume: true },
+  adhd: { bionic: false, fixation: 0.5, fade: 1, line: false, mask: false, maskHeight: 120 },
   notes: { defaultColor: "yellow", linkQuotes: true },
   markup: { signatures: [], stamps: [], color: "#dc2626", width: 0.0025, snap: true },
   listening: {
@@ -114,6 +131,7 @@ export function parsePrefs(json: string | null | undefined): ProfilePrefs {
     shortcuts: { ...d.shortcuts, ...raw.shortcuts },
     library: { ...d.library, ...raw.library },
     reader: { ...d.reader, ...raw.reader },
+    adhd: { ...d.adhd, ...raw.adhd },
     notes: { ...d.notes, ...raw.notes },
     markup: { ...d.markup, ...raw.markup },
     listening: { ...d.listening, ...raw.listening },
@@ -155,6 +173,7 @@ export const useProfilePrefs = create<PrefsState>((set, get) => ({
         : cur.shortcuts,
       library: { ...cur.library, ...change.library },
       reader: { ...cur.reader, ...change.reader },
+      adhd: { ...cur.adhd, ...change.adhd },
       notes: { ...cur.notes, ...change.notes },
       markup: { ...cur.markup, ...change.markup } as ProfilePrefs["markup"],
       listening: { ...cur.listening, ...change.listening },
