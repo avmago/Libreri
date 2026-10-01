@@ -11,9 +11,18 @@ const AUDIO: FileType[] = ["mp3", "m4b", "m4a", "aac", "ogg", "opus", "flac"];
 
 /** Formats Libreri's reader opens. The rest open in another app for now. */
 export function canRead(type: FileType): boolean {
-  return ["pdf", "epub", "mobi", "azw3", "fb2", "md", "txt", ...PAGE_IMAGES, ...AUDIO].includes(
-    type,
-  );
+  return [
+    "pdf",
+    "epub",
+    "mobi",
+    "azw3",
+    "fb2",
+    "md",
+    "rtf",
+    "txt",
+    ...PAGE_IMAGES,
+    ...AUDIO,
+  ].includes(type);
 }
 
 /** Audiobooks: opened in the player. */
@@ -28,7 +37,7 @@ export function isPaged(type: FileType | undefined): boolean {
 
 /** Books whose text Libreri lays out, so bionic reading can change it. */
 export function canBionic(type: FileType | undefined): boolean {
-  return type !== undefined && ["epub", "mobi", "azw3", "fb2", "md", "txt"].includes(type);
+  return type !== undefined && ["epub", "mobi", "azw3", "fb2", "md", "rtf", "txt"].includes(type);
 }
 
 /** Loads the renderer for a format (each is its own chunk). */
@@ -47,6 +56,7 @@ export async function createRenderer(
       return new PdfRenderer(events, bookId);
     }
     case "md":
+    case "rtf":
     case "txt": {
       const { DocumentRenderer } = await import("./document/DocumentRenderer");
       return new DocumentRenderer(type, events);

@@ -108,6 +108,21 @@ fn serve(app: &AppHandle, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
     let Some(path) = library.layout().resolve_relative(&relative) else {
         return status(StatusCode::FORBIDDEN);
     };
+    // `<book>.rtf?as=md`: an RTF book as Markdown, for the reader.
+    let as_md = request
+        .uri()
+        .query()
+        .is_some_and(|q| q.split('&').any(|p| p == "as=md"));
+    if as_md && relative.to_ascii_lowercase().ends_with(".rtf") {
+        return match libreri_formats::rtf::read_markdown(&path) {
+            Ok(md) => base(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
+                .header(header::CACHE_CONTROL, "no-cache")
+                .body(md.into_bytes())
+                .expect("markdown response"),
+            Err(_) => status(StatusCode::UNPROCESSABLE_ENTITY),
+        };
+    }
     serve_file(request, &path, &relative)
 }
 
@@ -303,6 +318,7 @@ fn content_type(path: &str) -> &'static str {
         "pdf" => "application/pdf",
         "epub" => "application/epub+zip",
         "md" | "markdown" | "txt" => "text/plain; charset=utf-8",
+        "rtf" => "application/rtf",
         "json" => "application/json",
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",

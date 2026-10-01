@@ -9,7 +9,7 @@ Requirement (user, 2026-09-27): when the database, metadata and every kind of no
    | Format | Primary locator | Fallback |
    |---|---|---|
    | PDF | page index + rectangle (PDF coordinates, zoom-independent) | quoted text + surrounding words (W3C TextQuoteSelector) |
-   | EPUB / MOBI / AZW3 / FB2 / TXT | EPUB CFI / character offset | quoted text + context |
+   | EPUB / MOBI / AZW3 / FB2 / TXT / RTF | EPUB CFI / character offset | quoted text + context |
    | DjVu | page + rectangle | OCR text quote |
    | Comics | page index + rectangle | page image hash |
    | Markdown | heading path + line | quoted text |

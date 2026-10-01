@@ -23,6 +23,7 @@ pub const DEFAULT_FORMAT_ORDER: &[FileType] = &[
     FileType::Cb7,
     FileType::Cbt,
     FileType::Md,
+    FileType::Rtf,
     FileType::Txt,
     FileType::M4b,
     FileType::Mp3,

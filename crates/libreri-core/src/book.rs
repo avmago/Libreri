@@ -15,6 +15,7 @@ pub enum FileType {
     Fb2,
     Txt,
     Md,
+    Rtf,
     Djvu,
     Cbz,
     Cbr,
@@ -39,6 +40,7 @@ impl FileType {
         Self::Fb2,
         Self::Txt,
         Self::Md,
+        Self::Rtf,
         Self::Djvu,
         Self::Cbz,
         Self::Cbr,
@@ -66,6 +68,7 @@ impl FileType {
             "fb2" => Self::Fb2,
             "txt" => Self::Txt,
             "md" | "markdown" => Self::Md,
+            "rtf" => Self::Rtf,
             "djvu" | "djv" => Self::Djvu,
             "cbz" => Self::Cbz,
             "cbr" => Self::Cbr,
@@ -92,6 +95,7 @@ impl FileType {
             Self::Fb2 => "fb2",
             Self::Txt => "txt",
             Self::Md => "md",
+            Self::Rtf => "rtf",
             Self::Djvu => "djvu",
             Self::Cbz => "cbz",
             Self::Cbr => "cbr",
@@ -475,6 +479,10 @@ mod tests {
             Some(FileType::Md)
         );
         assert_eq!(FileType::from_path(Path::new("x.docx")), None);
+        assert_eq!(
+            FileType::from_path(Path::new("Notes.RTF")),
+            Some(FileType::Rtf)
+        );
         assert_eq!(FileType::from_path(Path::new("noext")), None);
         for t in FileType::ALL {
             assert_eq!(FileType::parse(t.as_str()), Some(*t));

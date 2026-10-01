@@ -14,6 +14,7 @@ mod mobi;
 pub mod ocr;
 mod pdf;
 pub mod pdftext;
+pub mod rtf;
 pub mod text;
 pub use comic::{extract_pages, list_pages, read_zip_page, ComicPages};
 pub use pdf::{measure_scales, page_boxes, PageBox, PageScale};
@@ -46,6 +47,7 @@ pub fn extract(path: &Path, file_type: FileType) -> Extracted {
         FileType::Pdf => pdf::read(path, &mut out),
         FileType::Epub => epub::read(path, &mut out),
         FileType::Md => markdown::read(path, &mut out),
+        FileType::Rtf => rtf::read(path, &mut out),
         FileType::Fb2 => fb2::read(path, &mut out),
         FileType::Djvu => djvu::read(path, &mut out),
         FileType::Mobi | FileType::Azw3 => mobi::read(path, &mut out),

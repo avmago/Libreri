@@ -92,7 +92,7 @@ Your library is an ordinary folder. Books stay as plain files, notes are Markdow
 |---|---|
 | Documents | PDF (with forms), DjVu |
 | Ebooks | EPUB, MOBI, AZW3, FB2 (DRM-free) |
-| Text | Markdown (KaTeX maths, Mermaid, code), plain text |
+| Text | Markdown (KaTeX maths, Mermaid, code), RTF, plain text |
 | Comics | CBZ, CBR, CB7, CBT, CBA |
 | Audiobooks | MP3, M4B, M4A, AAC, OGG, Opus, FLAC |
 

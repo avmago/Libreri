@@ -40,7 +40,8 @@ export function TabStrip({ onMoveToWindow }: { onMoveToWindow: (bookId: string) 
       {tabs.map((t) => {
         const isActive = active === t.bookId;
         const inSplit = split?.left === t.bookId || split?.right === t.bookId;
-        const Icon = t.fileType === "md" || t.fileType === "txt" ? FileText : BookOpen;
+        const Icon =
+          t.fileType === "md" || t.fileType === "rtf" || t.fileType === "txt" ? FileText : BookOpen;
         return (
           <div
             key={t.bookId}

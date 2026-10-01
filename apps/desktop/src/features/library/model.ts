@@ -68,6 +68,7 @@ export const FILE_TYPE_LABEL: Record<FileType, string> = {
   fb2: "FB2",
   txt: "Text",
   md: "Markdown",
+  rtf: "RTF",
   djvu: "DjVu",
   cbz: "CBZ",
   cbr: "CBR",

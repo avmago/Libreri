@@ -117,27 +117,28 @@ export class DocumentRenderer implements Renderer {
   private bionic: BionicOptions | null = null;
 
   constructor(
-    private readonly kind: "md" | "txt",
+    /** RTF is read as Markdown, made by Libreri when it is opened. */
+    private readonly kind: "md" | "rtf" | "txt",
     private readonly events: RendererEvents,
   ) {}
 
   async open(container: HTMLElement, url: string, initial: Locator | null) {
-    const res = await fetch(url);
+    const res = await fetch(this.kind === "rtf" ? `${url}?as=md` : url);
     if (!res.ok) throw new Error(`The file could not be read (${res.status}).`);
     const text = await res.text();
 
     this.scroller = document.createElement("div");
     this.scroller.className = "lb-doc-scroller";
     this.article = document.createElement("article");
-    this.article.className = `lb-doc lb-doc-${this.kind}`;
-    if (this.kind === "md") {
+    this.article.className = `lb-doc lb-doc-${this.kind === "rtf" ? "md" : this.kind}`;
+    if (this.kind !== "txt") {
       this.article.innerHTML = renderMarkdown(text);
     } else {
       this.article.textContent = text;
     }
     this.scroller.append(this.article);
     container.append(this.scroller);
-    if (this.kind === "md") {
+    if (this.kind !== "txt") {
       for (const el of this.article.querySelectorAll<HTMLElement>("pre.mermaid")) {
         this.diagrams.set(el, el.textContent ?? "");
       }
@@ -437,7 +438,7 @@ export class DocumentRenderer implements Renderer {
     s.setProperty("--page-fg", theme.fg);
     s.setProperty("--page-link", theme.link);
     this.scroller.classList.toggle("lb-dark", theme.dark);
-    if (this.kind === "md") this.drawDiagrams();
+    if (this.kind !== "txt") this.drawDiagrams();
     // Recolour existing highlights for the new background.
     for (const m of this.article.querySelectorAll<HTMLElement>("mark[data-annotation]")) {
       const a = this.annotations.find((x) => x.id === m.dataset.annotation);

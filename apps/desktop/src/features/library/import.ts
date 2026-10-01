@@ -22,6 +22,7 @@ export const BOOK_EXTENSIONS = [
   "txt",
   "md",
   "markdown",
+  "rtf",
   "djvu",
   "djv",
   "cbz",

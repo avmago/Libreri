@@ -51,6 +51,7 @@ pub fn has_text(ft: FileType) -> bool {
             | FileType::Fb2
             | FileType::Txt
             | FileType::Md
+            | FileType::Rtf
             | FileType::Djvu
     )
 }
@@ -74,6 +75,11 @@ pub fn book_text(path: &Path, ft: FileType) -> Result<BookText, String> {
         FileType::Txt | FileType::Md => {
             let mut b = BookText::default();
             split_into(&mut b, None, None, &read_text_file(path)?);
+            b
+        }
+        FileType::Rtf => {
+            let mut b = BookText::default();
+            split_into(&mut b, None, None, &crate::rtf::read_markdown(path)?);
             b
         }
         _ => BookText::default(),

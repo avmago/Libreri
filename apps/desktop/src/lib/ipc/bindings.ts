@@ -1437,7 +1437,7 @@ export type FeedsDto = {
 };
 
 /**  Every file format Libreri accepts, detected from the file extension. */
-export type FileType = "pdf" | "epub" | "mobi" | "azw3" | "fb2" | "txt" | "md" | "djvu" | "cbz" | "cbr" | "cb7" | "cba" | "cbt" | "mp3" | "m4b" | "m4a" | "aac" | "ogg" | "opus" | "flac";
+export type FileType = "pdf" | "epub" | "mobi" | "azw3" | "fb2" | "txt" | "md" | "rtf" | "djvu" | "cbz" | "cbr" | "cb7" | "cba" | "cbt" | "mp3" | "m4b" | "m4a" | "aac" | "ogg" | "opus" | "flac";
 
 export type FolderChange = {
 	name: string | null,

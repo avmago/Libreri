@@ -21,6 +21,7 @@ const DEFAULT_ORDER: FileType[] = [
   "djvu",
   "cbz",
   "cbr",
+  "rtf",
   "txt",
 ];
 
