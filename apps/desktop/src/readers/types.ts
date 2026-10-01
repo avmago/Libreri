@@ -109,6 +109,10 @@ export interface Renderer {
   setTheme(theme: PageTheme, pdfMode: PdfDarkMode): void;
   /** Text size for reflowable books, page zoom for PDFs (1 = 100 %). */
   setZoom(zoom: ZoomValue): void;
+  /** Zooms by a factor around a point on screen (pinch, Ctrl + wheel),
+   * keeping that point under the fingers. Renderers without it are zoomed
+   * with `setZoom`. */
+  zoomBy?(factor: number, clientX: number, clientY: number): void;
   zoom(): ZoomValue;
   clearSelection(): void;
   /** True for PDFs, DjVu and comics (real pages you can jump to). */

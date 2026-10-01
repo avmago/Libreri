@@ -10,6 +10,8 @@ import {
   GitCompare,
   Headphones,
   Podcast,
+  ZoomIn,
+  ZoomOut,
   History,
   Mic,
   Volume2,
@@ -64,6 +66,7 @@ import {
   useSaveAnnotation,
 } from "../api";
 import { useAppDark } from "../hooks/useAppDark";
+import { usePinchZoom } from "../hooks/usePinchZoom";
 import { pageJump, parseBookLink } from "../links";
 import { useReaderPrefs } from "../prefs";
 import { AppearanceMenu } from "./AppearanceMenu";
@@ -743,6 +746,20 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
     renderer.setZoom(next);
     setZoom(renderer.zoom());
   };
+  // Pinch on a trackpad or touch screen, or Ctrl/⌘ + wheel: zoom pages,
+  // or change the text size of reflowing books.
+  usePinchZoom(hostRef, status === "ready" && !editing && !comparing, (factor, x, y) => {
+    const renderer = r();
+    if (!renderer) return;
+    if (renderer.zoomBy) renderer.zoomBy(factor, x, y);
+    else {
+      const cur = renderer.zoom();
+      const n = typeof cur === "number" ? cur : 1;
+      const [lo, hi] = isPdf ? [0.25, 5] : [0.5, 3];
+      renderer.setZoom(Math.round(Math.min(hi, Math.max(lo, n * factor)) * 100) / 100);
+    }
+    setZoom(renderer.zoom());
+  });
 
   const bookmarkHere = annotations.find(
     (a) =>
@@ -1296,6 +1313,42 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
             <span className="tabular-nums">/ {location.pages}</span>
           </form>
         ) : null}
+        {isPdf && status === "ready" && !comparing && (
+          <div
+            className="flex shrink-0 items-center rounded-md border"
+            role="group"
+            aria-label="Zoom"
+            title="Zoom: pinch, or Ctrl/⌘ + scroll"
+          >
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              aria-label={`Zoom out (${keys("reader.zoomOut")})`}
+              onClick={() => changeZoom(-1)}
+            >
+              <ZoomOut />
+            </Button>
+            <button
+              type="button"
+              className="w-12 text-center text-[12px] tabular-nums hover:text-foreground"
+              aria-label={`${zoomLabel}: fit automatically (${keys("reader.zoomReset")})`}
+              title="Fit automatically"
+              onClick={() => changeZoom(0)}
+            >
+              {typeof zoom === "number" ? `${Math.round(zoom * 100)}%` : "Fit"}
+            </button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              aria-label={`Zoom in (${keys("reader.zoomIn")})`}
+              onClick={() => changeZoom(1)}
+            >
+              <ZoomIn />
+            </Button>
+          </div>
+        )}
         {markup.available && (
           <div className="mr-1 flex rounded-md border p-0.5" role="radiogroup" aria-label="Mode">
             {(

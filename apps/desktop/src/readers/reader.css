@@ -6,6 +6,8 @@
 
 /* ---- Markdown and plain text ------------------------------------------ */
 .lb-doc-scroller {
+  /* Two-finger pinch zooms the book, not the whole window. */
+  touch-action: pan-x pan-y;
   position: absolute;
   inset: 0;
   overflow-y: auto;
@@ -192,6 +194,8 @@ mark.lb-find-current {
   background: var(--page-surround, #e9e9ec);
 }
 .lb-pdf-scroller {
+  /* Two-finger pinch zooms the book, not the whole window. */
+  touch-action: pan-x pan-y;
   position: absolute;
   inset: 0;
   overflow: auto;
@@ -274,6 +278,8 @@ mark.lb-find-current {
   background: #18181b;
 }
 .lb-pages-scroller {
+  /* Two-finger pinch zooms the book, not the whole window. */
+  touch-action: pan-x pan-y;
   position: absolute;
   inset: 0;
   overflow: auto;

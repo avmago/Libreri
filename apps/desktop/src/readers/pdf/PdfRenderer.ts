@@ -748,6 +748,14 @@ export class PdfRenderer implements Renderer {
       typeof zoom === "number" ? String(Math.min(5, Math.max(0.25, zoom))) : zoom;
   }
 
+  zoomBy(factor: number, clientX: number, clientY: number) {
+    const cur = this.viewer.currentScale || 1;
+    const next = Math.min(5, Math.max(0.25, cur * factor));
+    if (Math.abs(next - cur) < 0.001) return;
+    this.viewer.updateScale({ scaleFactor: next / cur, origin: [clientX, clientY] });
+    this.zoomValue = this.viewer.currentScale;
+  }
+
   zoom(): ZoomValue {
     const v = this.viewer?.currentScale;
     return typeof this.zoomValue === "number" ? this.zoomValue : (v ?? 1);
