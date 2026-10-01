@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { RowsSkeleton } from "@/components/Placeholders";
 import { toast } from "sonner";
 import { ask, open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -634,7 +635,7 @@ export function VersionsDialog({
       description="Libreri keeps the file as it was before each change to its pages, a redaction, a filled-in form or markup saved into it."
       className="w-[560px]"
     >
-      {isLoading && <p className="text-muted-foreground">Loading…</p>}
+      {isLoading && <RowsSkeleton rows={3} label="Loading versions…" />}
       {versions && !versions.length && (
         <p className="flex items-center gap-2 text-muted-foreground">
           <History className="size-4" /> No earlier versions. This is the file as it was added.

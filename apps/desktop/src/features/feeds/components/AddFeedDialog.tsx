@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { RowsSkeleton } from "@/components/Placeholders";
 import { open as pickFile } from "@tauri-apps/plugin-dialog";
 import { Check, FileUp, Loader2, Rss, Search } from "lucide-react";
 import { toast } from "sonner";
@@ -303,11 +304,7 @@ function ArxivTab({
         onChange={(e) => setFilter(e.target.value)}
       />
       <div className="max-h-72 overflow-auto rounded-lg border">
-        {isPending && (
-          <p className="flex items-center gap-2 p-3 text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" /> Loading…
-          </p>
-        )}
+        {isPending && <RowsSkeleton rows={4} label="Loading suggestions…" />}
         {shown.map((g) => (
           <fieldset key={g.name} className="border-b px-3 py-2 last:border-b-0">
             <legend className="sr-only">{g.name}</legend>

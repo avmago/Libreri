@@ -1,4 +1,5 @@
 import { ResizablePanel } from "@/components/ResizablePanel";
+import { ThumbsSkeleton } from "@/components/Placeholders";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ask } from "@tauri-apps/plugin-dialog";
@@ -425,8 +426,8 @@ export function PageEditor({
     );
   if (!s || !pdf)
     return (
-      <div className="flex flex-1 items-center justify-center gap-2 text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" /> Opening the pages…
+      <div className="flex-1">
+        <ThumbsSkeleton count={12} />
       </div>
     );
 

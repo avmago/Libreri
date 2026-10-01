@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BookPlus, ExternalLink, FolderOpen, Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { PageSkeleton } from "@/components/Placeholders";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/features/profiles";
 import { bookUrl, commands, unwrap } from "@/lib/ipc";
@@ -21,6 +22,7 @@ export function FeedDocView({ tab, feed }: { tab: BookTab; feed: FeedDoc }) {
   const host = useRef<HTMLDivElement>(null);
   const renderer = useRef<Renderer | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [opened, setOpened] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [adding, setAdding] = useState(false);
   const { editLibrary } = usePermissions();
@@ -41,6 +43,7 @@ export function FeedDocView({ tab, feed }: { tab: BookTab; feed: FeedDoc }) {
         await r.open(el, bookUrl(feed.file), null);
         if (gone) return r.destroy();
         renderer.current = r;
+        setOpened(true);
       } catch (e) {
         if (!gone)
           setError(
@@ -131,6 +134,11 @@ export function FeedDocView({ tab, feed }: { tab: BookTab; feed: FeedDoc }) {
       </div>
       <div className="relative min-h-0 flex-1 overflow-hidden bg-muted/40">
         <div ref={host} className="absolute inset-0" />
+        {!opened && !error && (
+          <div className="absolute inset-0">
+            <PageSkeleton />
+          </div>
+        )}
         {error && (
           <p className="absolute inset-0 flex items-center justify-center p-6 text-center text-destructive">
             {error}

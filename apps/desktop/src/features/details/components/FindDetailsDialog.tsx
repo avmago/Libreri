@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { RowsSkeleton } from "@/components/Placeholders";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { AlertTriangle, ExternalLink, Loader2, ScanBarcode, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -84,11 +86,7 @@ function Finder({ bookId, onDone }: { bookId: string; onDone: () => void }) {
   });
 
   if (!book || form === null) {
-    return (
-      <p className="flex items-center gap-2 py-10 text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" /> Getting ready…
-      </p>
-    );
+    return <RowsSkeleton rows={5} label="Getting ready…" />;
   }
 
   const set = (k: keyof Query) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -160,10 +158,12 @@ function Finder({ bookId, onDone }: { bookId: string; onDone: () => void }) {
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-8 text-center text-muted-foreground">
             {find.isPending ? (
-              <>
-                <Loader2 className="size-5 animate-spin" />
-                Asking the sources…
-              </>
+              <RowsSkeleton
+                rows={3}
+                picture="square"
+                label="Asking the sources…"
+                className="w-full text-left"
+              />
             ) : result ? (
               <>
                 Nothing found. Try a shorter title, only the author's last name, or the ISBN from
@@ -526,9 +526,7 @@ function CoverRow({
         {!url ? (
           <span className="text-muted-foreground/60">—</span>
         ) : preview.isPending ? (
-          <div className="flex aspect-[2/3] w-20 items-center justify-center rounded-[3px] bg-muted">
-            <Loader2 className="size-4 animate-spin text-muted-foreground" />
-          </div>
+          <Skeleton className="aspect-[2/3] w-20 rounded-[3px]" aria-label="Loading the cover" />
         ) : preview.data ? (
           <img src={preview.data} alt="Found cover" className="w-20 rounded-[3px] shadow" />
         ) : (

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PageSkeleton } from "@/components/Placeholders";
 import { setReadingFullscreen, toggleReadingFullscreen, useFullscreen } from "@/lib/fullscreen";
 import {
   AlertTriangle,
@@ -1708,8 +1709,8 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
             </Button>
           )}
           {status === "loading" && (
-            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-              Opening…
+            <div className="absolute inset-0 bg-muted/40">
+              <PageSkeleton />
             </div>
           )}
           {status === "error" && (

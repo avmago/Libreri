@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { RowsSkeleton } from "@/components/Placeholders";
 import { Check, Loader2, Plus, Search, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -256,9 +257,7 @@ function Results({
 }) {
   if (!shows)
     return busy ? (
-      <div className="flex justify-center py-8 text-muted-foreground">
-        <Loader2 className="size-5 animate-spin" />
-      </div>
+      <RowsSkeleton rows={4} picture="square" label="Finding shows…" className="-mx-5" />
     ) : null;
   if (!shows.length)
     return <p className="py-6 text-center text-[12.5px] text-muted-foreground">No shows found.</p>;

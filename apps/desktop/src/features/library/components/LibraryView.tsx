@@ -1,4 +1,5 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef } from "react";
+import { CoversSkeleton, RowsSkeleton } from "@/components/Placeholders";
 import {
   ArrowDownUp,
   BookOpen,
@@ -659,12 +660,11 @@ export function LibraryView() {
           }}
         >
           {isPending ? (
-            <div
-              className="flex flex-1 items-center justify-center gap-2 py-20 text-muted-foreground"
-              role="status"
-            >
-              <RefreshCw className="size-4 animate-spin" aria-hidden /> Loading books…
-            </div>
+            view.view === "list" ? (
+              <RowsSkeleton rows={10} picture="square" label="Loading books…" />
+            ) : (
+              <CoversSkeleton />
+            )
           ) : isError && !data ? (
             <div
               className="flex flex-1 flex-col items-center justify-center gap-3 py-20 text-center"

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { ThumbsSkeleton } from "@/components/Placeholders";
+import { ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -68,11 +69,7 @@ export function CaptureViewer({
       description={path ?? undefined}
       className="w-[820px] max-h-[90vh]"
     >
-      {state === "loading" && (
-        <p className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" /> Opening the pages…
-        </p>
-      )}
+      {state === "loading" && <ThumbsSkeleton count={6} />}
       {state === "failed" && <p className="text-destructive">The pages could not be shown.</p>}
       <div ref={box} className="min-h-0 overflow-y-auto" />
       <div className="flex justify-end">

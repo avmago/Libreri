@@ -1,4 +1,5 @@
 import { useDeferredValue, useMemo, useState } from "react";
+import { BarSkeleton, RowsSkeleton } from "@/components/Placeholders";
 import { save as pickSave } from "@tauri-apps/plugin-dialog";
 import {
   AlertCircle,
@@ -97,8 +98,15 @@ export function FeedsView() {
 
   if (!data) {
     return (
-      <div className="flex h-full items-center justify-center text-muted-foreground">
-        <Loader2 className="size-5 animate-spin" />
+      <div className="flex h-full">
+        <div className="w-64 shrink-0 border-r bg-sidebar p-3">
+          <RowsSkeleton
+            rows={8}
+            label="Loading feeds…"
+            className="[&>div>div]:border-0 [&>div>div]:px-1 [&>div>div]:py-1.5"
+          />
+        </div>
+        <RowsSkeleton rows={7} label="Loading items…" className="flex-1" />
       </div>
     );
   }
@@ -773,11 +781,7 @@ function Items({ data }: { data: FeedsDto }) {
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-auto">
-        {isPending && !list && (
-          <p className="flex items-center gap-2 p-5 text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" /> Loading…
-          </p>
-        )}
+        {isPending && !list && <RowsSkeleton rows={7} label="Loading items…" />}
         {list && items.length === 0 && (
           <div className="flex flex-col items-center gap-2 p-10 text-center text-muted-foreground">
             <Inbox className="size-7" aria-hidden />
@@ -887,6 +891,7 @@ function ItemRow({
             {it.summary}
           </p>
         )}
+        {busy && <BarSkeleton label="Downloading…" className="max-w-sm pt-1" />}
         {it.downloadError && !it.file && (
           <p className="flex items-center gap-1.5 text-[12px] text-destructive">
             <AlertCircle className="size-3.5 shrink-0" /> {sentence(it.downloadError)}

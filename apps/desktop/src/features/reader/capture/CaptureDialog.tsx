@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft,
   ArrowRight,
@@ -225,7 +226,10 @@ export function CaptureDialog({
                     className="max-h-full max-w-full object-contain shadow"
                   />
                 ) : (
-                  <Loader2 className="size-5 animate-spin text-muted-foreground" />
+                  <Skeleton
+                    className="aspect-[1/1.35] h-full max-h-full"
+                    aria-label="Preparing the page"
+                  />
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-1.5">

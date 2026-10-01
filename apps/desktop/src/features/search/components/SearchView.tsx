@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { RowsSkeleton } from "@/components/Placeholders";
 import {
   BookOpen,
   ChevronDown,
@@ -423,7 +424,7 @@ export function SearchView() {
             (textHits.length > 0 || text.isFetching) && (
               <Section icon={FileSearch} title="Inside books" count={textHits.length}>
                 {text.isFetching && !textHits.length ? (
-                  <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden />
+                  <RowsSkeleton rows={3} label="Searching inside books…" className="-mx-5" />
                 ) : (
                   <div className="flex flex-col divide-y">
                     {textHits.slice(0, scope === "all" ? 20 : 100).map((m) => (
