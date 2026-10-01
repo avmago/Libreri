@@ -52,9 +52,10 @@ export function ProfilePicker({
         <>
           <div className="flex flex-col items-center gap-6 text-center">
             <div className="flex flex-col items-center gap-2">
-              <div className="flex items-center gap-3">
-                <LibreriMark className="size-12" />
-                <span className="text-[30px] leading-none font-semibold tracking-tight">
+              {/* The mark stands on the text's baseline, as tall as its letters. */}
+              <div className="flex items-baseline gap-3">
+                <LibreriMark tight className="h-[0.72em] w-auto text-[40px]" />
+                <span className="text-[40px] leading-none font-semibold tracking-tight">
                   Libreri
                 </span>
               </div>

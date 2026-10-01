@@ -1,9 +1,10 @@
 /** Libreri's mark: three books standing and one leaning on the shelf
  * (drawn in the current text colour, sized like the icons around it). */
-export function LibreriMark({ className }: { className?: string }) {
+export function LibreriMark({ className, tight }: { className?: string; tight?: boolean }) {
   return (
     <svg
-      viewBox="0 0 200 200"
+      // Tight: no space around the drawing, to line up with text.
+      viewBox={tight ? "2 14 195 169" : "0 0 200 200"}
       fill="none"
       stroke="currentColor"
       strokeWidth={18}
