@@ -26,6 +26,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         .commands(tauri_specta::collect_commands![
             commands::app::app_info,
             commands::app::open_external_url,
+            commands::app::print_window,
             commands::settings::get_settings,
             commands::settings::set_theme,
             commands::settings::set_accent,

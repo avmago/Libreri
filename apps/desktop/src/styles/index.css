@@ -131,3 +131,32 @@
     display: none !important;
   }
 }
+
+/* Printing a book (Print in the reader): only its pages, one per sheet. */
+.lb-print-pages {
+  display: none;
+}
+@media print {
+  body:has(.lb-print-pages) > *:not(.lb-print-pages) {
+    display: none !important;
+  }
+  body:has(.lb-print-pages) {
+    background: #fff !important;
+  }
+  .lb-print-pages {
+    display: block;
+  }
+  .lb-print-pages img {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 100vh;
+    object-fit: contain;
+    break-after: page;
+    page-break-after: always;
+  }
+  .lb-print-pages img:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+}

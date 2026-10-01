@@ -29,3 +29,14 @@ pub fn open_external_url(app: AppHandle, url: String) -> AppResult<()> {
         .open_url(url, None::<&str>)
         .map_err(|e| AppError::new(AppErrorKind::Io, e.to_string()))
 }
+
+/// Opens the system's print dialog for this window (what shows is decided
+/// by the page's print styles). `window.print()` does nothing in the macOS
+/// web view, so printing goes through here.
+#[tauri::command]
+#[specta::specta]
+pub fn print_window(window: tauri::WebviewWindow) -> AppResult<()> {
+    window
+        .print()
+        .map_err(|e| AppError::new(AppErrorKind::Io, e.to_string()))
+}

@@ -10,6 +10,7 @@ import {
   GitCompare,
   Headphones,
   Podcast,
+  Printer,
   ZoomIn,
   ZoomOut,
   History,
@@ -67,6 +68,7 @@ import {
 } from "../api";
 import { useAppDark } from "../hooks/useAppDark";
 import { usePinchZoom } from "../hooks/usePinchZoom";
+import { PrintDialog } from "../print/PrintDialog";
 import { pageJump, parseBookLink } from "../links";
 import { useReaderPrefs } from "../prefs";
 import { AppearanceMenu } from "./AppearanceMenu";
@@ -181,6 +183,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   const doc = tab.feed ?? null;
   const { data: book, error: bookError } = useBook(doc ? null : bookId);
   const [addingDoc, setAddingDoc] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const notForDocs = () =>
     toast("Add it to your library to highlight and keep notes", {
       action: { label: "Add to library…", onClick: () => setAddingDoc(true) },
@@ -1212,6 +1215,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
     setZoom(r()?.zoom() ?? 1);
   });
   useShortcut("reader.goToPage", () => pageInputRef.current?.focus());
+  useShortcut("reader.print", () => fileType === "pdf" && status === "ready" && setPrinting(true));
   useShortcut("reader.bookmark", toggleBookmark);
   useShortcut("reader.contents", () => setLeft((p) => (p ? null : lastLeft)));
   useShortcut("reader.notebook", () => (doc ? notForDocs() : setNotebookOpen((o) => !o)));
@@ -1444,6 +1448,17 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
         >
           <Search />
         </Button>
+        {fileType === "pdf" && status === "ready" && !comparing && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Print"
+            title={`Print (${keys("reader.print")})`}
+            onClick={() => setPrinting(true)}
+          >
+            <Printer />
+          </Button>
+        )}
         <AppearanceMenu
           isPdf={isPdf}
           zoomLabel={zoomLabel}
@@ -2131,6 +2146,16 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
           setCompare(bookId, r);
         }}
       />
+      {fileType === "pdf" && relPath && (
+        <PrintDialog
+          open={printing}
+          url={bookUrl(relPath)}
+          title={book?.metadata.title ?? tab.title}
+          page={location?.page ?? 1}
+          pages={location?.pages ?? 1}
+          onClose={() => setPrinting(false)}
+        />
+      )}
       {doc && (
         <AddToLibraryDialog
           space={doc.space}

@@ -15,6 +15,12 @@ export const commands = {
 	 *  `mailto` links are allowed.
 	 */
 	openExternalUrl: (url: string) => typedError<null, AppError>(__TAURI_INVOKE("open_external_url", { url })),
+	/**
+	 *  Opens the system's print dialog for this window (what shows is decided
+	 *  by the page's print styles). `window.print()` does nothing in the macOS
+	 *  web view, so printing goes through here.
+	 */
+	printWindow: () => typedError<null, AppError>(__TAURI_INVOKE("print_window")),
 	getSettings: () => __TAURI_INVOKE<SettingsDto>("get_settings"),
 	setTheme: (theme: Theme) => typedError<SettingsDto, AppError>(__TAURI_INVOKE("set_theme", { theme })),
 	setAccent: (accent: string | null) => typedError<SettingsDto, AppError>(__TAURI_INVOKE("set_accent", { accent })),

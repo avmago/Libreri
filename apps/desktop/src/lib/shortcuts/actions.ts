@@ -253,6 +253,7 @@ export const ACTIONS = {
   "reader.back": { label: "Back (after following a link)", group: "Reader", keys: "Alt+ArrowLeft" },
   "reader.forward": { label: "Forward", group: "Reader", keys: "Alt+ArrowRight" },
   "reader.goToPage": { label: "Go to page", group: "Reader", keys: "Mod+G" },
+  "reader.print": { label: "Print", group: "Reader", keys: "Mod+P" },
   "reader.find": { label: "Find in book", group: "Reader", keys: "Mod+F", whileTyping: true },
   "reader.findNext": { label: "Find next", group: "Reader", keys: "F3", whileTyping: true },
   "reader.findPrevious": {
