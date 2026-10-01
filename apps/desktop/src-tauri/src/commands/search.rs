@@ -208,7 +208,9 @@ pub async fn make_searchable(
         if ids.is_empty() {
             return Err(AppError::invalid("choose a book first"));
         }
-        if libreri_helpers::find_program("tesseract").is_none() {
+        // A downloaded model, when one is chosen (ADR 0029); else Tesseract.
+        let reader = crate::commands::ocr_models::reader(&state)?;
+        if reader.is_none() && libreri_helpers::find_program("tesseract").is_none() {
             return Err(AppError::invalid(libreri_formats::ocr::NOT_INSTALLED));
         }
         let languages = if languages.is_empty() {
@@ -216,8 +218,11 @@ pub async fn make_searchable(
         } else {
             languages
         };
-        let tessdata_dir =
-            tessdata::prepare(&state.tessdata, &languages).map_err(AppError::invalid)?;
+        let tessdata_dir = if reader.is_some() {
+            None
+        } else {
+            tessdata::prepare(&state.tessdata, &languages).map_err(AppError::invalid)?
+        };
         let workers = std::thread::available_parallelism()
             .map(|n| n.get() / 2)
             .unwrap_or(2)
@@ -227,6 +232,7 @@ pub async fn make_searchable(
             tessdata: tessdata_dir,
             redo,
             workers,
+            reader,
         };
         Ok(state.start_ocr(ids, options)?.to_string())
     })

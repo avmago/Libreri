@@ -564,6 +564,17 @@ export const commands = {
 	removeMathsModel: () => typedError<MathsSettingsDto, AppError>(__TAURI_INVOKE("remove_maths_model")),
 	/**  Reads a picture of maths (PNG or JPEG, base64 or a data URL) as LaTeX. */
 	mathsFromPicture: (picture: string) => typedError<string, AppError>(__TAURI_INVOKE("maths_from_picture", { picture })),
+	ocrEngines: () => __TAURI_INVOKE<OcrEnginesDto>("ocr_engines"),
+	/**  Chooses what reads scanned pages: "tesseract" or a downloaded model. */
+	setOcrEngine: (id: string) => typedError<OcrEnginesDto, AppError>(__TAURI_INVOKE("set_ocr_engine", { id })),
+	/**  Downloads a model; progress arrives as `OcrModelDownload`. */
+	downloadOcrModel: (id: string) => typedError<OcrEnginesDto, AppError>(__TAURI_INVOKE("download_ocr_model", { id })),
+	cancelOcrModelDownload: () => __TAURI_INVOKE<void>("cancel_ocr_model_download"),
+	/**
+	 *  Removes a model (and goes back to Tesseract if it was chosen). Text
+	 *  already read with it stays.
+	 */
+	removeOcrModel: (id: string) => typedError<OcrEnginesDto, AppError>(__TAURI_INVOKE("remove_ocr_model", { id })),
 	spellDictionaries: () => __TAURI_INVOKE<DictionaryInfo[]>("spell_dictionaries"),
 	/**  Downloads a dictionary; progress arrives as `DictionaryDownload`. */
 	downloadDictionary: (code: string) => typedError<DictionaryInfo[], AppError>(__TAURI_INVOKE("download_dictionary", { code })),
@@ -610,6 +621,7 @@ export const events = {
 	mathsDownload: makeEvent<MathsDownload>("maths-download"),
 	ocrFinished: makeEvent<OcrFinished>("ocr-finished"),
 	ocrLanguageDownload: makeEvent<OcrLanguageDownload>("ocr-language-download"),
+	ocrModelDownload: makeEvent<OcrModelDownload>("ocr-model-download"),
 	phonePage: makeEvent<PhonePage>("phone-page"),
 	phoneScan: makeEvent<PhoneScan>("phone-scan"),
 	searchIndexProgress: makeEvent<SearchIndexProgress>("search-index-progress"),
@@ -1825,6 +1837,15 @@ export type NotebookEntryDto = {
 	words: number,
 };
 
+export type OcrEnginesDto = {
+	/**  "tesseract" or a downloaded model's id. */
+	selected: string,
+	tesseract: boolean,
+	models: OcrModelInfo[],
+	/**  The model being downloaded. */
+	downloading: string | null,
+};
+
 /**  "Make searchable" finished (or stopped). */
 export type OcrFinished = {
 	jobId: string,
@@ -1863,6 +1884,33 @@ export type OcrLanguagesDto = {
 	/**  Used when a book does not say its language. */
 	defaults: string[],
 	tesseract: boolean,
+};
+
+/**  Progress of downloading an OCR model. */
+export type OcrModelDownload = {
+	id: string,
+	done: number | null,
+	total: number | null,
+	finished: boolean,
+	error: string | null,
+};
+
+/**  A model Libreri can read pages with. */
+export type OcrModelInfo = {
+	/**  "paddleocr-vl". */
+	id: string,
+	name: string,
+	description: string,
+	/**  About how big the download is, in MB. */
+	sizeMb: number,
+	licence: string,
+	/**  Where it comes from, for people who want to know more. */
+	homepage: string,
+	downloaded: boolean,
+	/**  Offered for download (false: listed as coming later). */
+	available: boolean,
+	/**  Why it is not offered yet. */
+	note: string | null,
 };
 
 export type OnlineChange = {

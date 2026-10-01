@@ -51,7 +51,7 @@ pub(crate) fn rename(layout: &LibraryLayout, old: &BookId, new: &BookId) {
 }
 
 /// What to OCR and how.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct OcrOptions {
     /// Tesseract language codes.
     pub languages: Vec<String>,
@@ -61,6 +61,20 @@ pub struct OcrOptions {
     pub redo: bool,
     /// Pages to read side by side.
     pub workers: usize,
+    /// A downloaded model to read with instead of Tesseract (one page at
+    /// a time; languages and Tesseract data are then not used).
+    pub reader: Option<std::sync::Arc<dyn libreri_formats::ocr::PageReader>>,
+}
+
+impl std::fmt::Debug for OcrOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OcrOptions")
+            .field("languages", &self.languages)
+            .field("redo", &self.redo)
+            .field("workers", &self.workers)
+            .field("reader", &self.reader.as_ref().map(|r| r.engine()))
+            .finish_non_exhaustive()
+    }
 }
 
 /// What an OCR run did.
@@ -396,7 +410,7 @@ impl Library {
         if book.missing {
             return Err(Error::InvalidInput("the book's file is missing".into()));
         }
-        if libreri_helpers::find_program("tesseract").is_none() {
+        if options.reader.is_none() && libreri_helpers::find_program("tesseract").is_none() {
             return Err(Error::InvalidInput(
                 libreri_formats::ocr::NOT_INSTALLED.into(),
             ));
@@ -425,11 +439,18 @@ impl Library {
             return Ok(report);
         }
         saved.format_version = OCR_FORMAT;
-        saved.engine = libreri_helpers::status(libreri_helpers::Helper::Tesseract)
-            .version
-            .map(|v| format!("tesseract {v}"))
-            .unwrap_or_else(|| "tesseract".into());
-        saved.languages = options.languages.clone();
+        saved.engine = match &options.reader {
+            Some(r) => r.engine(),
+            None => libreri_helpers::status(libreri_helpers::Helper::Tesseract)
+                .version
+                .map(|v| format!("tesseract {v}"))
+                .unwrap_or_else(|| "tesseract".into()),
+        };
+        saved.languages = if options.reader.is_some() {
+            Vec::new()
+        } else {
+            options.languages.clone()
+        };
 
         let work = scratch.join(format!("ocr-{}", book.id));
         fs::create_dir_all(&work)?;
@@ -447,7 +468,12 @@ impl Library {
         let total = todo.len() as u64;
         let next = AtomicU32::new(0);
         let stop = AtomicBool::new(false);
-        let workers = options.workers.clamp(1, 8).min(todo.len());
+        // A model uses the whole computer for one page.
+        let workers = if options.reader.is_some() {
+            1
+        } else {
+            options.workers.clamp(1, 8).min(todo.len())
+        };
         progress.report(0, total, "Reading pages");
         let (tx, rx) = std::sync::mpsc::channel::<(u32, std::result::Result<OcrPage, String>)>();
         std::thread::scope(|s| {
@@ -480,8 +506,12 @@ impl Library {
                     }
                     Err(e) => {
                         report.pages_failed += 1;
-                        // Tesseract itself is broken: no point going on.
-                        if e.contains("could not start") || e.contains("language") {
+                        // Tesseract (or the model) itself is broken: no
+                        // point going on.
+                        if e.contains("could not start")
+                            || e.contains("language")
+                            || e.contains("could not load")
+                        {
                             stop.store(true, Ordering::Relaxed);
                         }
                         if report.errors.len() < 5 && !report.errors.contains(&e) {
@@ -558,13 +588,18 @@ impl Source {
                 (file, None)
             }
         };
-        let read = libreri_formats::ocr::recognize(
-            &file,
-            page,
-            &options.languages,
-            options.tessdata.as_deref(),
-            dpi,
-        );
+        let read = match &options.reader {
+            Some(reader) => fs::read(&file)
+                .map_err(|e| e.to_string())
+                .and_then(|bytes| reader.read_page(&bytes, page)),
+            None => libreri_formats::ocr::recognize(
+                &file,
+                page,
+                &options.languages,
+                options.tessdata.as_deref(),
+                dpi,
+            ),
+        };
         let _ = fs::remove_file(&file);
         read
     }
@@ -771,6 +806,7 @@ mod tests {
             tessdata: None,
             redo: false,
             workers: 2,
+            reader: None,
         };
         let r = lib
             .make_searchable(

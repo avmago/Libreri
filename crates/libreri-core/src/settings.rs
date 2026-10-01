@@ -43,6 +43,9 @@ pub struct AppSettings {
     /// Read maths from pictures with the downloaded model (off: LaTeX is
     /// only copied where a book has it exactly).
     pub maths_from_pictures: bool,
+    /// What reads scanned pages: `None` for Tesseract, or a downloaded
+    /// model ("paddleocr-vl", ADR 0029).
+    pub ocr_engine: Option<String>,
 }
 
 /// Speech recognition: which downloaded model to use and how.

@@ -104,3 +104,33 @@ export function useRemoveOcrLanguage() {
     onSettled: () => void qc.invalidateQueries({ queryKey: ocrLanguagesKey }),
   });
 }
+
+export const ocrEnginesKey = ["ocr-engines"] as const;
+
+/** Tesseract and the downloadable OCR models (ADR 0029). */
+export function useOcrEngines() {
+  return useQuery({
+    queryKey: ocrEnginesKey,
+    queryFn: () => commands.ocrEngines(),
+  });
+}
+
+function useOcrEngineMutation<A>(fn: (a: A) => Promise<unknown>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSettled: () => void qc.invalidateQueries({ queryKey: ocrEnginesKey }),
+  });
+}
+
+export function useSetOcrEngine() {
+  return useOcrEngineMutation((id: string) => unwrap(commands.setOcrEngine(id)));
+}
+
+export function useDownloadOcrModel() {
+  return useOcrEngineMutation((id: string) => unwrap(commands.downloadOcrModel(id)));
+}
+
+export function useRemoveOcrModel() {
+  return useOcrEngineMutation((id: string) => unwrap(commands.removeOcrModel(id)));
+}

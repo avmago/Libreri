@@ -243,6 +243,11 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::maths::cancel_maths_download,
             commands::maths::remove_maths_model,
             commands::maths::maths_from_picture,
+            commands::ocr_models::ocr_engines,
+            commands::ocr_models::set_ocr_engine,
+            commands::ocr_models::download_ocr_model,
+            commands::ocr_models::cancel_ocr_model_download,
+            commands::ocr_models::remove_ocr_model,
             commands::spell::spell_dictionaries,
             commands::spell::download_dictionary,
             commands::spell::cancel_dictionary_download,
@@ -278,6 +283,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::DictionaryDownload,
             events::CanvasFontDownload,
             events::MathsDownload,
+            events::OcrModelDownload,
         ])
 }
 

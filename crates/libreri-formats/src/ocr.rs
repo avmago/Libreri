@@ -34,6 +34,94 @@ pub struct OcrPage {
     pub confidence: f32,
 }
 
+/// Another way of reading page pictures than Tesseract: a model downloaded
+/// in Settings (PaddleOCR-VL). It runs inside Libreri, one page at a time.
+pub trait PageReader: Send + Sync {
+    /// What read the text, kept with it ("PaddleOCR-VL 1.6").
+    fn engine(&self) -> String;
+    /// Reads one page picture (PNG, JPEG or PNM bytes).
+    fn read_page(&self, image: &[u8], page: u32) -> Result<OcrPage, String>;
+}
+
+/// Lays text found in a region of the page out as words with boxes, line
+/// by line, for models that tell where a block is but not each word. The
+/// boxes are estimates, good enough to select, highlight and find.
+/// `region` is x, y, width, height as fractions of the page.
+pub fn words_in_region(text: &str, region: [f32; 4], page_aspect: f32) -> Vec<OcrWord> {
+    let lines_in: Vec<Vec<&str>> = text
+        .lines()
+        .map(|l| l.split_whitespace().collect::<Vec<_>>())
+        .filter(|l| !l.is_empty())
+        .collect();
+    let chars: usize = lines_in
+        .iter()
+        .flatten()
+        .map(|w| w.chars().count() + 1)
+        .sum();
+    let [x, y, w, h] = region;
+    if chars == 0 || w <= 0.0 || h <= 0.0 {
+        return Vec::new();
+    }
+    // Work in page-width units for both axes, so letters keep their shape.
+    let hh = h * page_aspect.max(0.1);
+    // A letter is about half as wide as a line is tall, and lines are
+    // spaced 1.3 times their height: solve for the line height that fills
+    // the region with this many letters.
+    let line_h = (w * hh / (chars as f32 * 0.5 * 1.3)).sqrt();
+    let per_line = (w / (line_h * 0.5)).max(1.0);
+    // Wrap the words into lines of at most `per_line` letters (and keep
+    // the model's own line breaks).
+    let mut lines: Vec<Vec<&str>> = Vec::new();
+    for l in &lines_in {
+        let mut cur: Vec<&str> = Vec::new();
+        let mut len = 0f32;
+        for word in l {
+            let n = word.chars().count() as f32 + 1.0;
+            if !cur.is_empty() && len + n > per_line {
+                lines.push(std::mem::take(&mut cur));
+                len = 0.0;
+            }
+            cur.push(word);
+            len += n;
+        }
+        if !cur.is_empty() {
+            lines.push(cur);
+        }
+    }
+    let rows = lines.len() as f32;
+    let row_h = h / rows;
+    let mut out = Vec::new();
+    for (i, line) in lines.iter().enumerate() {
+        let total: f32 = line
+            .iter()
+            .map(|w| w.chars().count() as f32 + 1.0)
+            .sum::<f32>()
+            - 1.0;
+        // A full line spans the region; a short last line keeps letter width.
+        let unit = if i + 1 < lines.len() || total > per_line * 0.9 {
+            w / total.max(1.0)
+        } else {
+            w / per_line
+        };
+        let mut cx = x;
+        let top = y + row_h * i as f32;
+        for word in line {
+            let n = word.chars().count() as f32;
+            out.push(OcrWord {
+                text: (*word).to_owned(),
+                rect: [
+                    round4(cx),
+                    round4(top + row_h * 0.1),
+                    round4((n * unit).min(x + w - cx).max(0.0)),
+                    round4(row_h * 0.8),
+                ],
+            });
+            cx += (n + 1.0) * unit;
+        }
+    }
+    out
+}
+
 fn round4(v: f32) -> f32 {
     (v * 10000.0).round() / 10000.0
 }
@@ -182,6 +270,28 @@ mod tests {
 5\t1\t1\t1\t2\t1\t100\t200\t200\t50\t80\twrote
 5\t1\t1\t2\t1\t1\t100\t400\t200\t50\t70\tAgain
 5\t1\t1\t2\t1\t2\t100\t400\t200\t50\t-1\t ";
+
+    #[test]
+    fn lays_words_out_in_a_region() {
+        let words = words_in_region(
+            "The keeper wrote again and again",
+            [0.1, 0.2, 0.4, 0.05],
+            1.4,
+        );
+        assert_eq!(words.len(), 6);
+        assert_eq!(words[0].text, "The");
+        assert!(words
+            .iter()
+            .all(|w| w.rect[0] >= 0.1 && w.rect[0] + w.rect[2] <= 0.5 + 1e-3));
+        assert!(words
+            .iter()
+            .all(|w| w.rect[1] >= 0.2 && w.rect[1] + w.rect[3] <= 0.25 + 1e-3));
+        // Reading order: left to right, then down.
+        assert!(words[1].rect[0] > words[0].rect[0] || words[1].rect[1] > words[0].rect[1]);
+        assert!(words_in_region("  ", [0.0, 0.0, 1.0, 1.0], 1.4).is_empty());
+        let two = words_in_region("first line\nsecond", [0.0, 0.0, 0.8, 0.1], 1.4);
+        assert!(two[2].rect[1] > two[0].rect[1]);
+    }
 
     #[test]
     fn parses_words_lines_and_paragraphs() {

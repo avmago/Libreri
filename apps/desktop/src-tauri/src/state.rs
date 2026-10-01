@@ -68,6 +68,11 @@ pub struct AppState {
     pub maths_dir: std::path::PathBuf,
     pub maths_reader: Mutex<Option<Arc<libreri_maths::Reader>>>,
     pub maths_download: Mutex<Option<Arc<AtomicBool>>>,
+    /// OCR models (app data `ocr-models/`, ADR 0029): the one loaded (kept
+    /// while used), and the one downloading with its cancel flag.
+    pub ocr_models_dir: std::path::PathBuf,
+    pub ocr_reader: Mutex<Option<(String, Arc<dyn libreri_formats::ocr::PageReader>)>>,
+    pub ocr_download: Mutex<Option<(String, Arc<AtomicBool>)>>,
     /// Speech models downloaded by Libreri (this computer only).
     pub whisper_dir: std::path::PathBuf,
     /// Spell check: dictionaries (downloaded into app data `dictionaries/`)
@@ -272,6 +277,7 @@ impl AppState {
         let dictionaries = app.path().app_data_dir()?.join("dictionaries");
         let extras_dir = app.path().app_data_dir()?.join("excalidraw");
         let maths_dir = app.path().app_data_dir()?;
+        let ocr_models_dir = app.path().app_data_dir()?.join("ocr-models");
         // Keep the page cache under 2 GB (least recently read books go first).
         let cache = page_cache.clone();
         std::thread::spawn(move || {
@@ -303,6 +309,9 @@ impl AppState {
             extras_dir,
             maths_dir,
             maths_reader: Mutex::default(),
+            ocr_models_dir,
+            ocr_reader: Mutex::default(),
+            ocr_download: Mutex::default(),
             media_files: Mutex::default(),
             player: Mutex::default(),
             fetched_links: Mutex::default(),

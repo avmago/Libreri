@@ -1,5 +1,6 @@
 import { HelpersList } from "@/features/helpers";
 import { Group } from "../parts";
+import { OcrEnginesGroup } from "./OcrEngines";
 import { OcrLanguagesGroup } from "./Search";
 
 /** Settings › Helper programs. */
@@ -13,6 +14,7 @@ export function HelperSettings() {
       >
         <HelpersList />
       </Group>
+      <OcrEnginesGroup />
       <OcrLanguagesGroup />
     </>
   );

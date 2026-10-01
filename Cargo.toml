@@ -20,6 +20,7 @@ members = [
     "crates/libreri-maths",
     "crates/libreri-links",
     "crates/libreri-feeds",
+    "crates/libreri-ocr",
 ]
 
 [workspace.package]
@@ -49,6 +50,7 @@ libreri-spell = { path = "crates/libreri-spell" }
 libreri-maths = { path = "crates/libreri-maths" }
 libreri-links = { path = "crates/libreri-links" }
 libreri-feeds = { path = "crates/libreri-feeds" }
+libreri-ocr = { path = "crates/libreri-ocr" }
 
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

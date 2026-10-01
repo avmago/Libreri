@@ -1,0 +1,31 @@
+[package]
+name = "libreri-ocr"
+description = "Optional OCR models downloaded on request (PaddleOCR-VL), run on this computer with candle."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+libreri-formats.workspace = true
+libreri-helpers.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+oar-ocr-vl = "0.9.2"
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "pnm"] }
+ureq = "3.4"
+specta = { version = "=2.0.0-rc.25", features = ["derive"], optional = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# The graphics chip of Apple computers: much faster than the processor.
+oar-ocr-vl = { version = "0.9.2", features = ["metal"] }
+
+[features]
+specta = ["dep:specta"]
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

@@ -394,6 +394,17 @@ pub struct MathsDownload {
     pub error: Option<String>,
 }
 
+/// Progress of downloading an OCR model.
+#[derive(Debug, Clone, Serialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrModelDownload {
+    pub id: String,
+    pub done: f64,
+    pub total: f64,
+    pub finished: bool,
+    pub error: Option<String>,
+}
+
 /// Progress of downloading an extra canvas font.
 #[derive(Debug, Clone, Serialize, Type, Event)]
 #[serde(rename_all = "camelCase")]

@@ -83,7 +83,7 @@ Highlights that link back to the page, a notebook per book, handwriting, paper n
 - **Real folders**, plus tags, categories, series, ratings, reading status and favourites.
 - **Grid, list and shelf** views, filters, **smart collections** and bulk edit.
 - **Online details** by ISBN, DOI, arXiv id or title from eight sources, with covers and **barcode scanning**.
-- **Full-text search** inside every book, with **OCR** for scans.
+- **Full-text search** inside every book, with **OCR** for scans: Tesseract, or an optional PaddleOCR-VL download that also reads tables and formulas.
 - Health check, PDF version history and automatic **backups**.
 
 </td>
@@ -267,6 +267,7 @@ crates/libreri-spell      Spell check and word suggestions
 crates/libreri-maths      Maths from pictures (pix2tex with candle)
 crates/libreri-links      Links: video details, offline copies, the local player
 crates/libreri-feeds      RSS, Atom and OPML; arXiv; podcasts (Apple and Podcast Index search)
+crates/libreri-ocr        Optional OCR models (PaddleOCR-VL), downloaded and run on this computer
 
 docs/                     Phases, architecture, portability and decisions (docs/adr)
 ```
@@ -286,7 +287,7 @@ Dependencies only point downward: interface → shell → crates → core. Read 
 | [Data portability](docs/data-portability.md) | How books, notes and links are kept, so nothing is locked in |
 | [AI research plan](docs/ai-research-plan.md) | Version 2's research tools and open-science plans |
 | [Phase 9 bugs](docs/phase9-bugs.md) | The Phase 9 bug list and what was fixed |
-| [Decisions](docs/adr) | 28 architecture decision records |
+| [Decisions](docs/adr) | 29 architecture decision records |
 
 ## Licence
 
