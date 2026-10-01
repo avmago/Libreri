@@ -3,13 +3,25 @@ import { commands, unwrap, type Annotation } from "@/lib/ipc";
 
 const key = (bookId: string) => ["lib", "reader", bookId] as const;
 
+/** A tab of a download from Feeds (`feed:<item id>`), not a book of the
+ * library: its place is kept on this computer, and it has no marks. */
+export const isFeedDoc = (bookId: string) => bookId.startsWith("feed:");
+const docPlace = (bookId: string) => `libreri.place.${bookId}`;
+
 /** Where the saved reading position is cached. */
 export const positionKey = (bookId: string) => [...key(bookId), "position"] as const;
 
 export function usePosition(bookId: string) {
   return useQuery({
     queryKey: positionKey(bookId),
-    queryFn: () => unwrap(commands.getPosition(bookId)),
+    queryFn: () => {
+      if (!isFeedDoc(bookId)) return unwrap(commands.getPosition(bookId));
+      try {
+        return Promise.resolve(localStorage.getItem(docPlace(bookId)));
+      } catch {
+        return Promise.resolve(null);
+      }
+    },
     // Read once when the book opens; the reader owns the position after that.
     staleTime: Infinity,
     gcTime: 0,
@@ -17,13 +29,22 @@ export function usePosition(bookId: string) {
 }
 
 export function savePosition(bookId: string, locator: string, progress: number) {
+  if (isFeedDoc(bookId)) {
+    try {
+      localStorage.setItem(docPlace(bookId), locator);
+    } catch {
+      /* not kept */
+    }
+    return Promise.resolve(null);
+  }
   return unwrap(commands.savePosition(bookId, locator, progress));
 }
 
 export function useAnnotations(bookId: string) {
   return useQuery({
     queryKey: [...key(bookId), "annotations"],
-    queryFn: () => unwrap(commands.listAnnotations(bookId)),
+    queryFn: () =>
+      isFeedDoc(bookId) ? Promise.resolve([]) : unwrap(commands.listAnnotations(bookId)),
   });
 }
 

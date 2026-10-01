@@ -128,8 +128,11 @@ export function SelectionMenu({
   onLatex,
   onCopy,
   onClose,
+  notes = true,
 }: {
   rect: DOMRect;
+  /** Highlights, comments and notes (not for downloads outside the library). */
+  notes?: boolean;
   onHighlight: (c: HighlightColor) => void;
   onComment: () => void;
   onNotebook: () => void;
@@ -152,55 +155,59 @@ export function SelectionMenu({
       )
         return;
       const n = Number(e.key);
-      if (n >= 1 && n <= 4 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (notes && n >= 1 && n <= 4 && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         onHighlight(HIGHLIGHT_COLORS[n - 1]!);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onHighlight]);
+  }, [onHighlight, notes]);
   return (
     <Floating rect={rect} onClose={onClose}>
       <div className="flex items-center gap-1">
-        <Swatches onPick={onHighlight} />
-        <div className="mx-0.5 h-6 w-px bg-border" />
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Highlight and comment"
-          title="Comment"
-          onClick={onComment}
-        >
-          <MessageSquarePlus />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Add to notebook"
-          title="Add to notebook"
-          onClick={onNotebook}
-        >
-          <NotebookPen />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Record a voice note about this"
-          title="Voice note"
-          onClick={onVoice}
-        >
-          <Mic />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Link a web page or video to this"
-          title="Link a web page, video or recording"
-          onClick={onLink}
-        >
-          <Link2 />
-        </Button>
+        {notes && (
+          <>
+            <Swatches onPick={onHighlight} />
+            <div className="mx-0.5 h-6 w-px bg-border" />
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Highlight and comment"
+              title="Comment"
+              onClick={onComment}
+            >
+              <MessageSquarePlus />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Add to notebook"
+              title="Add to notebook"
+              onClick={onNotebook}
+            >
+              <NotebookPen />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Record a voice note about this"
+              title="Voice note"
+              onClick={onVoice}
+            >
+              <Mic />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Link a web page or video to this"
+              title="Link a web page, video or recording"
+              onClick={onLink}
+            >
+              <Link2 />
+            </Button>
+          </>
+        )}
         <Button
           variant="ghost"
           size="icon"

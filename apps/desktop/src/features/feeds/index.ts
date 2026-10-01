@@ -4,7 +4,6 @@ export { AddToLibraryDialog } from "./components/ItemDialogs";
 export { AddFeedDialog, AddressTab, OpmlTab } from "./components/AddFeedDialog";
 export { whenLine } from "./model";
 export { openBook, openFeedDoc } from "./open";
-export { FeedDocView } from "./components/FeedDocView";
 export {
   feedsKey,
   refreshFeeds,

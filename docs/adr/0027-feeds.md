@@ -49,5 +49,5 @@ The download is imported into the chosen folder of `Books/` (moved, as imports d
 
 ## Changes (2026-10-01)
 
-- **Read opens a tab**, with the library's own reader (PDF or article), instead of a separate window. Highlights and notes come once it is added to the library; *Add to library* in the tab replaces it with the book.
+- **Read opens a tab** in the library's own reader (PDF or article), instead of a separate window: page appearance, ADHD reading, read aloud, find and reading maths all work, and the place is kept on this computer. Highlights, bookmarks and notes come once it is added to the library; *Add to library* in the tab replaces it with the book.
 - **Opened items stay in New** until you choose another list or feed, so they do not vanish while being read (they are marked seen at once).

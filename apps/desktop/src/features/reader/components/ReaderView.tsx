@@ -4,6 +4,7 @@ import { setReadingFullscreen, toggleReadingFullscreen, useFullscreen } from "@/
 import {
   AlertTriangle,
   Bookmark,
+  BookPlus,
   Camera,
   BookmarkCheck,
   GitCompare,
@@ -94,6 +95,7 @@ import { CaptureDialog, CaptureViewer } from "../capture";
 import { mathsFromPicture, useMathsSettings } from "../maths/api";
 import { AddLinkDialog, CopyViewer, LinksPanel, linkOf, type LinkInfo } from "../weblinks";
 import { useListening } from "../listening/store";
+import { AddToLibraryDialog, openBook } from "@/features/feeds";
 import { usePlayer } from "@/features/podcasts";
 import { ListenBar, type ListenMode } from "../listening/ListenBar";
 import { FocusOverlay } from "../adhd/FocusOverlay";
@@ -171,7 +173,15 @@ export function ReaderView({ tab, active }: { tab: BookTab; active: boolean }) {
 /** One open book: toolbar, contents and marks, the page, notebook. */
 function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   const { bookId } = tab;
-  const { data: book, error: bookError } = useBook(bookId);
+  // A download from Feeds, read before it is added to the library: the
+  // reader and its appearance, reading aloud and maths, but no marks.
+  const doc = tab.feed ?? null;
+  const { data: book, error: bookError } = useBook(doc ? null : bookId);
+  const [addingDoc, setAddingDoc] = useState(false);
+  const notForDocs = () =>
+    toast("Add it to your library to highlight and keep notes", {
+      action: { label: "Add to library…", onClick: () => setAddingDoc(true) },
+    });
   const position = usePosition(bookId);
   const { data: annotations = [] } = useAnnotations(bookId);
   const saveAnnotation = useSaveAnnotation(bookId);
@@ -374,8 +384,8 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   );
 
   // Create the renderer once the book and its saved position are known.
-  const relPath = book?.relPath;
-  const fileType = book?.fileType;
+  const relPath = doc ? doc.file : book?.relPath;
+  const fileType = doc ? tab.fileType : book?.fileType;
   const ready = position.isSuccess || position.isError;
   const linkRef = useRef(handleLink);
   useEffect(() => {
@@ -588,7 +598,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   const { data: audiobooks = [] } = useQuery({
     queryKey: ["lib", "reader", bookId, "audiobooks"],
     queryFn: () => unwrap(commands.audiobooksFor(bookId)),
-    enabled: status === "ready",
+    enabled: status === "ready" && !doc,
   });
   /** Plays the linked audiobook from the place being read, in the
    * floating player (the full player opens from there). */
@@ -599,7 +609,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   // Markup mode (fixed pages): drawings kept like highlights.
   const markup = useMarkup({
     bookId,
-    enabled: isPdf,
+    enabled: isPdf && !doc,
     ready: status === "ready",
     isPdf: fileType === "pdf",
     renderer: rendererRef,
@@ -745,6 +755,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   );
 
   const toggleBookmark = () => {
+    if (doc) return notForDocs();
     if (!location) return;
     if (bookmarkHere) {
       deleteAnnotation.mutate(bookmarkHere.id);
@@ -773,6 +784,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   const highlightFromSelection = (color: HighlightColor, then?: (a: Annotation) => void) => {
     const sel = selection;
     if (!sel) return;
+    if (doc) return notForDocs();
     const a: Annotation = {
       id: newId(),
       bookId,
@@ -803,6 +815,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
     position: number;
   } | null>(null);
   const startVoice = (fromSelection: boolean) => {
+    if (doc) return notForDocs();
     const sel = fromSelection ? selection : null;
     if (sel) {
       voiceAt.current = {
@@ -932,6 +945,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   );
   const links = annotations.filter((a) => a.kind === "link");
   const startLink = (fromSelection: boolean) => {
+    if (doc) return notForDocs();
     const sel = fromSelection ? selection : null;
     if (sel) {
       linkAt.current = {
@@ -1016,6 +1030,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   const captureAt = useRef<typeof voiceAt.current>(null);
   const [viewing, setViewing] = useState<{ path: string; title: string } | null>(null);
   const startCapture = () => {
+    if (doc) return notForDocs();
     if (!location) return;
     captureAt.current = {
       locator:
@@ -1182,13 +1197,14 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   useShortcut("reader.goToPage", () => pageInputRef.current?.focus());
   useShortcut("reader.bookmark", toggleBookmark);
   useShortcut("reader.contents", () => setLeft((p) => (p ? null : lastLeft)));
-  useShortcut("reader.notebook", () => setNotebookOpen((o) => !o));
+  useShortcut("reader.notebook", () => (doc ? notForDocs() : setNotebookOpen((o) => !o)));
   useShortcut("reader.themeNext", cycleTheme);
   useShortcut("reader.pdfModeNext", cyclePdfMode);
   useShortcut("reader.focusMode", () => setFocusMode((f) => !f));
   useShortcut("reader.markup", () => markup.available && markup.setActive(!markup.active));
   useShortcut("reader.readAloud", toggleReadAloud);
   useShortcut("reader.details", () => {
+    if (doc) return;
     useTabs.getState().activate(null);
     useLibraryView.getState().setSelection([bookId]);
     useLibraryView.getState().setDetailsOpen(true);
@@ -1254,7 +1270,9 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
         <div className="flex min-w-0 flex-1 flex-col px-2 leading-tight">
           <span className="truncate font-medium">{book?.metadata.title ?? tab.title}</span>
           <span className="truncate text-[11.5px] text-muted-foreground">
-            {location?.section ?? book?.metadata.authors.join(", ")}
+            {doc
+              ? `${doc.source} · from Feeds, not in your library yet`
+              : (location?.section ?? book?.metadata.authors.join(", "))}
           </span>
         </div>
         {isPdf && location?.pages ? (
@@ -1381,70 +1399,74 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
           onPageLayout={changeLayout}
           bionicHere={bionicHere}
         />
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={bookmarkHere ? "Remove bookmark" : "Add bookmark"}
-          aria-pressed={Boolean(bookmarkHere)}
-          title={`${bookmarkHere ? "Remove bookmark" : "Bookmark this page"} (${keys("reader.bookmark")})`}
-          onClick={toggleBookmark}
-          disabled={!location}
-        >
-          {bookmarkHere ? <BookmarkCheck className="fill-current" /> : <Bookmark />}
-        </Button>
-        {(fileType === "pdf" || fileType === "djvu") && (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Compare"
-            aria-pressed={Boolean(comparing)}
-            title="Compare with an earlier version, another book or a file"
-            onClick={() => (comparing ? setCompare(bookId, null) : setCompareOpen(true))}
-          >
-            <GitCompare />
-          </Button>
+        {!doc && (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={bookmarkHere ? "Remove bookmark" : "Add bookmark"}
+              aria-pressed={Boolean(bookmarkHere)}
+              title={`${bookmarkHere ? "Remove bookmark" : "Bookmark this page"} (${keys("reader.bookmark")})`}
+              onClick={toggleBookmark}
+              disabled={!location}
+            >
+              {bookmarkHere ? <BookmarkCheck className="fill-current" /> : <Bookmark />}
+            </Button>
+            {(fileType === "pdf" || fileType === "djvu") && (
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Compare"
+                aria-pressed={Boolean(comparing)}
+                title="Compare with an earlier version, another book or a file"
+                onClick={() => (comparing ? setCompare(bookId, null) : setCompareOpen(true))}
+              >
+                <GitCompare />
+              </Button>
+            )}
+            {fileType === "pdf" && (
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Version history"
+                title="Version history"
+                onClick={() => setVersionsOpen(true)}
+              >
+                <History />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Record a voice note here"
+              title="Record a voice note about this page (select text first to note a passage)"
+              disabled={!location || voice.phase !== "idle"}
+              onClick={() => startVoice(false)}
+            >
+              <Mic />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Capture paper notes"
+              title="Capture paper notes with the camera, your phone or pictures"
+              disabled={!location}
+              onClick={startCapture}
+            >
+              <Camera />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Add a link here"
+              title={`Link a web page, video or recording to this page (${keys("reader.addLink")})`}
+              disabled={!location}
+              onClick={() => startLink(false)}
+            >
+              <Link2 />
+            </Button>
+          </>
         )}
-        {fileType === "pdf" && (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Version history"
-            title="Version history"
-            onClick={() => setVersionsOpen(true)}
-          >
-            <History />
-          </Button>
-        )}
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Record a voice note here"
-          title="Record a voice note about this page (select text first to note a passage)"
-          disabled={!location || voice.phase !== "idle"}
-          onClick={() => startVoice(false)}
-        >
-          <Mic />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Capture paper notes"
-          title="Capture paper notes with the camera, your phone or pictures"
-          disabled={!location}
-          onClick={startCapture}
-        >
-          <Camera />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Add a link here"
-          title={`Link a web page, video or recording to this page (${keys("reader.addLink")})`}
-          disabled={!location}
-          onClick={() => startLink(false)}
-        >
-          <Link2 />
-        </Button>
         {mathsModel?.on && mathsModel.downloaded && (fileType === "pdf" || isPaged(fileType)) && (
           <Button
             variant="ghost"
@@ -1457,26 +1479,41 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
             {readingMaths ? <Loader2 className="animate-spin" /> : <SquareSigma />}
           </Button>
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Canvas"
-          aria-pressed={canvasOpen}
-          title="Canvas: write and draw by hand"
-          onClick={() => setCanvasOpen((o) => !o)}
-        >
-          <PenLine />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Notebook"
-          aria-pressed={notebookOpen}
-          title={`Notebook (${keys("reader.notebook")})`}
-          onClick={() => setNotebookOpen((o) => !o)}
-        >
-          <NotebookPen />
-        </Button>
+        {doc ? (
+          editLibrary && (
+            <Button
+              size="sm"
+              className="ml-1"
+              onClick={() => setAddingDoc(true)}
+              title="Add it to your library, to highlight and keep notes"
+            >
+              <BookPlus /> Add to library…
+            </Button>
+          )
+        ) : (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Canvas"
+              aria-pressed={canvasOpen}
+              title="Canvas: write and draw by hand"
+              onClick={() => setCanvasOpen((o) => !o)}
+            >
+              <PenLine />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Notebook"
+              aria-pressed={notebookOpen}
+              title={`Notebook (${keys("reader.notebook")})`}
+              onClick={() => setNotebookOpen((o) => !o)}
+            >
+              <NotebookPen />
+            </Button>
+          </>
+        )}
       </div>
 
       <VoiceNoteBar
@@ -1730,7 +1767,14 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
                     Install {/DjVuLibre/.test(error) ? "DjVuLibre" : "unar"}…
                   </Button>
                 )}
-                <Button variant="outline" onClick={() => void commands.openBookExternally(bookId)}>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    void (doc
+                      ? commands.feedOpenFile(doc.file)
+                      : commands.openBookExternally(bookId))
+                  }
+                >
                   Open in another app
                 </Button>
               </div>
@@ -1797,6 +1841,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
           onClose={() => setMath(null)}
           onNotebook={(block) => {
             setMath(null);
+            if (doc) return notForDocs();
             setNotebookOpen(true);
             setNotebookInsert(block);
           }}
@@ -1893,6 +1938,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
       {active && selection && !menu && (
         <SelectionMenu
           rect={selection.rect}
+          notes={!doc}
           onHighlight={(c) => highlightFromSelection(c)}
           onComment={() =>
             highlightFromSelection(profilePrefs.notes.defaultColor, (saved) =>
@@ -2032,6 +2078,18 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
           setCompare(bookId, r);
         }}
       />
+      {doc && (
+        <AddToLibraryDialog
+          space={doc.space}
+          item={addingDoc ? { id: doc.id, title: tab.title, file: doc.file } : null}
+          onClose={() => setAddingDoc(false)}
+          onAdded={(added) => {
+            // The book takes the download's place.
+            useTabs.getState().detach(bookId);
+            void openBook(added);
+          }}
+        />
+      )}
     </div>
   );
 }
