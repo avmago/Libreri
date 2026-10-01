@@ -26,6 +26,7 @@ export function useFeedItems(filter: ItemFilter, space: Space = "feeds") {
   return useQuery({
     queryKey: [...feedsKey, space, "items", filter],
     queryFn: () => unwrap(commands.feedItems(space, filter)),
+    // A changed filter (an item kept in New) shows the last list meanwhile.
     placeholderData: (prev) => prev,
   });
 }

@@ -59,7 +59,7 @@ import {
 import { FindDetailsDialog, useDetailsEvents } from "@/features/details";
 import { HelperDialog } from "@/features/helpers";
 import { NotesHub, flushNotes } from "@/features/notes";
-import { FeedsView, useFeedsBackground } from "@/features/feeds";
+import { FeedDocView, FeedsView, useFeedsBackground } from "@/features/feeds";
 import { PodcastPlayer, PodcastsView, setPodcastSettingsOpener } from "@/features/podcasts";
 import { OcrDialog, SearchView, useSearchEvents } from "@/features/search";
 import { setSpeechSettingsOpener } from "@/features/speech";
@@ -701,7 +701,11 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
                   style={{ order: inSplit && t.bookId === split.right ? 1 : 0 }}
                   onPointerDownCapture={() => isPartner && tabs.activate(t.bookId)}
                 >
-                  <ReaderView tab={t} active={isActive} />
+                  {t.feed ? (
+                    <FeedDocView tab={t} feed={t.feed} />
+                  ) : (
+                    <ReaderView tab={t} active={isActive} />
+                  )}
                 </main>
               </ShortcutScope>
             );

@@ -27,10 +27,13 @@ export async function flushSession(): Promise<void> {
 async function openable(tabs: BookTab[]): Promise<BookTab[]> {
   const found = await Promise.all(
     tabs.map((t) =>
-      commands
-        .getBook(t.bookId)
-        .then((r) => r.status === "ok" || r.error.kind !== "notFound")
-        .catch(() => true),
+      // A feed download's tab says so itself if the file has gone.
+      t.feed
+        ? Promise.resolve(true)
+        : commands
+            .getBook(t.bookId)
+            .then((r) => r.status === "ok" || r.error.kind !== "notFound")
+            .catch(() => true),
     ),
   );
   return tabs.filter((_, i) => found[i]);
@@ -91,7 +94,12 @@ export function useSession(libraryId: string) {
         const { theme, followApp, pdfMode } = useReaderPrefs.getState();
         const session: Session = {
           version: 1,
-          tabs: tabs.map(({ bookId, title, fileType }) => ({ bookId, title, fileType })),
+          tabs: tabs.map(({ bookId, title, fileType, feed }) => ({
+            bookId,
+            title,
+            fileType,
+            ...(feed ? { feed } : {}),
+          })),
           active,
           split,
           prefs: { theme, followApp, pdfMode },

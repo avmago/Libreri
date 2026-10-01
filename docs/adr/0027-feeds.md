@@ -16,7 +16,7 @@ Libreri follows RSS and Atom feeds, so new papers, preprints, articles and newsl
 
 - **Folders** sort feeds into categories and subcategories (any depth). A folder, or a feed, can be set to *Download new items automatically*; a feed follows the setting of any folder it is in.
 - **Topics** are the feed's own categories for each item (arXiv: `cs.AI`, `math.PR`, shown with arXiv's names). The list can be filtered by topic, by New / Downloaded / In library, and by words in the title, authors or abstract.
-- **Each item** has *Download* (the PDF, or the article) and *Delete*. Once downloaded: *Read* (in Libreri), *Add to library*, *Show in folder*, *Delete the download only*. Added items show *In library · Open*.
+- **Each item** has *Download* (the PDF, or the article) and *Delete*. Once downloaded: *Read* (in a tab, with the library's own reader), *Add to library*, *Show in folder*, *Delete the download only*. Added items show *In library · Open*.
 - **Deleted items do not come back**, even while the feed still lists them (they are remembered for 400 days). Items not downloaded are removed after 30 days by default (7 days to a year).
 
 ## How it is kept
@@ -46,3 +46,8 @@ The download is imported into the chosen folder of `Books/` (moved, as imports d
 - **Feeds** in the sidebar (with the number of new items), the command palette, and Mod+Shift+0.
 - **Feeds screen:** folders and feeds on the left, with their menus (auto-download, check now, mark all seen, rename, move, remove / stop following); items on the right. *Follow feeds* has four tabs: Address, arXiv, Suggested, OPML file. The ⋯ menu has New folder, Import and Export OPML, Show the Feeds folder, how often to check, and how long to keep items.
 - **Reading a download:** PDFs in Libreri's PDF reader, articles in its Markdown reader, inside a window; or *Open in another app*.
+
+## Changes (2026-10-01)
+
+- **Read opens a tab**, with the library's own reader (PDF or article), instead of a separate window. Highlights and notes come once it is added to the library; *Add to library* in the tab replaces it with the book.
+- **Opened items stay in New** until you choose another list or feed, so they do not vanish while being read (they are marked seen at once).

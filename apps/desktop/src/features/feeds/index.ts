@@ -3,7 +3,8 @@ export { useFeedsBackground, useFeedsOverview } from "./api";
 export { AddToLibraryDialog } from "./components/ItemDialogs";
 export { AddFeedDialog, AddressTab, OpmlTab } from "./components/AddFeedDialog";
 export { whenLine } from "./model";
-export { openBook } from "./open";
+export { openBook, openFeedDoc } from "./open";
+export { FeedDocView } from "./components/FeedDocView";
 export {
   feedsKey,
   refreshFeeds,

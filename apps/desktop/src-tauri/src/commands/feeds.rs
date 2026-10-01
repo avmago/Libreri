@@ -224,6 +224,10 @@ pub struct ItemFilter {
     /// Items with this topic (arXiv: "cs.AI").
     pub topic: Option<String>,
     pub search: Option<String>,
+    /// Items still listed under "unread" (and "unplayed") though they were
+    /// just opened, so they do not vanish while being read.
+    #[serde(default)]
+    pub keep: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Type)]
@@ -274,11 +278,11 @@ pub async fn feed_items(app: AppHandle, space: Space, filter: ItemFilter) -> App
                 .iter()
                 .filter(|i| feeds.as_ref().is_none_or(|f| f.contains(&i.feed)))
                 .filter(|i| match filter.show.as_str() {
-                    "unread" => !i.read,
+                    "unread" => !i.read || filter.keep.contains(&i.id),
                     "downloaded" => i.file.is_some(),
                     "library" => i.book.is_some(),
                     "inProgress" => i.position.is_some_and(|p| p > 0.0) && !i.played,
-                    "unplayed" => !i.played,
+                    "unplayed" => !i.played || filter.keep.contains(&i.id),
                     _ => true,
                 })
                 .collect();

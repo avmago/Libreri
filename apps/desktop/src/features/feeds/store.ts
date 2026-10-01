@@ -13,6 +13,9 @@ interface FeedsViewState {
   search: string;
   /** Folders shown closed. */
   closed: Record<string, boolean>;
+  /** Items opened in this list: still shown under New until the list changes. */
+  kept: string[];
+  keep: (id: string) => void;
   setPlace: (place: FeedPlace) => void;
   setShow: (show: FeedShow) => void;
   setTopic: (topic: string | null) => void;
@@ -26,8 +29,10 @@ export const useFeedsView = create<FeedsViewState>((set) => ({
   topic: null,
   search: "",
   closed: {},
-  setPlace: (place) => set({ place, topic: null }),
-  setShow: (show) => set({ show }),
+  kept: [],
+  keep: (id) => set((s) => (s.kept.includes(id) ? s : { kept: [...s.kept, id] })),
+  setPlace: (place) => set({ place, topic: null, kept: [] }),
+  setShow: (show) => set({ show, kept: [] }),
   setTopic: (topic) => set({ topic }),
   setSearch: (search) => set({ search }),
   toggle: (folder) => set((s) => ({ closed: { ...s.closed, [folder]: !s.closed[folder] } })),

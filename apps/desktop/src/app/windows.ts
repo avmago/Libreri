@@ -37,6 +37,10 @@ export function useWindowActions() {
       moveTabToWindow: async (bookId: string) => {
         const tab = useTabs.getState().tabs.find((t) => t.bookId === bookId);
         if (!tab) return;
+        if (tab.feed) {
+          toast("Add it to the library to read it in a window of its own");
+          return;
+        }
         try {
           // Save the reading position first, so the new window opens there.
           await flushSession();

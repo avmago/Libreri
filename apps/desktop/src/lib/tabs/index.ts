@@ -4,7 +4,7 @@
  * use it.
  */
 import { create } from "zustand";
-import type { CompareSourceDto, FileType } from "@/lib/ipc";
+import type { CompareSourceDto, FileType, Space } from "@/lib/ipc";
 
 export interface BookTab {
   /** One tab per book, so the book id is the tab id. */
@@ -17,6 +17,20 @@ export interface BookTab {
   findText?: FindRequest;
   /** Show a comparison instead of the book (until it is closed). */
   compare?: CompareRequest;
+  /** Not a book: a download from Feeds, read before it is added to the
+   * library (the tab id is `feed:<item id>`). */
+  feed?: FeedDoc;
+}
+
+/** A downloaded feed item or episode, opened in a tab. */
+export interface FeedDoc {
+  space: Space;
+  /** The item's id. */
+  id: string;
+  /** The download (library-relative, under `Feeds/`). */
+  file: string;
+  /** The feed's title. */
+  source: string;
 }
 
 /** Two documents to compare: the first is shown on the left. */

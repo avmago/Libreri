@@ -63,8 +63,8 @@ import {
 import { announceLabel, authorsLine, feedTree, whenLine, type TreeFolder } from "../model";
 import { useFeedsView, type FeedPlace, type FeedShow } from "../store";
 import { AddFeedDialog, FolderSelect, type AddTab } from "./AddFeedDialog";
-import { AddToLibraryDialog, ItemPreview } from "./ItemDialogs";
-import { openBook } from "../open";
+import { AddToLibraryDialog } from "./ItemDialogs";
+import { openBook, openFeedDoc } from "../open";
 
 const fail = (what: string) => (e: unknown) =>
   toast.error(what, { description: e instanceof Error ? e.message : String(e) });
@@ -678,7 +678,7 @@ function FeedRow({
 }
 
 function Items({ data }: { data: FeedsDto }) {
-  const { place, show, setShow, topic, setTopic, search, setSearch } = useFeedsView();
+  const { place, show, setShow, topic, setTopic, search, setSearch, kept } = useFeedsView();
   const deferred = useDeferredValue(search);
   const filter = {
     folder: place.kind === "folder" ? place.id : null,
@@ -686,10 +686,10 @@ function Items({ data }: { data: FeedsDto }) {
     show,
     topic,
     search: deferred.trim() || null,
+    keep: kept,
   };
   const { data: list, isPending } = useFeedItems(filter);
   const allRead = useMarkAllRead();
-  const [preview, setPreview] = useState<FeedItem | null>(null);
   const [adding, setAdding] = useState<FeedItem | null>(null);
   const { editLibrary } = usePermissions();
   const downloading = useMemo(() => new Set(data.downloading), [data.downloading]);
@@ -803,25 +803,13 @@ function Items({ data }: { data: FeedsDto }) {
               item={it}
               downloading={downloading.has(it.id)}
               canAdd={editLibrary}
-              onPreview={setPreview}
+              onPreview={(it) => openFeedDoc(it, "feeds")}
               onAdd={setAdding}
               showSource={place.kind !== "feed"}
             />
           ))}
         </ul>
       </div>
-      <ItemPreview
-        item={preview}
-        onClose={() => setPreview(null)}
-        onAdd={
-          editLibrary
-            ? (it) => {
-                setPreview(null);
-                setAdding(it);
-              }
-            : undefined
-        }
-      />
       <AddToLibraryDialog item={adding} onClose={() => setAdding(null)} />
     </section>
   );
@@ -847,13 +835,18 @@ function ItemRow({
   const remove = useDeleteItems();
   const forget = useForgetFile();
   const markRead = useMarkRead();
+  const keep = useFeedsView((s) => s.keep);
   const busy = downloading || download.isPending;
   const unread = !it.read;
   const note = announceLabel(it.announce);
   const pdf = it.file?.toLowerCase().endsWith(".pdf") ?? !!it.pdf;
   const expand = () => {
     setOpen((o) => !o);
-    if (unread) markRead.mutate({ ids: [it.id], read: true });
+    if (unread) {
+      // Stays in New while it is being read.
+      keep(it.id);
+      markRead.mutate({ ids: [it.id], read: true });
+    }
   };
   return (
     <li className="group flex gap-3 border-b px-5 py-3 hover:bg-muted/40">

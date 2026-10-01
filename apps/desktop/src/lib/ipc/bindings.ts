@@ -1653,6 +1653,11 @@ export type ItemFilter = {
 	/**  Items with this topic (arXiv: "cs.AI"). */
 	topic: string | null,
 	search: string | null,
+	/**
+	 *  Items still listed under "unread" (and "unplayed") though they were
+	 *  just opened, so they do not vanish while being read.
+	 */
+	keep?: string[],
 };
 
 export type ItemsDto = {

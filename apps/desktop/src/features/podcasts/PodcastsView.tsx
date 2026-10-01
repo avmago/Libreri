@@ -333,14 +333,14 @@ function PlaceRow({
 }
 
 function Episodes({ data }: { data: FeedsDto }) {
-  const { place, show, setShow, search, setSearch } = usePodcastsView();
+  const { place, show, setShow, search, setSearch, kept } = usePodcastsView();
   const q = useDeferredValue(search.trim());
   const feeds = useMemo(() => new Map(data.feeds.map((f) => [f.id, f])), [data.feeds]);
   const feed = place.kind === "show" ? (feeds.get(place.id) ?? null) : null;
   const queue = place.kind === "list" && place.id === "queue";
   const filter: ItemFilter = useMemo(() => {
     if (place.kind === "show")
-      return { folder: null, feed: place.id, show, topic: null, search: q || null };
+      return { folder: null, feed: place.id, show, topic: null, search: q || null, keep: kept };
     const byList = {
       new: "unread",
       inProgress: "inProgress",
@@ -348,8 +348,15 @@ function Episodes({ data }: { data: FeedsDto }) {
       all: "all",
       queue: "all",
     } as const;
-    return { folder: null, feed: null, show: byList[place.id], topic: null, search: q || null };
-  }, [place, show, q]);
+    return {
+      folder: null,
+      feed: null,
+      show: byList[place.id],
+      topic: null,
+      search: q || null,
+      keep: kept,
+    };
+  }, [place, show, q, kept]);
   const items = useFeedItems(filter, "podcasts");
   const queued = useQueueEpisodes(queue ? data.queue : []);
   const list: FeedItem[] = queue
@@ -589,6 +596,7 @@ function EpisodeRow({
   const current = usePlayer((s) => s.episode?.id === it.id);
   const playing = usePlayer((s) => s.episode?.id === it.id && s.playing);
   const play = usePlayer((s) => s.play);
+  const keep = usePodcastsView((s) => s.keep);
   const download = useDownloadItem("podcasts");
   const forget = useForgetFile("podcasts");
   const remove = useDeleteItems("podcasts");
@@ -612,7 +620,10 @@ function EpisodeRow({
         className="mt-0.5 size-9 shrink-0 rounded-full"
         aria-label={playing ? `Pause “${it.title}”` : `Play “${it.title}”`}
         disabled={!it.audio && !it.file}
-        onClick={() => play(it, feed)}
+        onClick={() => {
+          keep(it.id);
+          play(it, feed);
+        }}
       >
         {playing ? <Pause /> : <Play />}
       </Button>
