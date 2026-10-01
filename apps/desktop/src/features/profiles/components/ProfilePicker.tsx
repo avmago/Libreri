@@ -40,8 +40,6 @@ export function ProfilePicker({
   });
 
   if (isPending) return null;
-  // "Libre - My Library": the name large, what follows the dash below it.
-  const [title, subtitle] = splitName(library.name);
 
   return (
     <main className="flex h-full flex-col items-center justify-center gap-10 overflow-auto bg-sidebar px-6 py-10">
@@ -54,11 +52,13 @@ export function ProfilePicker({
         <>
           <div className="flex flex-col items-center gap-6 text-center">
             <div className="flex flex-col items-center gap-2">
-              <LibreriMark className="size-16" />
-              <span className="text-[26px] leading-tight font-semibold tracking-tight">
-                {title}
-              </span>
-              {subtitle && <span className="text-[14px] text-muted-foreground">{subtitle}</span>}
+              <div className="flex items-center gap-3">
+                <LibreriMark className="size-12" />
+                <span className="text-[30px] leading-none font-semibold tracking-tight">
+                  Libreri
+                </span>
+              </div>
+              <span className="text-[14px] text-muted-foreground">{library.name}</span>
             </div>
             <h1 className="text-[28px] font-semibold tracking-tight">Who's reading?</h1>
           </div>
@@ -185,10 +185,4 @@ function Unlock({ profile, onBack }: { profile: ProfileDto; onBack: () => void }
       <RecoveryDialog open={recovering} onOpenChange={setRecovering} />
     </section>
   );
-}
-
-/** Splits "Name - More" (or "Name — More", "Name · More") in two. */
-function splitName(name: string): [string, string | null] {
-  const m = /^(.+?)\s+[-–—·:|]\s+(.+)$/.exec(name.trim());
-  return m ? [m[1]!, m[2]!] : [name, null];
 }
