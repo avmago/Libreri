@@ -10,6 +10,10 @@ pub struct Parsed {
     pub title: String,
     /// The site the feed belongs to.
     pub site: Option<String>,
+    /// The feed's picture (a podcast's artwork).
+    pub image: Option<String>,
+    /// Who makes it (a podcast's host or publisher).
+    pub author: Option<String>,
     pub entries: Vec<FeedEntry>,
 }
 
@@ -36,6 +40,23 @@ pub struct FeedEntry {
     pub arxiv_id: Option<String>,
     /// arXiv: "new", "cross", "replace" or "replace-cross".
     pub announce: Option<String>,
+    /// Podcasts: the episode's audio, its type and length (seconds).
+    #[serde(default)]
+    pub audio: Option<String>,
+    #[serde(default)]
+    pub audio_type: Option<String>,
+    #[serde(default)]
+    pub duration: Option<f64>,
+    /// The episode's own picture.
+    #[serde(default)]
+    pub image: Option<String>,
+    /// Podcasting 2.0: a transcript (address and type) and chapters.
+    #[serde(default)]
+    pub transcript: Option<String>,
+    #[serde(default)]
+    pub transcript_type: Option<String>,
+    #[serde(default)]
+    pub chapters: Option<String>,
 }
 
 /// Reads a feed. `url` resolves relative links.
@@ -61,10 +82,40 @@ pub fn parse(bytes: &[u8], url: &str) -> Result<Parsed, String> {
         .iter()
         .find(|l| l.rel.as_deref().is_none_or(|r| r == "alternate") && !is_feed_type(l))
         .map(|l| l.href.clone());
-    let entries = feed.entries.iter().map(entry).collect();
+    let extra = podcast_tags(bytes);
+    let entries = feed
+        .entries
+        .iter()
+        .enumerate()
+        .map(|(i, e)| {
+            let mut out = entry(e);
+            if let Some(x) = extra.get(i) {
+                out.transcript = x.transcript.clone().map(|(u, _)| u);
+                out.transcript_type = x.transcript.clone().map(|(_, t)| t);
+                out.chapters = x.chapters.clone();
+                if x.duration.is_some() {
+                    out.duration = x.duration;
+                }
+            }
+            out
+        })
+        .collect();
+    let image = feed
+        .logo
+        .as_ref()
+        .or(feed.icon.as_ref())
+        .map(|i| i.uri.clone())
+        .filter(|u| u.starts_with("http"));
+    let author = feed
+        .authors
+        .first()
+        .map(|p| plain_text(&p.name))
+        .filter(|a| !a.is_empty());
     Ok(Parsed {
         title,
         site,
+        image,
+        author,
         entries,
     })
 }
@@ -161,6 +212,7 @@ fn entry(e: &feed_rs::model::Entry) -> FeedEntry {
         .find_map(doi_of)
         .or_else(|| link.as_deref().and_then(nature_doi));
     let published = e.published.or(e.updated).map(|d| d.to_rfc3339());
+    let (audio, audio_type, duration, image) = audio_of(e);
     let key = if !e.id.trim().is_empty() {
         e.id.trim().to_owned()
     } else if let Some(l) = &link {
@@ -184,7 +236,173 @@ fn entry(e: &feed_rs::model::Entry) -> FeedEntry {
         doi,
         arxiv_id,
         announce,
+        audio,
+        audio_type,
+        duration,
+        image,
+        transcript: None,
+        transcript_type: None,
+        chapters: None,
     }
+}
+
+/// The audio of a podcast episode: an `audio/*` enclosure or media file,
+/// or a link to one.
+fn audio_of(
+    e: &feed_rs::model::Entry,
+) -> (Option<String>, Option<String>, Option<f64>, Option<String>) {
+    let mut duration = None;
+    let mut image = None;
+    let mut audio: Option<(String, Option<String>)> = None;
+    for m in &e.media {
+        if duration.is_none() {
+            duration = m.duration.map(|d| d.as_secs_f64());
+        }
+        if image.is_none() {
+            image = m.thumbnails.first().map(|t| t.image.uri.clone());
+        }
+        for c in &m.content {
+            let kind = c.content_type.as_ref().map(|t| t.to_string());
+            let url = c.url.as_ref().map(|u| u.to_string());
+            let is_audio = kind.as_deref().is_some_and(|k| k.starts_with("audio/"))
+                || url.as_deref().is_some_and(|u| {
+                    let u = u.to_ascii_lowercase();
+                    let path = u.split(['?', '#']).next().unwrap_or("");
+                    [".mp3", ".m4a", ".aac", ".ogg", ".opus", ".flac", ".m4b"]
+                        .iter()
+                        .any(|x| path.ends_with(x))
+                });
+            if audio.is_none() && is_audio {
+                if let Some(u) = url {
+                    audio = Some((u, kind));
+                    if duration.is_none() {
+                        duration = c.duration.map(|d| d.as_secs_f64());
+                    }
+                }
+            }
+        }
+    }
+    if audio.is_none() {
+        audio = e
+            .links
+            .iter()
+            .find(|l| {
+                l.rel.as_deref() == Some("enclosure")
+                    && l.media_type
+                        .as_deref()
+                        .is_some_and(|t| t.starts_with("audio/"))
+            })
+            .map(|l| (l.href.clone(), l.media_type.clone()));
+    }
+    let (audio, audio_type) = match audio {
+        Some((u, t)) => (Some(u), t),
+        None => (None, None),
+    };
+    (
+        audio,
+        audio_type,
+        duration.filter(|d| *d > 0.0),
+        image.filter(|u| u.starts_with("http")),
+    )
+}
+
+/// Podcasting 2.0 tags feed-rs does not read, item by item.
+#[derive(Debug, Default, Clone)]
+struct PodcastTags {
+    /// The best transcript: address and type.
+    transcript: Option<(String, String)>,
+    chapters: Option<String>,
+    /// `itunes:duration`, read here: feed-rs takes "58:00" for 58 seconds.
+    duration: Option<f64>,
+}
+
+/// "1:02:03", "58:00" or "3480" as seconds.
+fn itunes_duration(v: &str) -> Option<f64> {
+    let mut total = 0.0;
+    for part in v.trim().split(':') {
+        total = total * 60.0 + part.trim().parse::<f64>().ok()?;
+    }
+    (total > 0.0).then_some(total)
+}
+
+/// Transcript types, most useful first.
+fn transcript_rank(kind: &str) -> u8 {
+    match kind {
+        "text/vtt" => 0,
+        "application/x-subrip" | "application/srt" | "text/srt" => 1,
+        "application/json" => 2,
+        "text/html" => 3,
+        "text/plain" => 4,
+        _ => 9,
+    }
+}
+
+fn podcast_tags(bytes: &[u8]) -> Vec<PodcastTags> {
+    use quick_xml::events::Event;
+    let mut reader = quick_xml::Reader::from_reader(bytes);
+    let mut out = Vec::new();
+    let mut cur: Option<PodcastTags> = None;
+    let mut in_duration = false;
+    let mut buf = Vec::new();
+    while let Ok(ev) = reader.read_event_into(&mut buf) {
+        match &ev {
+            Event::Eof => break,
+            Event::Start(e) if matches!(e.local_name().as_ref(), b"item" | b"entry") => {
+                cur = Some(PodcastTags::default());
+            }
+            Event::End(e) if matches!(e.local_name().as_ref(), b"item" | b"entry") => {
+                out.push(cur.take().unwrap_or_default());
+            }
+            Event::Start(e) if e.name().as_ref() == b"itunes:duration" => {
+                in_duration = cur.is_some();
+            }
+            Event::End(e) if e.name().as_ref() == b"itunes:duration" => {
+                in_duration = false;
+            }
+            Event::Text(t) if in_duration => {
+                if let (Some(tags), v) = (cur.as_mut(), String::from_utf8_lossy(t.as_ref())) {
+                    tags.duration = itunes_duration(&v);
+                }
+            }
+            Event::Start(e) | Event::Empty(e) => {
+                let Some(tags) = cur.as_mut() else {
+                    buf.clear();
+                    continue;
+                };
+                let name = e.name();
+                let attr = |k: &[u8]| {
+                    e.attributes().flatten().find_map(|a| {
+                        (a.key.as_ref() == k)
+                            .then(|| a.unescape_value().ok().map(|v| v.trim().to_owned()))
+                            .flatten()
+                    })
+                };
+                match name.as_ref() {
+                    b"podcast:transcript" => {
+                        if let Some(url) = attr(b"url").filter(|u| u.starts_with("http")) {
+                            let kind = attr(b"type").unwrap_or_default().to_ascii_lowercase();
+                            let better = tags
+                                .transcript
+                                .as_ref()
+                                .is_none_or(|(_, k)| transcript_rank(&kind) < transcript_rank(k));
+                            if better {
+                                tags.transcript = Some((url, kind));
+                            }
+                        }
+                    }
+                    b"podcast:chapters" => {
+                        if let Some(url) = attr(b"url").filter(|u| u.starts_with("http")) {
+                            tags.chapters = Some(url);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+        buf.clear();
+    }
+    out
 }
 
 /// "A. Smith, B. Jones and C. Lee" as three names (arXiv's RSS gives all

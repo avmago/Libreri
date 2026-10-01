@@ -143,6 +143,10 @@ pub struct Settings {
     pub enabled: Vec<Source>,
     pub comicvine_key: Option<String>,
     pub isbndb_key: Option<String>,
+    /// Podcast Index (podcast search, trending, categories): the reader's
+    /// own free key and secret. Not a book-details source.
+    pub podcastindex_key: Option<String>,
+    pub podcastindex_secret: Option<String>,
     /// Fill in missing details of newly imported books (off unless the
     /// reader turns it on: it sends titles to the sources).
     pub fill_on_import: bool,
@@ -157,6 +161,8 @@ impl Default for Settings {
                 .collect(),
             comicvine_key: None,
             isbndb_key: None,
+            podcastindex_key: None,
+            podcastindex_secret: None,
             fill_on_import: false,
         }
     }

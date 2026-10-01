@@ -151,7 +151,7 @@ function Header({
       filters: [{ name: "OPML", extensions: ["opml"] }],
     });
     if (!path) return;
-    unwrap(commands.feedsExportOpml(path)).then(
+    unwrap(commands.feedsExportOpml("feeds", path)).then(
       () => toast.success("Feeds exported"),
       fail("Could not export the feeds"),
     );
@@ -604,7 +604,10 @@ function FeedRow({
           <DropdownCheckItem
             checked={auto}
             onCheckedChange={(v) =>
-              change.mutate({ id: f.id, change: { title: null, folder: null, autoDownload: v } })
+              change.mutate({
+                id: f.id,
+                change: { title: null, folder: null, autoDownload: v, speed: null },
+              })
             }
             className={cn(f.autoFromFolder && "opacity-60")}
           >
@@ -1039,12 +1042,15 @@ function AskDialog({ ask, data, onClose }: { ask: Ask; data: FeedsDto; onClose: 
         );
       case "renameFeed":
         return changeFeed.mutate(
-          { id: ask.id, change: { title: name, folder: null, autoDownload: null } },
+          { id: ask.id, change: { title: name, folder: null, autoDownload: null, speed: null } },
           done,
         );
       case "moveFeed":
         return changeFeed.mutate(
-          { id: ask.feed.id, change: { title: null, folder: target, autoDownload: null } },
+          {
+            id: ask.feed.id,
+            change: { title: null, folder: target, autoDownload: null, speed: null },
+          },
           done,
         );
       case "moveFolder":

@@ -21,7 +21,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; frame-src 'self' blob: book: http://book.localhost http://127.0.0.1:*; img-src 'self' asset: book: http://book.localhost data: blob:; media-src 'self' book: http://book.localhost blob:; connect-src 'self' ipc: http://ipc.localhost book: http://book.localhost blob: data:; style-src 'self' 'unsafe-inline' blob:; font-src 'self' data: blob: book: http://book.localhost"
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; frame-src 'self' blob: book: http://book.localhost http://127.0.0.1:*; img-src 'self' asset: book: http://book.localhost data: blob: https://*.mzstatic.com; media-src 'self' book: http://book.localhost blob: https:; connect-src 'self' ipc: http://ipc.localhost book: http://book.localhost blob: data:; style-src 'self' 'unsafe-inline' blob:; font-src 'self' data: blob: book: http://book.localhost"
     }
   },
   "bundle": {

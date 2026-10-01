@@ -24,6 +24,7 @@ import {
   Moon,
   NotebookText,
   Rss,
+  Podcast,
   FileSearch,
   PanelLeft,
   RefreshCw,
@@ -59,6 +60,7 @@ import { FindDetailsDialog, useDetailsEvents } from "@/features/details";
 import { HelperDialog } from "@/features/helpers";
 import { NotesHub, flushNotes } from "@/features/notes";
 import { FeedsView, useFeedsBackground } from "@/features/feeds";
+import { PodcastPlayer, PodcastsView, setPodcastSettingsOpener } from "@/features/podcasts";
 import { OcrDialog, SearchView, useSearchEvents } from "@/features/search";
 import { setSpeechSettingsOpener } from "@/features/speech";
 import {
@@ -202,13 +204,14 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
     }
   }, []);
   const goHome = useCallback(
-    (kind: "all" | "notes" | "feeds" | "organize" | "search", query?: string) => {
+    (kind: "all" | "notes" | "feeds" | "podcasts" | "organize" | "search", query?: string) => {
       tabs.activate(null);
       ui.closeSettings();
       if (kind === "all") {
         if (
           nav.kind === "notes" ||
           nav.kind === "feeds" ||
+          nav.kind === "podcasts" ||
           nav.kind === "organize" ||
           nav.kind === "search"
         )
@@ -239,6 +242,7 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
 
   // "Settings" in the speech feature's messages (e.g. no model yet).
   useEffect(() => setSpeechSettingsOpener(() => useUi.getState().openSettings("speech")), []);
+  useEffect(() => setPodcastSettingsOpener(() => useUi.getState().openSettings("online")), []);
 
   useShortcut("palette.open", () => ui.setPaletteOpen(true));
   useShortcut("settings.open", () => ui.openSettings());
@@ -250,8 +254,10 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
   useShortcut("go.library", () => goHome("all"));
   useShortcut("go.notes", () => goHome("notes"));
   useShortcut("go.feeds", () => goHome("feeds"));
+  useShortcut("go.podcasts", () => goHome("podcasts"));
   // Feeds: new items are looked for while the library is open.
   useFeedsBackground(session.keepsData);
+  useFeedsBackground(session.keepsData, "podcasts");
   useShortcut("go.search", () => goHome("search"));
   useShortcut("go.organize", () => session.canEditLibrary && goHome("organize"));
   useShortcut("library.health", () => session.canEditLibrary && setHealth(true));
@@ -314,6 +320,14 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
         icon: Rss,
         shortcut: k("go.feeds"),
         run: () => goHome("feeds"),
+      },
+      {
+        id: "go.podcasts",
+        group: "Go to",
+        label: "Podcasts: find, follow and listen",
+        icon: Podcast,
+        shortcut: k("go.podcasts"),
+        run: () => goHome("podcasts"),
       },
       {
         id: "go.search",
@@ -585,6 +599,8 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
       <NotesHub />
     ) : nav.kind === "feeds" ? (
       <FeedsView />
+    ) : nav.kind === "podcasts" ? (
+      <PodcastsView />
     ) : nav.kind === "search" ? (
       <SearchView key={nav.query ?? ""} />
     ) : nav.kind === "organize" ? (
@@ -703,6 +719,8 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
           </div>
         )}
       </div>
+
+      {session.keepsData && <PodcastPlayer hidden={readingFullscreen} />}
 
       <CommandPalette
         open={ui.paletteOpen}

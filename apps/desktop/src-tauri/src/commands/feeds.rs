@@ -26,21 +26,60 @@ async fn blocking<T: Send + 'static>(
         .map_err(|e| AppError::new(AppErrorKind::Io, e.to_string()))?
 }
 
-fn load(lib: &Library) -> AppResult<State> {
-    match lib.read_feeds()? {
+/// Feeds (papers, articles) or podcasts: each has its own folders, feeds
+/// and items, in its own file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum Space {
+    Feeds,
+    Podcasts,
+}
+
+impl Space {
+    fn file(self) -> &'static str {
+        match self {
+            Space::Feeds => ".feeds.json",
+            Space::Podcasts => ".podcasts.json",
+        }
+    }
+
+    /// Downloads go under this folder of `Feeds/<profile>/` (podcasts in
+    /// their own).
+    fn downloads(self) -> Option<&'static str> {
+        match self {
+            Space::Feeds => None,
+            Space::Podcasts => Some("Podcasts"),
+        }
+    }
+
+    fn refreshing(self, state: &AppState) -> &std::sync::atomic::AtomicBool {
+        match self {
+            Space::Feeds => &state.feeds_refreshing,
+            Space::Podcasts => &state.podcasts_refreshing,
+        }
+    }
+
+    fn tag(self, id: &str) -> String {
+        format!("{self:?}:{id}")
+    }
+}
+
+fn load(lib: &Library, space: Space) -> AppResult<State> {
+    match lib.read_feeds_file(space.file())? {
         Some(json) => State::from_json(&json).map_err(AppError::invalid),
         None => Ok(State::default()),
     }
 }
 
-fn save(lib: &Library, s: &State) -> AppResult<()> {
-    lib.write_feeds(&s.to_json())?;
+fn save(lib: &Library, space: Space, s: &State) -> AppResult<()> {
+    lib.write_feeds_file(space.file(), &s.to_json())?;
     Ok(())
 }
 
 /// Loads, changes and saves the state, one change at a time.
 fn change<T>(
     state: &AppState,
+    space: Space,
     f: impl FnOnce(&Library, &mut State) -> AppResult<T>,
 ) -> AppResult<T> {
     let lib = state.library()?;
@@ -48,19 +87,19 @@ fn change<T>(
         .feeds_lock
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    let mut s = load(&lib)?;
+    let mut s = load(&lib, space)?;
     let out = f(&lib, &mut s)?;
-    save(&lib, &s)?;
+    save(&lib, space, &s)?;
     Ok(out)
 }
 
-fn read<T>(state: &AppState, f: impl FnOnce(&State) -> T) -> AppResult<T> {
+fn read<T>(state: &AppState, space: Space, f: impl FnOnce(&State) -> T) -> AppResult<T> {
     let lib = state.library()?;
     let _guard = state
         .feeds_lock
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    Ok(f(&load(&lib)?))
+    Ok(f(&load(&lib, space)?))
 }
 
 fn changed(app: &AppHandle, new_items: u32) {
@@ -82,6 +121,10 @@ pub struct FeedDto {
     pub error: Option<String>,
     pub unread: u32,
     pub total: u32,
+    /// Podcasts: who makes it, its artwork (a data URL) and its speed.
+    pub author: Option<String>,
+    pub artwork: Option<String>,
+    pub speed: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Type)]
@@ -96,23 +139,28 @@ pub struct FeedsDto {
     pub refreshing: bool,
     /// Items being downloaded now.
     pub downloading: Vec<String>,
+    /// Podcasts: episodes to play next, in order.
+    pub queue: Vec<String>,
+    /// Podcasts: episodes started and not finished.
+    pub in_progress: u32,
 }
 
 /// The folders and feeds, with counts.
 #[tauri::command]
 #[specta::specta]
-pub async fn feeds_overview(app: AppHandle) -> AppResult<FeedsDto> {
+pub async fn feeds_overview(app: AppHandle, space: Space) -> AppResult<FeedsDto> {
     blocking(move || {
         let state = app.state::<AppState>();
+        let prefix = space.tag("");
         let downloading: Vec<String> = state
             .feed_downloads
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .iter()
-            .cloned()
+            .filter_map(|t| t.strip_prefix(&prefix).map(str::to_owned))
             .collect();
-        let refreshing = state.feeds_refreshing.load(Ordering::SeqCst);
-        read(&state, |s| {
+        let refreshing = space.refreshing(&state).load(Ordering::SeqCst);
+        read(&state, space, |s| {
             let feeds = s
                 .feeds
                 .iter()
@@ -137,6 +185,9 @@ pub async fn feeds_overview(app: AppHandle) -> AppResult<FeedsDto> {
                         error: f.error.clone(),
                         unread,
                         total,
+                        author: f.author.clone(),
+                        artwork: f.artwork.clone(),
+                        speed: f.speed,
                     }
                 })
                 .collect();
@@ -149,6 +200,12 @@ pub async fn feeds_overview(app: AppHandle) -> AppResult<FeedsDto> {
                 downloaded: s.items.iter().filter(|i| i.file.is_some()).count() as u32,
                 refreshing,
                 downloading,
+                queue: s.queue.clone(),
+                in_progress: s
+                    .items
+                    .iter()
+                    .filter(|i| !i.played && i.position.is_some_and(|p| p > 0.0))
+                    .count() as u32,
             }
         })
     })
@@ -161,7 +218,8 @@ pub struct ItemFilter {
     /// A folder (with its subfolders) or a feed; neither: everything.
     pub folder: Option<String>,
     pub feed: Option<String>,
-    /// "all", "unread", "downloaded" or "library".
+    /// "all", "unread", "downloaded", "library"; podcasts also
+    /// "inProgress" and "unplayed".
     pub show: String,
     /// Items with this topic (arXiv: "cs.AI").
     pub topic: Option<String>,
@@ -193,10 +251,10 @@ const MAX_LISTED: usize = 600;
 /// The items that match, newest first.
 #[tauri::command]
 #[specta::specta]
-pub async fn feed_items(app: AppHandle, filter: ItemFilter) -> AppResult<ItemsDto> {
+pub async fn feed_items(app: AppHandle, space: Space, filter: ItemFilter) -> AppResult<ItemsDto> {
     blocking(move || {
         let state = app.state::<AppState>();
-        read(&state, |s| {
+        read(&state, space, |s| {
             let feeds: Option<HashSet<String>> = match (&filter.feed, &filter.folder) {
                 (Some(f), _) => Some(HashSet::from([f.clone()])),
                 (None, Some(folder)) => {
@@ -219,6 +277,8 @@ pub async fn feed_items(app: AppHandle, filter: ItemFilter) -> AppResult<ItemsDt
                     "unread" => !i.read,
                     "downloaded" => i.file.is_some(),
                     "library" => i.book.is_some(),
+                    "inProgress" => i.position.is_some_and(|p| p > 0.0) && !i.played,
+                    "unplayed" => !i.played,
                     _ => true,
                 })
                 .collect();
@@ -305,11 +365,11 @@ pub struct FeedPreviewDto {
 /// Finds the feed for an address (a feed's, or a site's).
 #[tauri::command]
 #[specta::specta]
-pub async fn feed_find(app: AppHandle, address: String) -> AppResult<FeedPreviewDto> {
+pub async fn feed_find(app: AppHandle, space: Space, address: String) -> AppResult<FeedPreviewDto> {
     blocking(move || {
         let found = libreri_feeds::fetch::discover(&address).map_err(AppError::invalid)?;
         let state = app.state::<AppState>();
-        let followed = read(&state, |s| {
+        let followed = read(&state, space, |s| {
             s.feeds
                 .iter()
                 .find(|f| f.url == found.url)
@@ -338,6 +398,7 @@ pub async fn feed_find(app: AppHandle, address: String) -> AppResult<FeedPreview
 #[specta::specta]
 pub async fn feed_add(
     app: AppHandle,
+    space: Space,
     url: String,
     title: String,
     folder: Option<String>,
@@ -346,7 +407,7 @@ pub async fn feed_add(
     blocking(move || {
         let url = libreri_feeds::fetch::normalise(&url).map_err(AppError::invalid)?;
         let state = app.state::<AppState>();
-        let id = change(&state, |_, s| {
+        let id = change(&state, space, |_, s| {
             let id = s
                 .add_feed(&url, &title, None, folder.as_deref())
                 .map_err(AppError::invalid)?;
@@ -382,6 +443,7 @@ pub async fn feeds_add_arxiv(
     search: Option<String>,
     auto_download: bool,
 ) -> AppResult<Vec<String>> {
+    let space = Space::Feeds;
     blocking(move || {
         let search_url = search
             .as_deref()
@@ -391,7 +453,7 @@ pub async fn feeds_add_arxiv(
             .transpose()
             .map_err(AppError::invalid)?;
         let state = app.state::<AppState>();
-        let ids = change(&state, |_, s| {
+        let ids = change(&state, space, |_, s| {
             let mut ids = Vec::new();
             for code in &codes {
                 let Some((group, name)) = libreri_feeds::sources::arxiv_category(code) else {
@@ -451,6 +513,8 @@ pub struct FeedChange {
     /// Move to this folder ("" = the top level).
     pub folder: Option<String>,
     pub auto_download: Option<bool>,
+    /// Podcasts: play at this speed (0: the usual speed).
+    pub speed: Option<f64>,
 }
 
 fn place(folder: &Option<String>) -> Option<Option<&str>> {
@@ -461,17 +525,28 @@ fn place(folder: &Option<String>) -> Option<Option<&str>> {
 
 #[tauri::command]
 #[specta::specta]
-pub async fn feed_change(app: AppHandle, id: String, change_to: FeedChange) -> AppResult<()> {
+pub async fn feed_change(
+    app: AppHandle,
+    space: Space,
+    id: String,
+    change_to: FeedChange,
+) -> AppResult<()> {
     blocking(move || {
         let state = app.state::<AppState>();
-        change(&state, |_, s| {
+        change(&state, space, |_, s| {
             s.change_feed(
                 &id,
                 change_to.title.as_deref(),
                 place(&change_to.folder),
                 change_to.auto_download,
             )
-            .map_err(AppError::invalid)
+            .map_err(AppError::invalid)?;
+            if let Some(v) = change_to.speed {
+                if let Some(f) = s.feeds.iter_mut().find(|f| f.id == id) {
+                    f.speed = (v > 0.0).then_some(v.clamp(0.5, 3.0));
+                }
+            }
+            Ok(())
         })?;
         changed(&app, 0);
         Ok(())
@@ -482,10 +557,10 @@ pub async fn feed_change(app: AppHandle, id: String, change_to: FeedChange) -> A
 /// Stops following a feed. Downloads stay.
 #[tauri::command]
 #[specta::specta]
-pub async fn feed_remove(app: AppHandle, id: String) -> AppResult<()> {
+pub async fn feed_remove(app: AppHandle, space: Space, id: String) -> AppResult<()> {
     blocking(move || {
         let state = app.state::<AppState>();
-        change(&state, |_, s| {
+        change(&state, space, |_, s| {
             s.remove_feed(&id);
             Ok(())
         })?;
@@ -499,12 +574,13 @@ pub async fn feed_remove(app: AppHandle, id: String) -> AppResult<()> {
 #[specta::specta]
 pub async fn feed_folder_add(
     app: AppHandle,
+    space: Space,
     name: String,
     parent: Option<String>,
 ) -> AppResult<String> {
     blocking(move || {
         let state = app.state::<AppState>();
-        let id = change(&state, |_, s| {
+        let id = change(&state, space, |_, s| {
             s.add_folder(&name, parent.as_deref())
                 .map_err(AppError::invalid)
         })?;
@@ -527,12 +603,13 @@ pub struct FolderChange {
 #[specta::specta]
 pub async fn feed_folder_change(
     app: AppHandle,
+    space: Space,
     id: String,
     change_to: FolderChange,
 ) -> AppResult<()> {
     blocking(move || {
         let state = app.state::<AppState>();
-        change(&state, |_, s| {
+        change(&state, space, |_, s| {
             s.change_folder(
                 &id,
                 change_to.name.as_deref(),
@@ -550,10 +627,10 @@ pub async fn feed_folder_change(
 /// Removes a folder; its feeds and folders move up a level.
 #[tauri::command]
 #[specta::specta]
-pub async fn feed_folder_remove(app: AppHandle, id: String) -> AppResult<()> {
+pub async fn feed_folder_remove(app: AppHandle, space: Space, id: String) -> AppResult<()> {
     blocking(move || {
         let state = app.state::<AppState>();
-        change(&state, |_, s| {
+        change(&state, space, |_, s| {
             s.remove_folder(&id).map_err(AppError::invalid)
         })?;
         changed(&app, 0);
@@ -564,10 +641,14 @@ pub async fn feed_folder_remove(app: AppHandle, id: String) -> AppResult<()> {
 
 #[tauri::command]
 #[specta::specta]
-pub async fn feeds_settings_set(app: AppHandle, settings: FeedSettings) -> AppResult<()> {
+pub async fn feeds_settings_set(
+    app: AppHandle,
+    space: Space,
+    settings: FeedSettings,
+) -> AppResult<()> {
     blocking(move || {
         let state = app.state::<AppState>();
-        change(&state, |_, s| {
+        change(&state, space, |_, s| {
             s.settings = FeedSettings {
                 refresh_minutes: settings.refresh_minutes.min(24 * 60),
                 keep_days: settings.keep_days.clamp(1, 3650),
@@ -598,18 +679,22 @@ const AT_ONCE: usize = 6;
 /// new items of feeds set to download by themselves.
 #[tauri::command]
 #[specta::specta]
-pub async fn feeds_refresh(app: AppHandle, ids: Option<Vec<String>>) -> AppResult<RefreshReport> {
+pub async fn feeds_refresh(
+    app: AppHandle,
+    space: Space,
+    ids: Option<Vec<String>>,
+) -> AppResult<RefreshReport> {
     blocking(move || {
         let state = app.state::<AppState>();
-        if state.feeds_refreshing.swap(true, Ordering::SeqCst) {
+        if space.refreshing(&state).swap(true, Ordering::SeqCst) {
             return Ok(RefreshReport {
                 busy: true,
                 ..Default::default()
             });
         }
         changed(&app, 0);
-        let result = refresh(&app, ids);
-        state.feeds_refreshing.store(false, Ordering::SeqCst);
+        let result = refresh(&app, space, ids);
+        space.refreshing(&state).store(false, Ordering::SeqCst);
         changed(&app, result.as_ref().map_or(0, |r| r.new_items));
         result
     })
@@ -618,12 +703,12 @@ pub async fn feeds_refresh(app: AppHandle, ids: Option<Vec<String>>) -> AppResul
 
 type Fetched = (String, Result<Option<libreri_feeds::fetch::Update>, String>);
 
-fn refresh(app: &AppHandle, ids: Option<Vec<String>>) -> AppResult<RefreshReport> {
+fn refresh(app: &AppHandle, space: Space, ids: Option<Vec<String>>) -> AppResult<RefreshReport> {
     let state = app.state::<AppState>();
     let lib = state.library()?;
     let profile = lib.profile()?;
     let now = chrono::Utc::now();
-    let wanted = change(&state, |_, s| {
+    let wanted = change(&state, space, |_, s| {
         s.prune(now);
         Ok(s.feeds
             .iter()
@@ -662,7 +747,7 @@ fn refresh(app: &AppHandle, ids: Option<Vec<String>>) -> AppResult<RefreshReport
     }
     let mut report = RefreshReport::default();
     let checked = chrono::Utc::now().to_rfc3339();
-    let fresh: Vec<String> = change(&state, |_, s| {
+    let fresh: Vec<String> = change(&state, space, |_, s| {
         let mut fresh = Vec::new();
         for (id, result) in &results {
             match result {
@@ -697,11 +782,14 @@ fn refresh(app: &AppHandle, ids: Option<Vec<String>>) -> AppResult<RefreshReport
         Ok(fresh)
     })?;
     changed(app, report.new_items);
+    if space == Space::Podcasts {
+        artworks(app, space);
+    }
     for id in fresh {
         if state.library()?.profile().ok().as_ref() != Some(&profile) {
             break;
         }
-        if download(app, &id).is_ok() {
+        if download(app, space, &id).is_ok() {
             report.downloaded += 1;
         }
         changed(app, 0);
@@ -724,19 +812,19 @@ impl Drop for Downloading<'_> {
 
 /// Downloads an item: its PDF, or a readable copy of its page as
 /// Markdown. Returns the item.
-fn download(app: &AppHandle, id: &str) -> AppResult<FeedItem> {
+fn download(app: &AppHandle, space: Space, id: &str) -> AppResult<FeedItem> {
     let state = app.state::<AppState>();
     if !state
         .feed_downloads
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .insert(id.to_owned())
+        .insert(space.tag(id))
     {
         return Err(AppError::invalid("this item is already being downloaded"));
     }
-    let _mark = Downloading(&state, id.to_owned());
+    let _mark = Downloading(&state, space.tag(id));
     changed(app, 0);
-    let (item, folders) = read(&state, |s| {
+    let (item, folders) = read(&state, space, |s| {
         s.item(id).cloned().map(|item| {
             let mut folders = s.feed(&item.feed).map_or_else(Vec::new, |f| {
                 let mut p = s.folder_path(f.folder.as_deref());
@@ -745,6 +833,9 @@ fn download(app: &AppHandle, id: &str) -> AppResult<FeedItem> {
             });
             if folders.is_empty() {
                 folders.push(item.source.clone());
+            }
+            if let Some(top) = space.downloads() {
+                folders.insert(0, top.to_owned());
             }
             (item, folders)
         })
@@ -755,6 +846,14 @@ fn download(app: &AppHandle, id: &str) -> AppResult<FeedItem> {
     }
     let lib = state.library()?;
     let saved = (|| -> AppResult<String> {
+        // Podcast episodes: the audio, written straight to disk.
+        if let Some(audio) = item.entry.audio.as_deref() {
+            let ext =
+                libreri_feeds::podcasts::audio_extension(audio, item.entry.audio_type.as_deref());
+            let (path, rel) = lib.new_feed_file(&folders, &item.entry.title, ext)?;
+            libreri_feeds::podcasts::download_audio(audio, &path).map_err(AppError::invalid)?;
+            return Ok(rel);
+        }
         let got =
             libreri_feeds::fetch::download(item.entry.pdf.as_deref(), item.entry.link.as_deref())
                 .map_err(AppError::invalid)?;
@@ -772,7 +871,7 @@ fn download(app: &AppHandle, id: &str) -> AppResult<FeedItem> {
             }
         }
     })();
-    let out = change(&state, |lib, s| {
+    let out = change(&state, space, |lib, s| {
         let Some(it) = s.item_mut(id) else {
             // Deleted while downloading: the file goes too.
             if let Ok(rel) = &saved {
@@ -796,17 +895,17 @@ fn download(app: &AppHandle, id: &str) -> AppResult<FeedItem> {
 
 #[tauri::command]
 #[specta::specta]
-pub async fn feed_item_download(app: AppHandle, id: String) -> AppResult<FeedItem> {
-    blocking(move || download(&app, &id)).await
+pub async fn feed_item_download(app: AppHandle, space: Space, id: String) -> AppResult<FeedItem> {
+    blocking(move || download(&app, space, &id)).await
 }
 
 /// Deletes items (and their downloads). They do not come back.
 #[tauri::command]
 #[specta::specta]
-pub async fn feed_items_delete(app: AppHandle, ids: Vec<String>) -> AppResult<()> {
+pub async fn feed_items_delete(app: AppHandle, space: Space, ids: Vec<String>) -> AppResult<()> {
     blocking(move || {
         let state = app.state::<AppState>();
-        change(&state, |lib, s| {
+        change(&state, space, |lib, s| {
             let now = chrono::Utc::now();
             for id in &ids {
                 if let Some(file) = s.delete_item(id, now) {
@@ -824,10 +923,10 @@ pub async fn feed_items_delete(app: AppHandle, ids: Vec<String>) -> AppResult<()
 /// Deletes an item's download only (the item stays, to download again).
 #[tauri::command]
 #[specta::specta]
-pub async fn feed_item_forget_file(app: AppHandle, id: String) -> AppResult<()> {
+pub async fn feed_item_forget_file(app: AppHandle, space: Space, id: String) -> AppResult<()> {
     blocking(move || {
         let state = app.state::<AppState>();
-        change(&state, |lib, s| {
+        change(&state, space, |lib, s| {
             if let Some(it) = s.item_mut(&id) {
                 if let Some(file) = it.file.take() {
                     lib.delete_feed_file(&file)?;
@@ -843,10 +942,15 @@ pub async fn feed_item_forget_file(app: AppHandle, id: String) -> AppResult<()> 
 
 #[tauri::command]
 #[specta::specta]
-pub async fn feed_items_read(app: AppHandle, ids: Vec<String>, read_now: bool) -> AppResult<()> {
+pub async fn feed_items_read(
+    app: AppHandle,
+    space: Space,
+    ids: Vec<String>,
+    read_now: bool,
+) -> AppResult<()> {
     blocking(move || {
         let state = app.state::<AppState>();
-        change(&state, |_, s| {
+        change(&state, space, |_, s| {
             for id in &ids {
                 if let Some(it) = s.item_mut(id) {
                     it.read = read_now;
@@ -865,12 +969,13 @@ pub async fn feed_items_read(app: AppHandle, ids: Vec<String>, read_now: bool) -
 #[specta::specta]
 pub async fn feed_all_read(
     app: AppHandle,
+    space: Space,
     folder: Option<String>,
     feed: Option<String>,
 ) -> AppResult<()> {
     blocking(move || {
         let state = app.state::<AppState>();
-        change(&state, |_, s| {
+        change(&state, space, |_, s| {
             let feeds: Option<HashSet<String>> = match (&feed, &folder) {
                 (Some(f), _) => Some(HashSet::from([f.clone()])),
                 (None, Some(folder)) => {
@@ -905,7 +1010,10 @@ fn details_of(item: &FeedItem, file: &str) -> BookMetadata {
         || ["arxiv", "biorxiv", "medrxiv", "ssrn"]
             .iter()
             .any(|p| item.source.to_lowercase().contains(p));
-    let content_type = if file.ends_with(".md") {
+    let audio = e.audio.is_some();
+    let content_type = if audio {
+        ContentType::Audiobook
+    } else if file.ends_with(".md") {
         ContentType::Article
     } else if preprint {
         ContentType::Preprint
@@ -942,6 +1050,8 @@ fn details_of(item: &FeedItem, file: &str) -> BookMetadata {
         url: e.link.clone(),
         tags,
         content_type,
+        // A podcast episode: the show is the series.
+        series: audio.then(|| item.source.clone()).filter(|s| !s.is_empty()),
         ..Default::default()
     }
 }
@@ -950,18 +1060,23 @@ fn details_of(item: &FeedItem, file: &str) -> BookMetadata {
 /// downloading it first if need be. Returns the book's id.
 #[tauri::command]
 #[specta::specta]
-pub async fn feed_item_to_library(app: AppHandle, id: String, folder: String) -> AppResult<String> {
+pub async fn feed_item_to_library(
+    app: AppHandle,
+    space: Space,
+    id: String,
+    folder: String,
+) -> AppResult<String> {
     blocking(move || {
         let state = app.state::<AppState>();
         state.library()?.require_edit()?;
-        let item = download(&app, &id)?;
+        let item = download(&app, space, &id)?;
         let file = item
             .file
             .clone()
             .ok_or_else(|| AppError::invalid("the item could not be downloaded"))?;
         let lib = state.library()?;
         let book = lib.add_feed_file_to_library(&file, &folder, &details_of(&item, &file))?;
-        change(&state, |_, s| {
+        change(&state, space, |_, s| {
             if let Some(it) = s.item_mut(&id) {
                 it.file = None;
                 it.book = Some(book.to_string());
@@ -981,6 +1096,7 @@ pub async fn feed_item_to_library(app: AppHandle, id: String, folder: String) ->
 #[specta::specta]
 pub async fn feeds_import_opml(
     app: AppHandle,
+    space: Space,
     path: String,
     parent: Option<String>,
 ) -> AppResult<(u32, u32)> {
@@ -989,7 +1105,7 @@ pub async fn feeds_import_opml(
             .map_err(|_| AppError::invalid("the OPML file could not be read"))?;
         let nodes = libreri_feeds::opml::read(&xml).map_err(AppError::invalid)?;
         let state = app.state::<AppState>();
-        let counts = change(&state, |_, s| {
+        let counts = change(&state, space, |_, s| {
             s.add_opml(&nodes, parent.as_deref())
                 .map_err(AppError::invalid)
         })?;
@@ -1002,10 +1118,10 @@ pub async fn feeds_import_opml(
 /// Writes the folders and feeds to an OPML file.
 #[tauri::command]
 #[specta::specta]
-pub async fn feeds_export_opml(app: AppHandle, path: String) -> AppResult<()> {
+pub async fn feeds_export_opml(app: AppHandle, space: Space, path: String) -> AppResult<()> {
     blocking(move || {
         let state = app.state::<AppState>();
-        let nodes = read(&state, |s| s.opml())?;
+        let nodes = read(&state, space, |s| s.opml())?;
         let xml = libreri_feeds::opml::write("Libreri feeds", &nodes);
         std::fs::write(&path, xml).map_err(|e| AppError::new(AppErrorKind::Io, e.to_string()))?;
         Ok(())
@@ -1045,4 +1161,312 @@ pub async fn feed_open_file(app: AppHandle, file: String) -> AppResult<()> {
     app.opener()
         .open_path(path.to_string_lossy(), None::<&str>)
         .map_err(|e| AppError::new(AppErrorKind::Io, e.to_string()))
+}
+
+/// Makes a small copy of each show's artwork that has none yet, so it
+/// shows offline and nothing is fetched from the shows' sites on display.
+fn artworks(app: &AppHandle, space: Space) {
+    let state = app.state::<AppState>();
+    let Ok(wanted) = read(&state, space, |s| {
+        s.feeds
+            .iter()
+            .filter(|f| f.artwork.is_none())
+            .filter_map(|f| f.image.clone().map(|i| (f.id.clone(), i)))
+            .collect::<Vec<_>>()
+    }) else {
+        return;
+    };
+    for (id, url) in wanted {
+        let Ok(bytes) = libreri_feeds::podcasts::fetch_image(&url) else {
+            continue;
+        };
+        let Ok((pic, kind, _, _)) = libreri_thumbs::picture(&bytes, 240) else {
+            continue;
+        };
+        use base64::Engine;
+        let data = format!(
+            "data:{kind};base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(pic)
+        );
+        let _ = change(&state, space, |_, s| {
+            if let Some(f) = s.feeds.iter_mut().find(|f| f.id == id) {
+                f.artwork = Some(data);
+            }
+            Ok(())
+        });
+        changed(app, 0);
+    }
+}
+
+// ---- Podcasts -------------------------------------------------------------
+
+fn index_key(state: &AppState) -> Option<libreri_feeds::podcasts::IndexKey> {
+    let s = state.online_settings();
+    let key = s.podcastindex_key.filter(|k| !k.trim().is_empty())?;
+    let secret = s.podcastindex_secret.filter(|k| !k.trim().is_empty())?;
+    Some(libreri_feeds::podcasts::IndexKey { key, secret })
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct PodcastIndexDto {
+    /// A key and secret are saved on this computer.
+    pub configured: bool,
+    /// The key's last characters, to recognise it.
+    pub key_hint: Option<String>,
+}
+
+fn index_dto(state: &AppState) -> PodcastIndexDto {
+    let s = state.online_settings();
+    let key = s.podcastindex_key.filter(|k| !k.trim().is_empty());
+    PodcastIndexDto {
+        configured: key.is_some() && s.podcastindex_secret.is_some_and(|k| !k.trim().is_empty()),
+        key_hint: key.map(|k| {
+            let tail: String = k
+                .trim()
+                .chars()
+                .rev()
+                .take(4)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect();
+            format!("…{tail}")
+        }),
+    }
+}
+
+/// Whether a Podcast Index key is set on this computer.
+#[tauri::command]
+#[specta::specta]
+pub fn podcast_index_status(app: AppHandle) -> PodcastIndexDto {
+    index_dto(&app.state::<AppState>())
+}
+
+/// Saves (after checking it) or removes (empty key) a Podcast Index key
+/// and secret. Kept on this computer only, never exported.
+#[tauri::command]
+#[specta::specta]
+pub async fn podcast_index_set(
+    app: AppHandle,
+    key: String,
+    secret: String,
+) -> AppResult<PodcastIndexDto> {
+    blocking(move || {
+        let state = app.state::<AppState>();
+        let key = key.trim().to_owned();
+        let secret = secret.trim().to_owned();
+        if key.is_empty() {
+            state
+                .update_online(|s| {
+                    s.podcastindex_key = None;
+                    s.podcastindex_secret = None;
+                })
+                .map_err(|e| AppError::new(AppErrorKind::Io, e.to_string()))?;
+            return Ok(index_dto(&state));
+        }
+        if secret.is_empty() {
+            return Err(AppError::invalid("enter the secret too"));
+        }
+        libreri_feeds::podcasts::check_key(&libreri_feeds::podcasts::IndexKey {
+            key: key.clone(),
+            secret: secret.clone(),
+        })
+        .map_err(AppError::invalid)?;
+        state
+            .update_online(|s| {
+                s.podcastindex_key = Some(key);
+                s.podcastindex_secret = Some(secret);
+            })
+            .map_err(|e| AppError::new(AppErrorKind::Io, e.to_string()))?;
+        Ok(index_dto(&state))
+    })
+    .await
+}
+
+/// Shows matching the words: Apple's podcast search, or Podcast Index
+/// (`index`) when a key is set.
+#[tauri::command]
+#[specta::specta]
+pub async fn podcast_search(
+    app: AppHandle,
+    query: String,
+    index: bool,
+) -> AppResult<Vec<libreri_feeds::podcasts::Show>> {
+    blocking(move || {
+        let state = app.state::<AppState>();
+        let result = if index {
+            let key = index_key(&state).ok_or_else(|| {
+                AppError::invalid("add your Podcast Index key in Settings › Online details")
+            })?;
+            libreri_feeds::podcasts::search_index(&key, &query)
+        } else {
+            libreri_feeds::podcasts::search_apple(&query)
+        };
+        result.map_err(AppError::invalid)
+    })
+    .await
+}
+
+/// Popular shows on Podcast Index (needs a key), optionally in a category.
+#[tauri::command]
+#[specta::specta]
+pub async fn podcast_trending(
+    app: AppHandle,
+    category: Option<String>,
+) -> AppResult<Vec<libreri_feeds::podcasts::Show>> {
+    blocking(move || {
+        let state = app.state::<AppState>();
+        let key = index_key(&state).ok_or_else(|| {
+            AppError::invalid("add your Podcast Index key in Settings › Online details")
+        })?;
+        libreri_feeds::podcasts::trending(&key, category.as_deref(), None)
+            .map_err(AppError::invalid)
+    })
+    .await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn podcast_categories(app: AppHandle) -> AppResult<Vec<String>> {
+    blocking(move || {
+        let state = app.state::<AppState>();
+        let key = index_key(&state).ok_or_else(|| {
+            AppError::invalid("add your Podcast Index key in Settings › Online details")
+        })?;
+        libreri_feeds::podcasts::categories(&key).map_err(AppError::invalid)
+    })
+    .await
+}
+
+/// Keeps where listening stopped, and whether the episode was finished.
+#[tauri::command]
+#[specta::specta]
+pub async fn podcast_progress(
+    app: AppHandle,
+    id: String,
+    position: f64,
+    duration: Option<f64>,
+    played: bool,
+) -> AppResult<()> {
+    blocking(move || {
+        let state = app.state::<AppState>();
+        change(&state, Space::Podcasts, |_, s| {
+            if let Some(it) = s.item_mut(&id) {
+                it.position = Some(position.max(0.0));
+                it.read = true;
+                if let Some(d) = duration.filter(|d| d.is_finite() && *d > 0.0) {
+                    it.entry.duration = Some(d);
+                }
+                if played {
+                    it.played = true;
+                    it.position = None;
+                }
+            }
+            if played {
+                s.queue.retain(|q| q != &id);
+            }
+            Ok(())
+        })?;
+        changed(&app, 0);
+        Ok(())
+    })
+    .await
+}
+
+/// Marks episodes played (or not), keeping no position.
+#[tauri::command]
+#[specta::specta]
+pub async fn podcast_played(app: AppHandle, ids: Vec<String>, played: bool) -> AppResult<()> {
+    blocking(move || {
+        let state = app.state::<AppState>();
+        change(&state, Space::Podcasts, |_, s| {
+            for id in &ids {
+                if let Some(it) = s.item_mut(id) {
+                    it.played = played;
+                    it.read = true;
+                    it.position = None;
+                }
+            }
+            if played {
+                s.queue.retain(|q| !ids.contains(q));
+            }
+            Ok(())
+        })?;
+        changed(&app, 0);
+        Ok(())
+    })
+    .await
+}
+
+/// Sets the Up next queue (episode ids, in order).
+#[tauri::command]
+#[specta::specta]
+pub async fn podcast_queue_set(app: AppHandle, ids: Vec<String>) -> AppResult<()> {
+    blocking(move || {
+        let state = app.state::<AppState>();
+        change(&state, Space::Podcasts, |_, s| {
+            let mut seen = HashSet::new();
+            s.queue = ids
+                .into_iter()
+                .filter(|id| s.items.iter().any(|i| &i.id == id) && seen.insert(id.clone()))
+                .collect();
+            Ok(())
+        })?;
+        changed(&app, 0);
+        Ok(())
+    })
+    .await
+}
+
+/// Episodes by id (for the queue and the player).
+#[tauri::command]
+#[specta::specta]
+pub async fn podcast_episodes(app: AppHandle, ids: Vec<String>) -> AppResult<Vec<FeedItem>> {
+    blocking(move || {
+        let state = app.state::<AppState>();
+        read(&state, Space::Podcasts, |s| {
+            ids.iter().filter_map(|id| s.item(id).cloned()).collect()
+        })
+    })
+    .await
+}
+
+/// An episode's transcript, from the show (none when it has none).
+#[tauri::command]
+#[specta::specta]
+pub async fn podcast_transcript(
+    app: AppHandle,
+    id: String,
+) -> AppResult<Vec<libreri_feeds::podcasts::Cue>> {
+    blocking(move || {
+        let state = app.state::<AppState>();
+        let item = read(&state, Space::Podcasts, |s| s.item(&id).cloned())?
+            .ok_or_else(|| AppError::invalid("that episode is no longer there"))?;
+        let Some(url) = item.entry.transcript.as_deref() else {
+            return Ok(Vec::new());
+        };
+        libreri_feeds::podcasts::transcript(url, item.entry.transcript_type.as_deref())
+            .map_err(AppError::invalid)
+    })
+    .await
+}
+
+/// An episode's chapters, from the show (none when it has none).
+#[tauri::command]
+#[specta::specta]
+pub async fn podcast_chapters(
+    app: AppHandle,
+    id: String,
+) -> AppResult<Vec<libreri_feeds::podcasts::Chapter>> {
+    blocking(move || {
+        let state = app.state::<AppState>();
+        let item = read(&state, Space::Podcasts, |s| s.item(&id).cloned())?
+            .ok_or_else(|| AppError::invalid("that episode is no longer there"))?;
+        let Some(url) = item.entry.chapters.as_deref() else {
+            return Ok(Vec::new());
+        };
+        libreri_feeds::podcasts::chapters(url).map_err(AppError::invalid)
+    })
+    .await
 }

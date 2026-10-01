@@ -14,6 +14,7 @@ pub mod article;
 pub mod fetch;
 pub mod opml;
 pub mod parse;
+pub mod podcasts;
 pub mod sources;
 pub mod state;
 

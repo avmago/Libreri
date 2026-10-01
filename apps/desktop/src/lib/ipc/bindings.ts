@@ -476,13 +476,13 @@ export const commands = {
 	 */
 	linkOpenFile: (file: string) => typedError<null, AppError>(__TAURI_INVOKE("link_open_file", { file })),
 	/**  The folders and feeds, with counts. */
-	feedsOverview: () => typedError<FeedsDto, AppError>(__TAURI_INVOKE("feeds_overview")),
+	feedsOverview: (space: Space) => typedError<FeedsDto, AppError>(__TAURI_INVOKE("feeds_overview", { space })),
 	/**  The items that match, newest first. */
-	feedItems: (filter: ItemFilter) => typedError<ItemsDto, AppError>(__TAURI_INVOKE("feed_items", { filter })),
+	feedItems: (space: Space, filter: ItemFilter) => typedError<ItemsDto, AppError>(__TAURI_INVOKE("feed_items", { space, filter })),
 	/**  Finds the feed for an address (a feed's, or a site's). */
-	feedFind: (address: string) => typedError<FeedPreviewDto, AppError>(__TAURI_INVOKE("feed_find", { address })),
+	feedFind: (space: Space, address: string) => typedError<FeedPreviewDto, AppError>(__TAURI_INVOKE("feed_find", { space, address })),
 	/**  Follows a feed. Its items are fetched by [`feeds_refresh`]. */
-	feedAdd: (url: string, title: string, folder: string | null, autoDownload: boolean) => typedError<string, AppError>(__TAURI_INVOKE("feed_add", { url, title, folder, autoDownload })),
+	feedAdd: (space: Space, url: string, title: string, folder: string | null, autoDownload: boolean) => typedError<string, AppError>(__TAURI_INVOKE("feed_add", { space, url, title, folder, autoDownload })),
 	arxivCategories: () => __TAURI_INVOKE<ArxivGroup[]>("arxiv_categories"),
 	suggestedFeeds: () => __TAURI_INVOKE<Suggested[]>("suggested_feeds"),
 	/**
@@ -490,40 +490,67 @@ export const commands = {
 	 *  a search. Returns the new feeds' ids.
 	 */
 	feedsAddArxiv: (codes: string[], search: string | null, autoDownload: boolean) => typedError<string[], AppError>(__TAURI_INVOKE("feeds_add_arxiv", { codes, search, autoDownload })),
-	feedChange: (id: string, changeTo: FeedChange) => typedError<null, AppError>(__TAURI_INVOKE("feed_change", { id, changeTo })),
+	feedChange: (space: Space, id: string, changeTo: FeedChange) => typedError<null, AppError>(__TAURI_INVOKE("feed_change", { space, id, changeTo })),
 	/**  Stops following a feed. Downloads stay. */
-	feedRemove: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("feed_remove", { id })),
-	feedFolderAdd: (name: string, parent: string | null) => typedError<string, AppError>(__TAURI_INVOKE("feed_folder_add", { name, parent })),
-	feedFolderChange: (id: string, changeTo: FolderChange) => typedError<null, AppError>(__TAURI_INVOKE("feed_folder_change", { id, changeTo })),
+	feedRemove: (space: Space, id: string) => typedError<null, AppError>(__TAURI_INVOKE("feed_remove", { space, id })),
+	feedFolderAdd: (space: Space, name: string, parent: string | null) => typedError<string, AppError>(__TAURI_INVOKE("feed_folder_add", { space, name, parent })),
+	feedFolderChange: (space: Space, id: string, changeTo: FolderChange) => typedError<null, AppError>(__TAURI_INVOKE("feed_folder_change", { space, id, changeTo })),
 	/**  Removes a folder; its feeds and folders move up a level. */
-	feedFolderRemove: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("feed_folder_remove", { id })),
-	feedsSettingsSet: (settings: FeedSettings) => typedError<null, AppError>(__TAURI_INVOKE("feeds_settings_set", { settings })),
+	feedFolderRemove: (space: Space, id: string) => typedError<null, AppError>(__TAURI_INVOKE("feed_folder_remove", { space, id })),
+	feedsSettingsSet: (space: Space, settings: FeedSettings) => typedError<null, AppError>(__TAURI_INVOKE("feeds_settings_set", { space, settings })),
 	/**
 	 *  Looks for new items in every feed (or those given), then downloads the
 	 *  new items of feeds set to download by themselves.
 	 */
-	feedsRefresh: (ids: string[] | null) => typedError<RefreshReport, AppError>(__TAURI_INVOKE("feeds_refresh", { ids })),
-	feedItemDownload: (id: string) => typedError<FeedItem, AppError>(__TAURI_INVOKE("feed_item_download", { id })),
+	feedsRefresh: (space: Space, ids: string[] | null) => typedError<RefreshReport, AppError>(__TAURI_INVOKE("feeds_refresh", { space, ids })),
+	feedItemDownload: (space: Space, id: string) => typedError<FeedItem, AppError>(__TAURI_INVOKE("feed_item_download", { space, id })),
 	/**  Deletes items (and their downloads). They do not come back. */
-	feedItemsDelete: (ids: string[]) => typedError<null, AppError>(__TAURI_INVOKE("feed_items_delete", { ids })),
+	feedItemsDelete: (space: Space, ids: string[]) => typedError<null, AppError>(__TAURI_INVOKE("feed_items_delete", { space, ids })),
 	/**  Deletes an item's download only (the item stays, to download again). */
-	feedItemForgetFile: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("feed_item_forget_file", { id })),
-	feedItemsRead: (ids: string[], readNow: boolean) => typedError<null, AppError>(__TAURI_INVOKE("feed_items_read", { ids, readNow })),
+	feedItemForgetFile: (space: Space, id: string) => typedError<null, AppError>(__TAURI_INVOKE("feed_item_forget_file", { space, id })),
+	feedItemsRead: (space: Space, ids: string[], readNow: boolean) => typedError<null, AppError>(__TAURI_INVOKE("feed_items_read", { space, ids, readNow })),
 	/**  Marks everything shown by a folder or feed (or all) as read. */
-	feedAllRead: (folder: string | null, feed: string | null) => typedError<null, AppError>(__TAURI_INVOKE("feed_all_read", { folder, feed })),
+	feedAllRead: (space: Space, folder: string | null, feed: string | null) => typedError<null, AppError>(__TAURI_INVOKE("feed_all_read", { space, folder, feed })),
 	/**
 	 *  Adds an item to the library, in `folder` (relative to `Books/`),
 	 *  downloading it first if need be. Returns the book's id.
 	 */
-	feedItemToLibrary: (id: string, folder: string) => typedError<string, AppError>(__TAURI_INVOKE("feed_item_to_library", { id, folder })),
+	feedItemToLibrary: (space: Space, id: string, folder: string) => typedError<string, AppError>(__TAURI_INVOKE("feed_item_to_library", { space, id, folder })),
 	/**  Adds the feeds of an OPML file (in `parent`, or at the top level). */
-	feedsImportOpml: (path: string, parent: string | null) => typedError<[number, number], AppError>(__TAURI_INVOKE("feeds_import_opml", { path, parent })),
+	feedsImportOpml: (space: Space, path: string, parent: string | null) => typedError<[number, number], AppError>(__TAURI_INVOKE("feeds_import_opml", { space, path, parent })),
 	/**  Writes the folders and feeds to an OPML file. */
-	feedsExportOpml: (path: string) => typedError<null, AppError>(__TAURI_INVOKE("feeds_export_opml", { path })),
+	feedsExportOpml: (space: Space, path: string) => typedError<null, AppError>(__TAURI_INVOKE("feeds_export_opml", { space, path })),
 	/**  Shows the feeds folder, or a download, in the file manager. */
 	feedsReveal: (file: string | null) => typedError<null, AppError>(__TAURI_INVOKE("feeds_reveal", { file })),
 	/**  Opens a download in the app the system uses for it. */
 	feedOpenFile: (file: string) => typedError<null, AppError>(__TAURI_INVOKE("feed_open_file", { file })),
+	/**  Whether a Podcast Index key is set on this computer. */
+	podcastIndexStatus: () => __TAURI_INVOKE<PodcastIndexDto>("podcast_index_status"),
+	/**
+	 *  Saves (after checking it) or removes (empty key) a Podcast Index key
+	 *  and secret. Kept on this computer only, never exported.
+	 */
+	podcastIndexSet: (key: string, secret: string) => typedError<PodcastIndexDto, AppError>(__TAURI_INVOKE("podcast_index_set", { key, secret })),
+	/**
+	 *  Shows matching the words: Apple's podcast search, or Podcast Index
+	 *  (`index`) when a key is set.
+	 */
+	podcastSearch: (query: string, index: boolean) => typedError<Show[], AppError>(__TAURI_INVOKE("podcast_search", { query, index })),
+	/**  Popular shows on Podcast Index (needs a key), optionally in a category. */
+	podcastTrending: (category: string | null) => typedError<Show[], AppError>(__TAURI_INVOKE("podcast_trending", { category })),
+	podcastCategories: () => typedError<string[], AppError>(__TAURI_INVOKE("podcast_categories")),
+	/**  Keeps where listening stopped, and whether the episode was finished. */
+	podcastProgress: (id: string, position: number | null, duration: number | null, played: boolean) => typedError<null, AppError>(__TAURI_INVOKE("podcast_progress", { id, position, duration, played })),
+	/**  Marks episodes played (or not), keeping no position. */
+	podcastPlayed: (ids: string[], played: boolean) => typedError<null, AppError>(__TAURI_INVOKE("podcast_played", { ids, played })),
+	/**  Sets the Up next queue (episode ids, in order). */
+	podcastQueueSet: (ids: string[]) => typedError<null, AppError>(__TAURI_INVOKE("podcast_queue_set", { ids })),
+	/**  Episodes by id (for the queue and the player). */
+	podcastEpisodes: (ids: string[]) => typedError<FeedItem[], AppError>(__TAURI_INVOKE("podcast_episodes", { ids })),
+	/**  An episode's transcript, from the show (none when it has none). */
+	podcastTranscript: (id: string) => typedError<Cue[], AppError>(__TAURI_INVOKE("podcast_transcript", { id })),
+	/**  An episode's chapters, from the show (none when it has none). */
+	podcastChapters: (id: string) => typedError<Chapter[], AppError>(__TAURI_INVOKE("podcast_chapters", { id })),
 	mathsSettings: () => __TAURI_INVOKE<MathsSettingsDto>("maths_settings"),
 	/**
 	 *  Turns reading maths from pictures on or off (the model stays until
@@ -1010,6 +1037,12 @@ export type ChangeKind =
 /**  Drawings or pictures look different. */
 "look" | "pageRemoved" | "pageAdded";
 
+/**  A chapter of an episode. */
+export type Chapter = {
+	start: number | null,
+	title: string,
+};
+
 export type ChapterDto = {
 	title: string,
 	start: number | null,
@@ -1112,6 +1145,15 @@ export type CountDto<T> = {
 export type CountedBook = {
 	book: BookRef,
 	notes: number,
+};
+
+/**  A line of a transcript. */
+export type Cue = {
+	/**  Seconds from the start (none: the transcript has no times). */
+	start: number | null,
+	end: number | null,
+	speaker: string | null,
+	text: string,
 };
 
 /**  "Fill in missing details" finished (by hand, or after an import). */
@@ -1263,6 +1305,8 @@ export type FeedChange = {
 	/**  Move to this folder ("" = the top level). */
 	folder: string | null,
 	autoDownload: boolean | null,
+	/**  Podcasts: play at this speed (0: the usual speed). */
+	speed: number | null,
 };
 
 export type FeedDto = {
@@ -1278,6 +1322,10 @@ export type FeedDto = {
 	error: string | null,
 	unread: number,
 	total: number,
+	/**  Podcasts: who makes it, its artwork (a data URL) and its speed. */
+	author: string | null,
+	artwork: string | null,
+	speed: number | null,
 };
 
 /**  One entry of a feed. */
@@ -1300,6 +1348,16 @@ export type FeedEntry = {
 	arxivId: string | null,
 	/**  arXiv: "new", "cross", "replace" or "replace-cross". */
 	announce: string | null,
+	/**  Podcasts: the episode's audio, its type and length (seconds). */
+	audio?: string | null,
+	audioType?: string | null,
+	duration?: number | null,
+	/**  The episode's own picture. */
+	image?: string | null,
+	/**  Podcasting 2.0: a transcript (address and type) and chapters. */
+	transcript?: string | null,
+	transcriptType?: string | null,
+	chapters?: string | null,
 };
 
 export type FeedFolder = {
@@ -1324,6 +1382,12 @@ export type FeedItem = {
 	/**  The book it became when added to the library. */
 	book: string | null,
 	downloadError: string | null,
+	/**
+	 *  Podcasts: where listening stopped (seconds), and whether it was
+	 *  heard to the end.
+	 */
+	position?: number | null,
+	played?: boolean,
 } & FeedEntry;
 
 export type FeedPreviewDto = {
@@ -1366,6 +1430,10 @@ export type FeedsDto = {
 	refreshing: boolean,
 	/**  Items being downloaded now. */
 	downloading: string[],
+	/**  Podcasts: episodes to play next, in order. */
+	queue: string[],
+	/**  Podcasts: episodes started and not finished. */
+	inProgress: number,
 };
 
 /**  Every file format Libreri accepts, detected from the file extension. */
@@ -1577,7 +1645,10 @@ export type ItemFilter = {
 	/**  A folder (with its subfolders) or a feed; neither: everything. */
 	folder: string | null,
 	feed: string | null,
-	/**  "all", "unread", "downloaded" or "library". */
+	/**
+	 *  "all", "unread", "downloaded", "library"; podcasts also
+	 *  "inProgress" and "unplayed".
+	 */
 	show: string,
 	/**  Items with this topic (arXiv: "cs.AI"). */
 	topic: string | null,
@@ -1907,6 +1978,13 @@ export type PlayerDto = {
 	watch: string,
 };
 
+export type PodcastIndexDto = {
+	/**  A key and secret are saved on this computer. */
+	configured: boolean,
+	/**  The key's last characters, to recognise it. */
+	keyHint: string | null,
+};
+
 /**  A profile as the picker and Settings show it. Never includes hashes. */
 export type ProfileDto = {
 	id: string,
@@ -2031,6 +2109,20 @@ export type SettingsDto = {
 	recentLibraries: RecentLibraryDto[],
 };
 
+/**  A show found by a search. */
+export type Show = {
+	title: string,
+	author: string | null,
+	/**  The show's RSS feed. */
+	feedUrl: string,
+	artwork: string | null,
+	categories: string[],
+	episodes: number | null,
+	/**  The newest episode (RFC 3339). */
+	latest: string | null,
+	about: string | null,
+};
+
 /**  Part of a snippet: matched words are marked. */
 export type SnippetPart = {
 	text: string,
@@ -2057,6 +2149,12 @@ export type SourceInfo = {
 	/**  The end of the saved key ("…a1b2"); the key itself never leaves Rust. */
 	keyHint: string | null,
 };
+
+/**
+ *  Feeds (papers, articles) or podcasts: each has its own folders, feeds
+ *  and items, in its own file.
+ */
+export type Space = "feeds" | "podcasts";
 
 /**  Progress of downloading a speech model. */
 export type SpeechModelDownload = {

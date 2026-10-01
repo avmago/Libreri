@@ -11,6 +11,21 @@ use std::path::PathBuf;
 /// The subscriptions file, hidden in the profile's feeds folder.
 const STATE_FILE: &str = ".feeds.json";
 
+/// Only Libreri's own state files: hidden, `.json`, a plain name.
+fn state_name(name: &str) -> Result<&str> {
+    let ok = name.starts_with('.')
+        && name.ends_with(".json")
+        && name.len() < 64
+        && name[1..]
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-');
+    if ok {
+        Ok(name)
+    } else {
+        Err(Error::InvalidInput("not a feeds state file".into()))
+    }
+}
+
 impl Library {
     /// The signed-in profile's feeds folder (guests have none).
     pub(crate) fn own_feeds_dir(&self) -> Result<PathBuf> {
@@ -38,7 +53,13 @@ impl Library {
 
     /// The profile's subscriptions (JSON), or None before the first one.
     pub fn read_feeds(&self) -> Result<Option<String>> {
-        let path = self.own_feeds_dir()?.join(STATE_FILE);
+        self.read_feeds_file(STATE_FILE)
+    }
+
+    /// A state file in the profile's feeds folder (`.feeds.json`,
+    /// `.podcasts.json`), or None before the first save.
+    pub fn read_feeds_file(&self, name: &str) -> Result<Option<String>> {
+        let path = self.own_feeds_dir()?.join(state_name(name)?);
         match fs::read_to_string(&path) {
             Ok(s) => Ok(Some(s)),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
@@ -49,22 +70,26 @@ impl Library {
     /// Saves the subscriptions (written aside first, so a crash never
     /// leaves half a file).
     pub fn write_feeds(&self, json: &str) -> Result<()> {
+        self.write_feeds_file(STATE_FILE, json)
+    }
+
+    pub fn write_feeds_file(&self, name: &str, json: &str) -> Result<()> {
+        let name = state_name(name)?;
         let dir = self.feeds_folder()?;
-        let tmp = dir.join(".feeds.json.tmp");
+        let tmp = dir.join(format!("{name}.tmp"));
         fs::write(&tmp, json)?;
-        fs::rename(&tmp, dir.join(STATE_FILE))?;
+        fs::rename(&tmp, dir.join(name))?;
         Ok(())
     }
 
-    /// Saves a download in `Feeds/<profile>/<folders…>/<title>.<ext>`.
-    /// Returns its path in the library.
-    pub fn save_feed_file(
+    /// A new file for a download: `Feeds/<profile>/<folders…>/<title>.<ext>`
+    /// (a free name). Returns its full path and its path in the library.
+    pub fn new_feed_file(
         &self,
         folders: &[String],
         title: &str,
         ext: &str,
-        bytes: &[u8],
-    ) -> Result<String> {
+    ) -> Result<(PathBuf, String)> {
         let mut dir = self.feeds_folder()?;
         for f in folders {
             let name = crate::reading::safe_file_name(f);
@@ -81,9 +106,23 @@ impl Library {
             stem = stem.chars().take(120).collect::<String>().trim().to_owned();
         }
         let path = crate::paths::unique_path(&dir, &format!("{stem}.{ext}"));
+        let rel = crate::paths::rel_of(self.layout(), &path)
+            .ok_or_else(|| Error::InvalidInput("the download could not be saved".into()))?;
+        Ok((path, rel))
+    }
+
+    /// Saves a download in `Feeds/<profile>/<folders…>/<title>.<ext>`.
+    /// Returns its path in the library.
+    pub fn save_feed_file(
+        &self,
+        folders: &[String],
+        title: &str,
+        ext: &str,
+        bytes: &[u8],
+    ) -> Result<String> {
+        let (path, rel) = self.new_feed_file(folders, title, ext)?;
         fs::write(&path, bytes)?;
-        crate::paths::rel_of(self.layout(), &path)
-            .ok_or_else(|| Error::InvalidInput("the download could not be saved".into()))
+        Ok(rel)
     }
 
     /// A file in the signed-in profile's own feeds folder.

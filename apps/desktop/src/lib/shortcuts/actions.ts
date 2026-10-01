@@ -79,6 +79,12 @@ export const ACTIONS = {
     keys: "Mod+Shift+0",
     whileTyping: true,
   },
+  "go.podcasts": {
+    label: "Go to Podcasts",
+    group: "General",
+    keys: "Mod+Shift+9",
+    whileTyping: true,
+  },
   "go.search": {
     label: "Search inside books, details and notes",
     group: "General",

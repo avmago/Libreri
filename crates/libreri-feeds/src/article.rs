@@ -105,6 +105,8 @@ mod tests {
             file: None,
             book: None,
             download_error: None,
+            position: None,
+            played: false,
         };
         let article = Readable {
             title: "Ignored".into(),

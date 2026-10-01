@@ -61,6 +61,7 @@ pub struct AppState {
     /// a check for new items running, and items being downloaded.
     pub feeds_lock: Mutex<()>,
     pub feeds_refreshing: AtomicBool,
+    pub podcasts_refreshing: AtomicBool,
     pub feed_downloads: Mutex<std::collections::HashSet<String>>,
     /// The maths model (app data `maths/`), loaded once when used, and
     /// its download, to cancel it.
@@ -307,6 +308,7 @@ impl AppState {
             fetched_links: Mutex::default(),
             feeds_lock: Mutex::default(),
             feeds_refreshing: AtomicBool::new(false),
+            podcasts_refreshing: AtomicBool::new(false),
             feed_downloads: Mutex::default(),
             maths_download: Mutex::default(),
             capture_photos: Mutex::default(),

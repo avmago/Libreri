@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { NativeSelect } from "@/components/ui/input";
 import { flattenFolders, useFolders } from "@/features/library";
-import { bookUrl, commands, unwrap, type FeedItem } from "@/lib/ipc";
+import { bookUrl, commands, unwrap, type FeedItem, type Space } from "@/lib/ipc";
 import { renderMarkdown, stripFrontMatter } from "@/lib/markdown";
 import { createRenderer, type Renderer } from "@/readers";
 import "@/readers/reader.css";
@@ -146,13 +146,15 @@ function ArticlePreview({ file }: { file: string }) {
 export function AddToLibraryDialog({
   item,
   onClose,
+  space = "feeds",
 }: {
   item: FeedItem | null;
   onClose: () => void;
+  space?: Space;
 }) {
   const { data: folders = [] } = useFolders();
   const [folder, setFolder] = useState("");
-  const add = useAddToLibrary();
+  const add = useAddToLibrary(space);
   return (
     <Dialog
       open={!!item}
@@ -160,7 +162,7 @@ export function AddToLibraryDialog({
       title="Add to library"
       description={
         item?.file
-          ? "The download moves into the folder you choose and becomes a book of your library, with the feed's details."
+          ? `The download moves into the folder you choose and becomes ${space === "podcasts" ? "an audiobook" : "a book"} of your library, with the ${space === "podcasts" ? "show" : "feed"}'s details.`
           : "It is downloaded, then moved into the folder you choose as a book of your library, with the feed's details."
       }
     >

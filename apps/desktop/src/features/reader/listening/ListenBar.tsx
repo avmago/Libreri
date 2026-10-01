@@ -19,6 +19,7 @@ import { DropdownMenu, menuContent, menuItem } from "@/components/ui/menu";
 import { useHelperDialog } from "@/features/helpers";
 import { useProfilePrefs } from "@/features/profiles";
 import { bookUrl, commands, unwrap, type BookDto } from "@/lib/ipc";
+import { PodcastControls, usePlayer } from "@/features/podcasts";
 import { useTabs } from "@/lib/tabs";
 import { cn } from "@/lib/utils";
 import { savePosition } from "../api";
@@ -28,7 +29,7 @@ import type { ReadAloud } from "../speech/useReadAloud";
 import { useListening } from "./store";
 import { chapterAt, clock, progressAt, timeAt } from "./sync";
 
-export type ListenMode = "read" | "audio";
+export type ListenMode = "read" | "audio" | "podcast";
 
 const SLEEP = [5, 10, 15, 30, 45, 60];
 const isLinux = /Linux/.test(navigator.userAgent) && !/Android/.test(navigator.userAgent);
@@ -93,10 +94,11 @@ export function ListenBar({
   progress: number;
 }) {
   const audio = audiobooks[0] ?? null;
+  const podcast = usePlayer((s) => s.episode !== null);
   return (
     <div
       role="toolbar"
-      aria-label={mode === "read" ? "Read aloud" : "Audiobook"}
+      aria-label={mode === "read" ? "Read aloud" : mode === "audio" ? "Audiobook" : "Podcast"}
       className="absolute bottom-5 left-1/2 z-30 flex w-max max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-1.5 rounded-2xl border bg-popover/95 p-1.5 text-[12.5px] text-popover-foreground shadow-xl backdrop-blur"
     >
       <div
@@ -108,29 +110,34 @@ export function ListenBar({
           [
             ["read", "Read aloud"],
             ["audio", "Audiobook"],
+            ["podcast", "Podcast"],
           ] as const
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={mode === id}
-            disabled={id === "audio" && !audio}
-            title={id === "audio" && !audio ? "Link an audiobook in Edit details" : undefined}
-            onClick={() => onMode(id)}
-            className={cn(
-              "rounded-[10px] px-2.5 py-1 leading-tight font-medium disabled:opacity-40",
-              mode === id
-                ? "bg-background shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {label}
-          </button>
-        ))}
+        )
+          .filter(([id]) => id !== "podcast" || podcast)
+          .map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={mode === id}
+              disabled={id === "audio" && !audio}
+              title={id === "audio" && !audio ? "Link an audiobook in Edit details" : undefined}
+              onClick={() => onMode(id)}
+              className={cn(
+                "rounded-[10px] px-2.5 py-1 leading-tight font-medium disabled:opacity-40",
+                mode === id
+                  ? "bg-background shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {label}
+            </button>
+          ))}
       </div>
       {mode === "read" ? (
         <ReadPart r={r} lang={lang} onClose={onClose} />
+      ) : mode === "podcast" ? (
+        <PodcastPart onClose={onClose} />
       ) : audio ? (
         <AudioPart
           key={audio.id}
@@ -141,6 +148,33 @@ export function ListenBar({
         />
       ) : null}
     </div>
+  );
+}
+
+/** The podcast playing (the strip at the bottom hides meanwhile). */
+function PodcastPart({ onClose }: { onClose: () => void }) {
+  const episode = usePlayer((s) => s.episode);
+  const setInBar = usePlayer((s) => s.setInBar);
+  useEffect(() => {
+    setInBar(true);
+    return () => setInBar(false);
+  }, [setInBar]);
+  useEffect(() => {
+    if (!episode) onClose();
+  }, [episode, onClose]);
+  if (!episode) return null;
+  return (
+    <>
+      <div className="flex min-w-0 max-w-64 flex-col px-1 leading-tight">
+        <span className="truncate font-medium" title={episode.title}>
+          {episode.title}
+        </span>
+        <span className="truncate text-[11.5px] text-muted-foreground" title={episode.show}>
+          {episode.show}
+        </span>
+      </div>
+      <PodcastControls compact />
+    </>
   );
 }
 

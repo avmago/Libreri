@@ -9,22 +9,23 @@ import {
   type FeedSettings,
   type FolderChange,
   type ItemFilter,
+  type Space,
 } from "@/lib/ipc";
 
 export const feedsKey = ["feeds"] as const;
 
-export function useFeedsOverview(enabled = true) {
+export function useFeedsOverview(enabled = true, space: Space = "feeds") {
   return useQuery({
-    queryKey: [...feedsKey, "overview"],
-    queryFn: () => unwrap(commands.feedsOverview()),
+    queryKey: [...feedsKey, space, "overview"],
+    queryFn: () => unwrap(commands.feedsOverview(space)),
     enabled,
   });
 }
 
-export function useFeedItems(filter: ItemFilter) {
+export function useFeedItems(filter: ItemFilter, space: Space = "feeds") {
   return useQuery({
-    queryKey: [...feedsKey, "items", filter],
-    queryFn: () => unwrap(commands.feedItems(filter)),
+    queryKey: [...feedsKey, space, "items", filter],
+    queryFn: () => unwrap(commands.feedItems(space, filter)),
     placeholderData: (prev) => prev,
   });
 }
@@ -63,8 +64,8 @@ function useFeedsMutation<A, R>(fn: (args: A) => Promise<R>, error: string) {
 }
 
 /** Looks for new items (in the feeds given, or all). */
-export function refreshFeeds(ids: string[] | null, quiet = false) {
-  return unwrap(commands.feedsRefresh(ids)).then(
+export function refreshFeeds(ids: string[] | null, quiet = false, space: Space = "feeds") {
+  return unwrap(commands.feedsRefresh(space, ids)).then(
     (r) => {
       if (quiet || r.busy) return r;
       if (r.failed && !r.newItems)
@@ -83,15 +84,18 @@ export function refreshFeeds(ids: string[] | null, quiet = false) {
   );
 }
 
-export function useRefreshFeeds() {
-  return useFeedsMutation((ids: string[] | null) => refreshFeeds(ids), "Could not check the feeds");
+export function useRefreshFeeds(space: Space = "feeds") {
+  return useFeedsMutation(
+    (ids: string[] | null) => refreshFeeds(ids, false, space),
+    "Could not check for new items",
+  );
 }
 
-export function useAddFeed() {
+export function useAddFeed(space: Space = "feeds") {
   return useFeedsMutation(
     (a: { url: string; title: string; folder: string | null; autoDownload: boolean }) =>
-      unwrap(commands.feedAdd(a.url, a.title, a.folder, a.autoDownload)).then((id) => {
-        void refreshFeeds([id], true);
+      unwrap(commands.feedAdd(space, a.url, a.title, a.folder, a.autoDownload)).then((id) => {
+        void refreshFeeds([id], true, space);
         return id;
       }),
     "Could not follow the feed",
@@ -109,90 +113,91 @@ export function useAddArxiv() {
   );
 }
 
-export function useChangeFeed() {
+export function useChangeFeed(space: Space = "feeds") {
   return useFeedsMutation(
-    (a: { id: string; change: FeedChange }) => unwrap(commands.feedChange(a.id, a.change)),
+    (a: { id: string; change: FeedChange }) => unwrap(commands.feedChange(space, a.id, a.change)),
     "Could not change the feed",
   );
 }
 
-export function useRemoveFeed() {
+export function useRemoveFeed(space: Space = "feeds") {
   return useFeedsMutation(
-    (id: string) => unwrap(commands.feedRemove(id)),
+    (id: string) => unwrap(commands.feedRemove(space, id)),
     "Could not remove the feed",
   );
 }
 
-export function useAddFeedFolder() {
+export function useAddFeedFolder(space: Space = "feeds") {
   return useFeedsMutation(
     (a: { name: string; parent: string | null }) =>
-      unwrap(commands.feedFolderAdd(a.name, a.parent)),
+      unwrap(commands.feedFolderAdd(space, a.name, a.parent)),
     "Could not add the folder",
   );
 }
 
-export function useChangeFeedFolder() {
+export function useChangeFeedFolder(space: Space = "feeds") {
   return useFeedsMutation(
-    (a: { id: string; change: FolderChange }) => unwrap(commands.feedFolderChange(a.id, a.change)),
+    (a: { id: string; change: FolderChange }) =>
+      unwrap(commands.feedFolderChange(space, a.id, a.change)),
     "Could not change the folder",
   );
 }
 
-export function useRemoveFeedFolder() {
+export function useRemoveFeedFolder(space: Space = "feeds") {
   return useFeedsMutation(
-    (id: string) => unwrap(commands.feedFolderRemove(id)),
+    (id: string) => unwrap(commands.feedFolderRemove(space, id)),
     "Could not remove the folder",
   );
 }
 
-export function useFeedSettings() {
+export function useFeedSettings(space: Space = "feeds") {
   return useFeedsMutation(
-    (s: FeedSettings) => unwrap(commands.feedsSettingsSet(s)),
+    (s: FeedSettings) => unwrap(commands.feedsSettingsSet(space, s)),
     "Could not save the settings",
   );
 }
 
-export function useDownloadItem() {
+export function useDownloadItem(space: Space = "feeds") {
   return useFeedsMutation(
-    (id: string) => unwrap(commands.feedItemDownload(id)),
+    (id: string) => unwrap(commands.feedItemDownload(space, id)),
     "Could not download it",
   );
 }
 
-export function useDeleteItems() {
+export function useDeleteItems(space: Space = "feeds") {
   return useFeedsMutation(
-    (ids: string[]) => unwrap(commands.feedItemsDelete(ids)),
+    (ids: string[]) => unwrap(commands.feedItemsDelete(space, ids)),
     "Could not delete it",
   );
 }
 
-export function useForgetFile() {
+export function useForgetFile(space: Space = "feeds") {
   return useFeedsMutation(
-    (id: string) => unwrap(commands.feedItemForgetFile(id)),
+    (id: string) => unwrap(commands.feedItemForgetFile(space, id)),
     "Could not delete the download",
   );
 }
 
-export function useMarkRead() {
+export function useMarkRead(space: Space = "feeds") {
   return useFeedsMutation(
-    (a: { ids: string[]; read: boolean }) => unwrap(commands.feedItemsRead(a.ids, a.read)),
+    (a: { ids: string[]; read: boolean }) => unwrap(commands.feedItemsRead(space, a.ids, a.read)),
     "Could not mark it",
   );
 }
 
-export function useMarkAllRead() {
+export function useMarkAllRead(space: Space = "feeds") {
   return useFeedsMutation(
     (a: { folder: string | null; feed: string | null }) =>
-      unwrap(commands.feedAllRead(a.folder, a.feed)),
+      unwrap(commands.feedAllRead(space, a.folder, a.feed)),
     "Could not mark them read",
   );
 }
 
-export function useAddToLibrary() {
+export function useAddToLibrary(space: Space = "feeds") {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (a: { id: string; folder: string }) =>
-      unwrap(commands.feedItemToLibrary(a.id, a.folder)),
+      unwrap(commands.feedItemToLibrary(space, a.id, a.folder)),
     onError: fail("Could not add it to the library"),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: feedsKey });
@@ -206,9 +211,9 @@ export function useAddToLibrary() {
  * looks for new items when the library opens and then every so often
  * while Libreri is open, as Feeds settings say.
  */
-export function useFeedsBackground(active: boolean) {
+export function useFeedsBackground(active: boolean, space: Space = "feeds") {
   const qc = useQueryClient();
-  const { data } = useFeedsOverview(active);
+  const { data } = useFeedsOverview(active, space);
   const minutes = data?.settings.refreshMinutes ?? 60;
   const hasFeeds = (data?.feeds.length ?? 0) > 0;
 
@@ -228,14 +233,14 @@ export function useFeedsBackground(active: boolean) {
   useEffect(() => {
     if (!active || !hasFeeds) return;
     // Soon after opening, then on the schedule.
-    const first = setTimeout(() => void refreshFeeds(null, true).catch(() => {}), 8000);
+    const first = setTimeout(() => void refreshFeeds(null, true, space).catch(() => {}), 8000);
     const every =
       minutes > 0
-        ? setInterval(() => void refreshFeeds(null, true).catch(() => {}), minutes * 60_000)
+        ? setInterval(() => void refreshFeeds(null, true, space).catch(() => {}), minutes * 60_000)
         : undefined;
     return () => {
       clearTimeout(first);
       if (every) clearInterval(every);
     };
-  }, [active, hasFeeds, minutes]);
+  }, [active, hasFeeds, minutes, space]);
 }

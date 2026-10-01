@@ -61,6 +61,17 @@ pub struct Feed {
     /// When it was last read (RFC 3339), and why that failed.
     pub checked_at: Option<String>,
     pub error: Option<String>,
+    /// Podcasts: who makes it, its artwork's address, and a small copy of
+    /// the artwork (a data URL, so it shows offline).
+    #[serde(default)]
+    pub author: Option<String>,
+    #[serde(default)]
+    pub image: Option<String>,
+    #[serde(default)]
+    pub artwork: Option<String>,
+    /// Podcasts: play at this speed (none: the usual).
+    #[serde(default)]
+    pub speed: Option<f64>,
 }
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -82,6 +93,12 @@ pub struct FeedItem {
     /// The book it became when added to the library.
     pub book: Option<String>,
     pub download_error: Option<String>,
+    /// Podcasts: where listening stopped (seconds), and whether it was
+    /// heard to the end.
+    #[serde(default)]
+    pub position: Option<f64>,
+    #[serde(default)]
+    pub played: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -97,6 +114,8 @@ pub struct State {
     pub settings: FeedSettings,
     /// Counter for new ids.
     pub next_id: u64,
+    /// Podcasts: episodes to play next, in order.
+    pub queue: Vec<String>,
 }
 
 impl Default for State {
@@ -109,6 +128,7 @@ impl Default for State {
             gone: BTreeMap::new(),
             settings: FeedSettings::default(),
             next_id: 1,
+            queue: Vec::new(),
         }
     }
 }
@@ -323,6 +343,10 @@ impl State {
             last_modified: None,
             checked_at: None,
             error: None,
+            author: None,
+            image: None,
+            artwork: None,
+            speed: None,
         });
         Ok(id)
     }
@@ -362,6 +386,9 @@ impl State {
         self.feeds.retain(|f| f.id != id);
         self.items
             .retain(|i| i.feed != id || i.file.is_some() || i.book.is_some());
+        let items: std::collections::HashSet<&str> =
+            self.items.iter().map(|i| i.id.as_str()).collect();
+        self.queue.retain(|q| items.contains(q.as_str()));
     }
 
     /// Adds a feed's new entries; returns the new items' ids.
@@ -374,6 +401,14 @@ impl State {
         }
         if feed.site.is_none() {
             feed.site = parsed.site.clone();
+        }
+        if parsed.author.is_some() {
+            feed.author = parsed.author.clone();
+        }
+        if parsed.image.is_some() && feed.image != parsed.image {
+            feed.image = parsed.image.clone();
+            // A new picture: its small copy is made again.
+            feed.artwork = None;
         }
         let source = feed.title.clone();
         let have: HashSet<String> = self
@@ -404,6 +439,8 @@ impl State {
                 file: None,
                 book: None,
                 download_error: None,
+                position: None,
+                played: false,
             });
         }
         added
@@ -417,7 +454,8 @@ impl State {
         self.items.retain(|i| {
             let old = chrono::DateTime::parse_from_rfc3339(&i.found_at)
                 .is_ok_and(|d| now.signed_duration_since(d) > keep);
-            let drop = old && i.file.is_none() && i.book.is_none();
+            let started = i.position.is_some_and(|p| p > 0.0) && !i.played;
+            let drop = old && i.file.is_none() && i.book.is_none() && !started;
             if drop {
                 gone.push(gone_key(&i.feed, &i.entry.key));
             }
@@ -449,6 +487,7 @@ impl State {
     pub fn delete_item(&mut self, id: &str, now: Now) -> Option<String> {
         let pos = self.items.iter().position(|i| i.id == id)?;
         let item = self.items.remove(pos);
+        self.queue.retain(|q| q != id);
         self.gone
             .insert(gone_key(&item.feed, &item.entry.key), now.to_rfc3339());
         item.file
@@ -550,6 +589,8 @@ mod tests {
         Parsed {
             title: "cs.AI updates".into(),
             site: Some("https://arxiv.org".into()),
+            image: None,
+            author: None,
             entries: keys.iter().map(|k| entry(k)).collect(),
         }
     }

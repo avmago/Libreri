@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input, NativeSelect } from "@/components/ui/input";
-import { commands, unwrap, type FeedFolder, type FeedPreviewDto } from "@/lib/ipc";
+import { commands, unwrap, type FeedFolder, type FeedPreviewDto, type Space } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
 import {
   feedsKey,
@@ -130,30 +130,33 @@ export function FolderSelect({
   );
 }
 
-function AddressTab({
+export function AddressTab({
   folder,
   auto,
   followed,
   onDone,
+  space = "feeds",
 }: {
   folder: string | null;
   auto: boolean;
   followed: Set<string>;
   onDone: () => void;
+  space?: Space;
 }) {
+  const pod = space === "podcasts";
   const [address, setAddress] = useState("");
   const [finding, setFinding] = useState(false);
   const [found, setFound] = useState<FeedPreviewDto | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
-  const add = useAddFeed();
+  const add = useAddFeed(space);
 
   const find = async () => {
     setFinding(true);
     setError(null);
     setFound(null);
     try {
-      const f = await unwrap(commands.feedFind(address));
+      const f = await unwrap(commands.feedFind(space, address));
       setFound(f);
       setTitle(f.title);
     } catch (e) {
@@ -174,8 +177,12 @@ function AddressTab({
       >
         <Input
           autoFocus
-          aria-label="Feed or site address"
-          placeholder="Paste a feed or website address (arxiv.org/…, a blog, a Substack…)"
+          aria-label={pod ? "Podcast feed address" : "Feed or site address"}
+          placeholder={
+            pod
+              ? "Paste a podcast's RSS address, or its website"
+              : "Paste a feed or website address (arxiv.org/…, a blog, a Substack…)"
+          }
           value={address}
           onChange={(e) => setAddress(e.target.value)}
           className="flex-1"
@@ -187,8 +194,9 @@ function AddressTab({
       {error && <p className="text-[12.5px] text-destructive">{error}</p>}
       {!found && !error && (
         <p className="text-[12.5px] text-muted-foreground">
-          A site's own address is enough when its pages name their feed. PubMed, journals and
-          newsletters offer feed addresses too (look for RSS).
+          {pod
+            ? "Every podcast has an RSS address: its website or app usually shows it (look for RSS). Private feeds from Patreon or Supercast work too."
+            : "A site's own address is enough when its pages name their feed. PubMed, journals and newsletters offer feed addresses too (look for RSS)."}
         </p>
       )}
       {found && (
@@ -203,7 +211,10 @@ function AddressTab({
             />
           </div>
           <p className="truncate text-[12px] text-muted-foreground" title={found.url}>
-            {found.url} · {found.count === 1 ? "1 item now" : `${found.count} items now`}
+            {found.url} ·{" "}
+            {found.count === 1
+              ? `1 ${pod ? "episode" : "item"} now`
+              : `${found.count} ${pod ? "episodes" : "items"} now`}
           </p>
           {found.sample.length > 0 && (
             <ul className="list-disc pl-5 text-[12.5px] text-muted-foreground">
@@ -217,7 +228,7 @@ function AddressTab({
           <div className="flex justify-end">
             {found.followed || followed.has(found.url) ? (
               <span className="text-[12.5px] text-muted-foreground">
-                You already follow this feed.
+                You already follow this {pod ? "show" : "feed"}.
               </span>
             ) : (
               <Button
@@ -442,24 +453,38 @@ function SuggestedTab({
   );
 }
 
-function OpmlTab({ folder, onDone }: { folder: string | null; onDone: () => void }) {
+export function OpmlTab({
+  folder,
+  onDone,
+  space = "feeds",
+}: {
+  folder: string | null;
+  onDone: () => void;
+  space?: Space;
+}) {
+  const pod = space === "podcasts";
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
   const choose = async () => {
     const path = await pickFile({
       multiple: false,
-      title: "Import feeds from an OPML file",
+      title: pod ? "Import shows from an OPML file" : "Import feeds from an OPML file",
       filters: [{ name: "OPML", extensions: ["opml", "xml"] }],
     });
     if (typeof path !== "string") return;
     setBusy(true);
     try {
-      const [added, skipped] = await unwrap(commands.feedsImportOpml(path, folder));
+      const [added, skipped] = await unwrap(commands.feedsImportOpml(space, path, folder));
       void qc.invalidateQueries({ queryKey: feedsKey });
-      toast.success(added === 1 ? "Following 1 feed" : `Following ${added} feeds`, {
-        description: skipped ? `${skipped} already followed.` : undefined,
-      });
-      if (added) void refreshFeeds(null, true);
+      toast.success(
+        added === 1
+          ? `Following 1 ${pod ? "show" : "feed"}`
+          : `Following ${added} ${pod ? "shows" : "feeds"}`,
+        {
+          description: skipped ? `${skipped} already followed.` : undefined,
+        },
+      );
+      if (added) void refreshFeeds(null, true, space);
       onDone();
     } catch (e) {
       toast.error("Could not import the file", {
@@ -472,8 +497,9 @@ function OpmlTab({ folder, onDone }: { folder: string | null; onDone: () => void
   return (
     <div className="flex flex-col items-start gap-3">
       <p className="text-[12.5px] text-muted-foreground">
-        Feed readers (Feedly, Inoreader, NetNewsWire, Thunderbird, Zotero…) export your
-        subscriptions as an OPML file. Their folders become folders here.
+        {pod
+          ? "Podcast apps (Apple Podcasts, Overcast, Pocket Casts, AntennaPod…) export the shows you follow as an OPML file."
+          : "Feed readers (Feedly, Inoreader, NetNewsWire, Thunderbird, Zotero…) export your subscriptions as an OPML file. Their folders become folders here."}
       </p>
       <Button onClick={() => void choose()} disabled={busy}>
         {busy ? <Loader2 className="animate-spin" /> : <FileUp />} Choose an OPML file…

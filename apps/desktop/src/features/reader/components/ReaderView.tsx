@@ -7,6 +7,7 @@ import {
   BookmarkCheck,
   GitCompare,
   Headphones,
+  Podcast,
   History,
   Mic,
   Volume2,
@@ -92,6 +93,7 @@ import { CaptureDialog, CaptureViewer } from "../capture";
 import { mathsFromPicture, useMathsSettings } from "../maths/api";
 import { AddLinkDialog, CopyViewer, LinksPanel, linkOf, type LinkInfo } from "../weblinks";
 import { useListening } from "../listening/store";
+import { usePlayer } from "@/features/podcasts";
 import { ListenBar, type ListenMode } from "../listening/ListenBar";
 import { FocusOverlay } from "../adhd/FocusOverlay";
 import { useAdhd, useAdhdPause } from "../adhd/state";
@@ -557,15 +559,23 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
     }
   };
   const listenWith = (m: ListenMode) => {
-    if (m === "audio") readAloud.stop();
-    else void readAloud.start();
+    if (m === "read") {
+      // One voice at a time.
+      const p = usePlayer.getState();
+      if (p.playing) p.toggle();
+      void readAloud.start();
+    } else readAloud.stop();
     setListen(m);
   };
+  const podcastLoaded = usePlayer((s) => s.episode !== null);
   const stopListening = () => {
     readAloud.stop();
     setListen(null);
   };
-  const showListenBar = listen === "audio" || (listen === "read" && readAloud.status !== "off");
+  const showListenBar =
+    listen === "audio" ||
+    (listen === "podcast" && podcastLoaded) ||
+    (listen === "read" && readAloud.status !== "off");
 
   // An audiobook of this book is playing: follow it.
   const followTo = useListening((s) => s.follow[bookId]);
@@ -1339,6 +1349,18 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
             onClick={() => (listen === "audio" ? stopListening() : listenHere())}
           >
             <Headphones />
+          </Button>
+        )}
+        {podcastLoaded && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Podcast"
+            title="Show the podcast here"
+            aria-pressed={listen === "podcast"}
+            onClick={() => (listen === "podcast" ? setListen(null) : listenWith("podcast"))}
+          >
+            <Podcast />
           </Button>
         )}
         <Button

@@ -20,6 +20,9 @@ const feed = (id: string, title: string, folderId: string | null, unread: number
   error: null,
   unread,
   total: unread,
+  author: null,
+  artwork: null,
+  speed: null,
 });
 
 describe("feeds", () => {
