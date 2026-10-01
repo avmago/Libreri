@@ -1,3 +1,4 @@
+import { ResizablePanel } from "@/components/ResizablePanel";
 import { useEffect } from "react";
 import {
   ArrowLeft,
@@ -89,30 +90,39 @@ export function SettingsPage({
 
   return (
     <div className="flex h-full">
-      <nav
-        aria-label="Settings"
-        className="flex w-60 shrink-0 flex-col gap-1 border-r bg-sidebar p-2.5"
+      <ResizablePanel
+        id="settings.nav"
+        initial={240}
+        min={200}
+        max={400}
+        side="left"
+        label="settings sections"
       >
-        <Button variant="ghost" size="sm" className="mb-2 justify-start" onClick={onClose}>
-          <ArrowLeft /> Back
-        </Button>
-        <h1 className="px-2.5 pb-2 text-[20px] font-semibold tracking-tight">Settings</h1>
-        {SECTIONS.map(({ id, label, Icon }) => (
-          <button
-            key={id}
-            type="button"
-            aria-current={id === section ? "page" : undefined}
-            onClick={() => onSection(id)}
-            className={cn(
-              "flex h-8 items-center gap-2.5 rounded-md px-2.5 text-left",
-              id === section ? "bg-muted font-medium" : "hover:bg-muted/60",
-            )}
-          >
-            <Icon className="size-4 text-muted-foreground" aria-hidden />
-            {label}
-          </button>
-        ))}
-      </nav>
+        <nav
+          aria-label="Settings"
+          className="flex min-w-0 flex-1 flex-col gap-1 overflow-auto border-r bg-sidebar p-2.5"
+        >
+          <Button variant="ghost" size="sm" className="mb-2 justify-start" onClick={onClose}>
+            <ArrowLeft /> Back
+          </Button>
+          <h1 className="px-2.5 pb-2 text-[20px] font-semibold tracking-tight">Settings</h1>
+          {SECTIONS.map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              type="button"
+              aria-current={id === section ? "page" : undefined}
+              onClick={() => onSection(id)}
+              className={cn(
+                "flex h-8 items-center gap-2.5 rounded-md px-2.5 text-left",
+                id === section ? "bg-muted font-medium" : "hover:bg-muted/60",
+              )}
+            >
+              <Icon className="size-4 text-muted-foreground" aria-hidden />
+              {label}
+            </button>
+          ))}
+        </nav>
+      </ResizablePanel>
       <main className="min-w-0 flex-1 overflow-y-auto" aria-label={current.label}>
         <div className="mx-auto flex max-w-3xl flex-col gap-8 px-8 pt-8 pb-16">
           <h1 className="text-[20px] font-semibold tracking-tight">{current.label}</h1>

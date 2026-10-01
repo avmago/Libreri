@@ -29,6 +29,7 @@ import {
   Unplug,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ResizablePanel } from "@/components/ResizablePanel";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input, NativeSelect } from "@/components/ui/input";
@@ -315,39 +316,41 @@ function Tree({
   const tree = useMemo(() => feedTree(data.folders, data.feeds), [data.folders, data.feeds]);
   const { place, setPlace } = useFeedsView();
   return (
-    <nav
-      aria-label="Feeds"
-      className="flex w-64 shrink-0 flex-col gap-px overflow-auto border-r bg-sidebar p-2"
-    >
-      <Row
-        active={samePlace(place, { kind: "all" })}
-        onClick={() => setPlace({ kind: "all" })}
-        icon={<Inbox className="size-4" />}
-        label="All feeds"
-        count={data.unread}
-        depth={0}
-      />
-      <div className="mt-2 flex h-6 items-center justify-between pr-1 pl-2.5">
-        <h2 className="text-[11px] font-semibold tracking-wide text-muted-foreground">
-          FOLDERS & FEEDS
-        </h2>
-        <button
-          type="button"
-          aria-label="New folder"
-          title="New folder"
-          onClick={() => onAsk({ kind: "newFolder", parent: null })}
-          className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <FolderPlus className="size-3.5" />
-        </button>
-      </div>
-      {tree.folders.map((t) => (
-        <FolderRow key={t.folder.id} t={t} depth={0} onAsk={onAsk} onAdd={onAdd} data={data} />
-      ))}
-      {tree.feeds.map((f) => (
-        <FeedRow key={f.id} feed={f} depth={0} onAsk={onAsk} />
-      ))}
-    </nav>
+    <ResizablePanel id="feeds.tree" initial={256} side="left" label="folders and feeds">
+      <nav
+        aria-label="Feeds"
+        className="flex min-w-0 flex-1 flex-col gap-px overflow-auto border-r bg-sidebar p-2"
+      >
+        <Row
+          active={samePlace(place, { kind: "all" })}
+          onClick={() => setPlace({ kind: "all" })}
+          icon={<Inbox className="size-4" />}
+          label="All feeds"
+          count={data.unread}
+          depth={0}
+        />
+        <div className="mt-2 flex h-6 items-center justify-between pr-1 pl-2.5">
+          <h2 className="text-[11px] font-semibold tracking-wide text-muted-foreground">
+            FOLDERS & FEEDS
+          </h2>
+          <button
+            type="button"
+            aria-label="New folder"
+            title="New folder"
+            onClick={() => onAsk({ kind: "newFolder", parent: null })}
+            className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <FolderPlus className="size-3.5" />
+          </button>
+        </div>
+        {tree.folders.map((t) => (
+          <FolderRow key={t.folder.id} t={t} depth={0} onAsk={onAsk} onAdd={onAdd} data={data} />
+        ))}
+        {tree.feeds.map((f) => (
+          <FeedRow key={f.id} feed={f} depth={0} onAsk={onAsk} />
+        ))}
+      </nav>
+    </ResizablePanel>
   );
 }
 

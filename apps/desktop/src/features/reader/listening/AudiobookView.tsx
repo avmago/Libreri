@@ -1,3 +1,4 @@
+import { ResizablePanel } from "@/components/ResizablePanel";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -621,220 +622,229 @@ export function AudiobookView({ tab, active }: { tab: BookTab; active: boolean }
         </div>
 
         {/* Side panel */}
-        <aside className="flex w-80 shrink-0 flex-col border-l">
-          <div role="tablist" className="flex gap-1 border-b p-1.5">
-            {(
-              [
-                ["chapters", `Chapters${chapters.length ? ` (${chapters.length})` : ""}`],
-                ["bookmarks", `Bookmarks${bookmarks.length ? ` (${bookmarks.length})` : ""}`],
-                ["book", "Book"],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                role="tab"
-                aria-selected={panel === id}
-                onClick={() => setPanel(id)}
-                className={cn(
-                  "flex-1 rounded-md py-1 text-[12.5px] text-muted-foreground",
-                  panel === id && "bg-muted font-medium text-foreground",
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="min-h-0 flex-1 overflow-auto text-[13px]">
-            {panel === "chapters" &&
-              (chapters.length ? (
-                <ol className="flex flex-col py-1">
-                  {chapters.map((c, i) => (
-                    <li key={i}>
-                      <button
-                        type="button"
-                        onClick={() => seek(c.start)}
-                        className={cn(
-                          "flex w-full items-baseline gap-2 px-3 py-1.5 text-left hover:bg-muted",
-                          i === chapter && "bg-muted font-medium",
-                        )}
-                      >
-                        <span className="min-w-0 flex-1 truncate">
-                          {c.title || `Chapter ${i + 1}`}
-                        </span>
-                        <span className="text-[11.5px] text-muted-foreground tabular-nums">
-                          {clock(c.start)}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p className="p-4 text-muted-foreground">
-                  {info ? "This file has no chapters." : "Reading the chapters…"}
-                </p>
+        <ResizablePanel
+          id="audiobook.side"
+          initial={320}
+          min={260}
+          side="right"
+          label="chapters and bookmarks"
+        >
+          <aside className="flex min-w-0 flex-1 flex-col border-l">
+            <div role="tablist" className="flex gap-1 border-b p-1.5">
+              {(
+                [
+                  ["chapters", `Chapters${chapters.length ? ` (${chapters.length})` : ""}`],
+                  ["bookmarks", `Bookmarks${bookmarks.length ? ` (${bookmarks.length})` : ""}`],
+                  ["book", "Book"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={panel === id}
+                  onClick={() => setPanel(id)}
+                  className={cn(
+                    "flex-1 rounded-md py-1 text-[12.5px] text-muted-foreground",
+                    panel === id && "bg-muted font-medium text-foreground",
+                  )}
+                >
+                  {label}
+                </button>
               ))}
-            {panel === "bookmarks" &&
-              (bookmarks.length ? (
-                <ul className="flex flex-col py-1">
-                  {bookmarks.map(({ a, t }) => (
-                    <li key={a.id} className="group flex items-center hover:bg-muted">
-                      <button
-                        type="button"
-                        onClick={() => seek(t)}
-                        className="min-w-0 flex-1 truncate px-3 py-1.5 text-left"
-                      >
-                        {a.label || clock(t)}
-                      </button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                        aria-label="Delete bookmark"
-                        onClick={() => deleteAnnotation.mutate(a.id)}
-                      >
-                        <Trash2 />
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="p-4 text-muted-foreground">
-                  No bookmarks yet. Press Bookmark while listening to mark a moment.
-                </p>
-              ))}
-            {panel === "book" && (
-              <div className="flex flex-col gap-3 p-3">
-                {link?.text ? (
-                  <>
-                    <div className="flex items-start gap-2">
-                      <BookOpen className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium">{link.text.metadata.title}</p>
-                        <p className="text-[12px] text-muted-foreground">
-                          The book this audiobook reads
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      <Button size="sm" variant="outline" onClick={() => openText(link.text!)}>
-                        Open beside
-                      </Button>
-                      {editLibrary && (
+            </div>
+            <div className="min-h-0 flex-1 overflow-auto text-[13px]">
+              {panel === "chapters" &&
+                (chapters.length ? (
+                  <ol className="flex flex-col py-1">
+                    {chapters.map((c, i) => (
+                      <li key={i}>
+                        <button
+                          type="button"
+                          onClick={() => seek(c.start)}
+                          className={cn(
+                            "flex w-full items-baseline gap-2 px-3 py-1.5 text-left hover:bg-muted",
+                            i === chapter && "bg-muted font-medium",
+                          )}
+                        >
+                          <span className="min-w-0 flex-1 truncate">
+                            {c.title || `Chapter ${i + 1}`}
+                          </span>
+                          <span className="text-[11.5px] text-muted-foreground tabular-nums">
+                            {clock(c.start)}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="p-4 text-muted-foreground">
+                    {info ? "This file has no chapters." : "Reading the chapters…"}
+                  </p>
+                ))}
+              {panel === "bookmarks" &&
+                (bookmarks.length ? (
+                  <ul className="flex flex-col py-1">
+                    {bookmarks.map(({ a, t }) => (
+                      <li key={a.id} className="group flex items-center hover:bg-muted">
+                        <button
+                          type="button"
+                          onClick={() => seek(t)}
+                          className="min-w-0 flex-1 truncate px-3 py-1.5 text-left"
+                        >
+                          {a.label || clock(t)}
+                        </button>
                         <Button
-                          size="sm"
                           variant="ghost"
-                          onClick={() => setLink.mutate(null)}
-                          title="Unlink (sync points are forgotten)"
+                          size="icon"
+                          className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                          aria-label="Delete bookmark"
+                          onClick={() => deleteAnnotation.mutate(a.id)}
                         >
-                          <Link2Off /> Unlink
+                          <Trash2 />
                         </Button>
-                      )}
-                    </div>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={follow}
-                        onChange={(e) => setFollow(e.target.checked)}
-                      />
-                      The open book follows the audio
-                    </label>
-                    <div className="flex flex-col gap-1.5 border-t pt-3">
-                      <p className="font-medium">Sync points</p>
-                      <p className="text-[12px] text-muted-foreground">
-                        Match a moment of the audio to a place in the book: open the book beside, go
-                        to where this moment is read, and add a sync point. Between points, Libreri
-                        keeps both in step.
-                      </p>
-                      {editLibrary && (
-                        <Button
-                          size="sm"
-                          className="self-start"
-                          disabled={!textPlace}
-                          onClick={addSyncPoint}
-                          title={textPlace ? undefined : "Open the book first"}
-                        >
-                          <Plus /> {clock(time)} is{" "}
-                          {textPlace ? textPlace.label || "the open place" : "…"}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="p-4 text-muted-foreground">
+                    No bookmarks yet. Press Bookmark while listening to mark a moment.
+                  </p>
+                ))}
+              {panel === "book" && (
+                <div className="flex flex-col gap-3 p-3">
+                  {link?.text ? (
+                    <>
+                      <div className="flex items-start gap-2">
+                        <BookOpen className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium">{link.text.metadata.title}</p>
+                          <p className="text-[12px] text-muted-foreground">
+                            The book this audiobook reads
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        <Button size="sm" variant="outline" onClick={() => openText(link.text!)}>
+                          Open beside
                         </Button>
-                      )}
-                      {editLibrary &&
-                        (autoSync ? (
-                          <div className="flex items-center gap-2 text-[12px]" aria-live="polite">
-                            <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
-                            <span className="min-w-0 flex-1 truncate">
-                              {autoSync.message || "Getting ready to listen…"}
-                              {autoSync.total > 1 && ` (${autoSync.done + 1} of ${autoSync.total})`}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => void commands.cancelJob(autoSync.job)}
-                            >
-                              Stop
-                            </Button>
-                          </div>
-                        ) : (
+                        {editLibrary && (
                           <Button
                             size="sm"
-                            variant="outline"
-                            className="self-start"
-                            onClick={findPoints}
-                            title="Libreri listens to short stretches of the audiobook and finds them in the book's text"
+                            variant="ghost"
+                            onClick={() => setLink.mutate(null)}
+                            title="Unlink (sync points are forgotten)"
                           >
-                            <AudioLines /> Find sync points by listening
+                            <Link2Off /> Unlink
                           </Button>
-                        ))}
-                      <ul className="flex flex-col">
-                        {syncPoints.map((p, i) => (
-                          <li key={i} className="group flex items-center gap-2 py-0.5">
-                            <button
-                              type="button"
-                              className="min-w-0 flex-1 truncate text-left hover:underline"
-                              onClick={() => seek(p.t)}
-                            >
-                              <span className="tabular-nums">{clock(p.t)}</span>
-                              <span className="text-muted-foreground">
-                                {" "}
-                                → {p.label || `${Math.round(p.progress * 100)}%`}
-                                {p.auto && " · found"}
+                        )}
+                      </div>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={follow}
+                          onChange={(e) => setFollow(e.target.checked)}
+                        />
+                        The open book follows the audio
+                      </label>
+                      <div className="flex flex-col gap-1.5 border-t pt-3">
+                        <p className="font-medium">Sync points</p>
+                        <p className="text-[12px] text-muted-foreground">
+                          Match a moment of the audio to a place in the book: open the book beside,
+                          go to where this moment is read, and add a sync point. Between points,
+                          Libreri keeps both in step.
+                        </p>
+                        {editLibrary && (
+                          <Button
+                            size="sm"
+                            className="self-start"
+                            disabled={!textPlace}
+                            onClick={addSyncPoint}
+                            title={textPlace ? undefined : "Open the book first"}
+                          >
+                            <Plus /> {clock(time)} is{" "}
+                            {textPlace ? textPlace.label || "the open place" : "…"}
+                          </Button>
+                        )}
+                        {editLibrary &&
+                          (autoSync ? (
+                            <div className="flex items-center gap-2 text-[12px]" aria-live="polite">
+                              <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
+                              <span className="min-w-0 flex-1 truncate">
+                                {autoSync.message || "Getting ready to listen…"}
+                                {autoSync.total > 1 &&
+                                  ` (${autoSync.done + 1} of ${autoSync.total})`}
                               </span>
-                            </button>
-                            {editLibrary && (
                               <Button
                                 variant="ghost"
-                                size="icon"
-                                aria-label="Remove sync point"
-                                className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                                onClick={() =>
-                                  setPoints.mutate(syncPoints.filter((_, j) => j !== i))
-                                }
+                                size="sm"
+                                onClick={() => void commands.cancelJob(autoSync.job)}
                               >
-                                <Trash2 />
+                                Stop
                               </Button>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-muted-foreground">
-                      Link this audiobook to the book it reads to switch between listening and
-                      reading, and to have the book follow along.
-                    </p>
-                    {editLibrary && (
-                      <Button size="sm" className="self-start" onClick={() => setLinking(true)}>
-                        <Link2 /> Link to a book…
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        </aside>
+                            </div>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="self-start"
+                              onClick={findPoints}
+                              title="Libreri listens to short stretches of the audiobook and finds them in the book's text"
+                            >
+                              <AudioLines /> Find sync points by listening
+                            </Button>
+                          ))}
+                        <ul className="flex flex-col">
+                          {syncPoints.map((p, i) => (
+                            <li key={i} className="group flex items-center gap-2 py-0.5">
+                              <button
+                                type="button"
+                                className="min-w-0 flex-1 truncate text-left hover:underline"
+                                onClick={() => seek(p.t)}
+                              >
+                                <span className="tabular-nums">{clock(p.t)}</span>
+                                <span className="text-muted-foreground">
+                                  {" "}
+                                  → {p.label || `${Math.round(p.progress * 100)}%`}
+                                  {p.auto && " · found"}
+                                </span>
+                              </button>
+                              {editLibrary && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  aria-label="Remove sync point"
+                                  className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                                  onClick={() =>
+                                    setPoints.mutate(syncPoints.filter((_, j) => j !== i))
+                                  }
+                                >
+                                  <Trash2 />
+                                </Button>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-muted-foreground">
+                        Link this audiobook to the book it reads to switch between listening and
+                        reading, and to have the book follow along.
+                      </p>
+                      {editLibrary && (
+                        <Button size="sm" className="self-start" onClick={() => setLinking(true)}>
+                          <Link2 /> Link to a book…
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </aside>
+        </ResizablePanel>
       </div>
       <LinkBookDialog
         open={linking}

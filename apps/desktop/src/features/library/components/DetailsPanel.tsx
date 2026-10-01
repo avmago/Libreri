@@ -1,3 +1,4 @@
+import { ResizablePanel } from "@/components/ResizablePanel";
 import { useState, type ReactNode } from "react";
 import { AudioLinks } from "./AudioLinks";
 import {
@@ -383,31 +384,40 @@ export function DetailsPanel({ books }: { books: BookView[] }) {
   const selected = books.filter((b) => ids.has(b.id));
 
   return (
-    <aside aria-label="Details" className="flex w-80 shrink-0 flex-col border-l bg-sidebar">
-      <div className="flex h-10 shrink-0 items-center justify-between border-b pr-2 pl-4">
-        <span className="text-[11px] font-semibold tracking-wide text-muted-foreground">
-          DETAILS
-        </span>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Hide details"
-          onClick={() => setDetailsOpen(false)}
-        >
-          <X />
-        </Button>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {selected.length === 1 && selected[0] ? (
-          <SingleBook key={selected[0].id} book={selected[0]} />
-        ) : selected.length > 1 ? (
-          <ManyBooks books={selected} />
-        ) : (
-          <p className="px-6 py-10 text-center text-muted-foreground">
-            Select a book to see and edit its details.
-          </p>
-        )}
-      </div>
-    </aside>
+    <ResizablePanel
+      id="library.details"
+      initial={320}
+      min={260}
+      max={720}
+      side="right"
+      label="details"
+    >
+      <aside aria-label="Details" className="flex min-w-0 flex-1 flex-col border-l bg-sidebar">
+        <div className="flex h-10 shrink-0 items-center justify-between border-b pr-2 pl-4">
+          <span className="text-[11px] font-semibold tracking-wide text-muted-foreground">
+            DETAILS
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Hide details"
+            onClick={() => setDetailsOpen(false)}
+          >
+            <X />
+          </Button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {selected.length === 1 && selected[0] ? (
+            <SingleBook key={selected[0].id} book={selected[0]} />
+          ) : selected.length > 1 ? (
+            <ManyBooks books={selected} />
+          ) : (
+            <p className="px-6 py-10 text-center text-muted-foreground">
+              Select a book to see and edit its details.
+            </p>
+          )}
+        </div>
+      </aside>
+    </ResizablePanel>
   );
 }

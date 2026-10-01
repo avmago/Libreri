@@ -1,3 +1,4 @@
+import { ResizablePanel } from "@/components/ResizablePanel";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -326,197 +327,206 @@ export function PageDetail({
         </div>
       </div>
 
-      <aside className="flex w-72 shrink-0 flex-col gap-3 overflow-auto border-l p-4 text-[13px]">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <h3 className="text-[14px] font-semibold">
-              {{ crop: "Crop", redact: "Redact", correct: "Correct text" }[mode]}
-            </h3>
-            <p className="text-muted-foreground">{title}</p>
-          </div>
-          <Button variant="ghost" size="icon" aria-label="Close" onClick={onCancel}>
-            <X />
-          </Button>
-        </div>
-        <p className="text-[12.5px] text-muted-foreground">{help}</p>
-
-        {mode === "crop" && (
-          <>
-            {crop && (
-              <Button variant="outline" size="sm" onClick={() => setBoxes([])}>
-                Keep the whole page
-              </Button>
-            )}
-            {selectedCount > 1 && (
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={(e) => setAllSelected(e.target.checked)}
-                />
-                The same on all {selectedCount} selected pages
-              </label>
-            )}
-          </>
-        )}
-
-        {mode === "redact" && (
-          <>
-            <form
-              className="flex flex-col gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                findHere();
-              }}
-            >
-              <label className="font-medium" htmlFor="lb-redact-find">
-                Black out words
-              </label>
-              <div className="flex gap-1.5">
-                <input
-                  id="lb-redact-find"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="A name, a number…"
-                  className="h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-2 outline-none focus-visible:border-ring"
-                />
-                <Button type="submit" variant="outline" size="sm" disabled={!text}>
-                  <Search /> This page
-                </Button>
-              </div>
-              {onFindEverywhere && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="self-start"
-                  disabled={!query.trim()}
-                  onClick={() => onFindEverywhere(query)}
-                >
-                  On every page…
-                </Button>
-              )}
-              {!text && (
-                <p className="text-[12px] text-muted-foreground">
-                  This page has no text to search; draw boxes by hand.
-                </p>
-              )}
-            </form>
-            <p className="text-muted-foreground">
-              {boxes.length === 0
-                ? "No boxes yet."
-                : `${boxes.length} ${boxes.length === 1 ? "box" : "boxes"} on this page.`}
-            </p>
-            {picked !== null && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setBoxes((list) => list.filter((_, j) => j !== picked));
-                  setPicked(null);
-                }}
-              >
-                <Trash2 /> Remove this box
-              </Button>
-            )}
-            {boxes.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={() => setBoxes([])}>
-                Remove all boxes
-              </Button>
-            )}
-          </>
-        )}
-
-        {mode === "correct" && editingFix && (
-          <div className="flex flex-col gap-2 rounded-lg border p-3">
-            <label className="font-medium" htmlFor="lb-fix-text">
-              New text
-            </label>
-            <SpellTextarea
-              plain
-              id="lb-fix-text"
-              autoFocus
-              rows={3}
-              value={editingFix.text}
-              onChange={(e) => updateFix({ text: e.target.value })}
-              className="rounded-md border border-input bg-background px-2 py-1.5 outline-none focus-visible:border-ring"
-            />
-            <div className="grid grid-cols-2 gap-2">
-              <label className="flex flex-col gap-1">
-                <span className="text-[12px] text-muted-foreground">Font</span>
-                <select
-                  value={editingFix.font}
-                  onChange={(e) => updateFix({ font: e.target.value })}
-                  className="h-8 rounded-md border border-input bg-background px-1.5"
-                >
-                  {FONTS.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[12px] text-muted-foreground">Size (pt)</span>
-                <input
-                  type="number"
-                  min={4}
-                  max={96}
-                  step={0.5}
-                  value={Math.round((editingFix.size ?? 0.02) * pagePoints[0] * 2) / 2}
-                  onChange={(e) =>
-                    updateFix({ size: Math.max(2, Number(e.target.value)) / pagePoints[0] })
-                  }
-                  className="h-8 rounded-md border border-input bg-background px-1.5"
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[12px] text-muted-foreground">Text colour</span>
-                <input
-                  type="color"
-                  value={editingFix.color}
-                  onChange={(e) => updateFix({ color: e.target.value })}
-                  className="h-8 w-full rounded-md border border-input"
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[12px] text-muted-foreground">Paper</span>
-                <input
-                  type="color"
-                  value={editingFix.background}
-                  onChange={(e) => updateFix({ background: e.target.value })}
-                  className="h-8 w-full rounded-md border border-input"
-                />
-              </label>
+      <ResizablePanel
+        id="edit.page"
+        initial={288}
+        min={240}
+        max={560}
+        side="right"
+        label="page tools"
+      >
+        <aside className="flex min-w-0 flex-1 flex-col gap-3 overflow-auto border-l p-4 text-[13px]">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h3 className="text-[14px] font-semibold">
+                {{ crop: "Crop", redact: "Redact", correct: "Correct text" }[mode]}
+              </h3>
+              <p className="text-muted-foreground">{title}</p>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="self-start"
-              onClick={() => {
-                setFixes((list) => list.filter((_, i) => i !== editing));
-                setEditing(null);
-              }}
-            >
-              <Trash2 /> Remove this correction
+            <Button variant="ghost" size="icon" aria-label="Close" onClick={onCancel}>
+              <X />
             </Button>
           </div>
-        )}
-        {mode === "correct" && !editingFix && (
-          <p className="text-muted-foreground">
-            {fixes.length
-              ? `${fixes.length} ${fixes.length === 1 ? "correction" : "corrections"} on this page. Click one to change it.`
-              : "No corrections yet."}
-          </p>
-        )}
+          <p className="text-[12.5px] text-muted-foreground">{help}</p>
 
-        <div className="mt-auto flex justify-end gap-2 pt-2">
-          <Button variant="ghost" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button onClick={save}>Done</Button>
-        </div>
-      </aside>
+          {mode === "crop" && (
+            <>
+              {crop && (
+                <Button variant="outline" size="sm" onClick={() => setBoxes([])}>
+                  Keep the whole page
+                </Button>
+              )}
+              {selectedCount > 1 && (
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={(e) => setAllSelected(e.target.checked)}
+                  />
+                  The same on all {selectedCount} selected pages
+                </label>
+              )}
+            </>
+          )}
+
+          {mode === "redact" && (
+            <>
+              <form
+                className="flex flex-col gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  findHere();
+                }}
+              >
+                <label className="font-medium" htmlFor="lb-redact-find">
+                  Black out words
+                </label>
+                <div className="flex gap-1.5">
+                  <input
+                    id="lb-redact-find"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="A name, a number…"
+                    className="h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-2 outline-none focus-visible:border-ring"
+                  />
+                  <Button type="submit" variant="outline" size="sm" disabled={!text}>
+                    <Search /> This page
+                  </Button>
+                </div>
+                {onFindEverywhere && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="self-start"
+                    disabled={!query.trim()}
+                    onClick={() => onFindEverywhere(query)}
+                  >
+                    On every page…
+                  </Button>
+                )}
+                {!text && (
+                  <p className="text-[12px] text-muted-foreground">
+                    This page has no text to search; draw boxes by hand.
+                  </p>
+                )}
+              </form>
+              <p className="text-muted-foreground">
+                {boxes.length === 0
+                  ? "No boxes yet."
+                  : `${boxes.length} ${boxes.length === 1 ? "box" : "boxes"} on this page.`}
+              </p>
+              {picked !== null && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setBoxes((list) => list.filter((_, j) => j !== picked));
+                    setPicked(null);
+                  }}
+                >
+                  <Trash2 /> Remove this box
+                </Button>
+              )}
+              {boxes.length > 0 && (
+                <Button variant="ghost" size="sm" onClick={() => setBoxes([])}>
+                  Remove all boxes
+                </Button>
+              )}
+            </>
+          )}
+
+          {mode === "correct" && editingFix && (
+            <div className="flex flex-col gap-2 rounded-lg border p-3">
+              <label className="font-medium" htmlFor="lb-fix-text">
+                New text
+              </label>
+              <SpellTextarea
+                plain
+                id="lb-fix-text"
+                autoFocus
+                rows={3}
+                value={editingFix.text}
+                onChange={(e) => updateFix({ text: e.target.value })}
+                className="rounded-md border border-input bg-background px-2 py-1.5 outline-none focus-visible:border-ring"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex flex-col gap-1">
+                  <span className="text-[12px] text-muted-foreground">Font</span>
+                  <select
+                    value={editingFix.font}
+                    onChange={(e) => updateFix({ font: e.target.value })}
+                    className="h-8 rounded-md border border-input bg-background px-1.5"
+                  >
+                    {FONTS.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[12px] text-muted-foreground">Size (pt)</span>
+                  <input
+                    type="number"
+                    min={4}
+                    max={96}
+                    step={0.5}
+                    value={Math.round((editingFix.size ?? 0.02) * pagePoints[0] * 2) / 2}
+                    onChange={(e) =>
+                      updateFix({ size: Math.max(2, Number(e.target.value)) / pagePoints[0] })
+                    }
+                    className="h-8 rounded-md border border-input bg-background px-1.5"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[12px] text-muted-foreground">Text colour</span>
+                  <input
+                    type="color"
+                    value={editingFix.color}
+                    onChange={(e) => updateFix({ color: e.target.value })}
+                    className="h-8 w-full rounded-md border border-input"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[12px] text-muted-foreground">Paper</span>
+                  <input
+                    type="color"
+                    value={editingFix.background}
+                    onChange={(e) => updateFix({ background: e.target.value })}
+                    className="h-8 w-full rounded-md border border-input"
+                  />
+                </label>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="self-start"
+                onClick={() => {
+                  setFixes((list) => list.filter((_, i) => i !== editing));
+                  setEditing(null);
+                }}
+              >
+                <Trash2 /> Remove this correction
+              </Button>
+            </div>
+          )}
+          {mode === "correct" && !editingFix && (
+            <p className="text-muted-foreground">
+              {fixes.length
+                ? `${fixes.length} ${fixes.length === 1 ? "correction" : "corrections"} on this page. Click one to change it.`
+                : "No corrections yet."}
+            </p>
+          )}
+
+          <div className="mt-auto flex justify-end gap-2 pt-2">
+            <Button variant="ghost" onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button onClick={save}>Done</Button>
+          </div>
+        </aside>
+      </ResizablePanel>
     </div>
   );
 }

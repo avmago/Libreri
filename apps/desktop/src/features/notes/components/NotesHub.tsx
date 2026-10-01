@@ -1,3 +1,4 @@
+import { ResizablePanel } from "@/components/ResizablePanel";
 import { useDeferredValue, useMemo, useRef, useState } from "react";
 import {
   BookOpen,
@@ -351,60 +352,62 @@ function Canvases({ search }: { search: string }) {
 
   return (
     <div className="flex min-h-0 flex-1 border-t">
-      <div className="flex w-72 shrink-0 flex-col border-r bg-sidebar">
-        <div className="flex items-center justify-between px-3 py-2">
-          <span className="text-[11px] font-semibold tracking-wide text-muted-foreground">
-            {list.length} {list.length === 1 ? "CANVAS" : "CANVASES"}
-          </span>
-          <Button variant="ghost" size="sm" onClick={newCanvas}>
-            <PenLine /> New canvas
-          </Button>
+      <ResizablePanel id="notes.canvases" initial={288} side="left" label="canvas list">
+        <div className="flex min-w-0 flex-1 flex-col border-r bg-sidebar">
+          <div className="flex items-center justify-between px-3 py-2">
+            <span className="text-[11px] font-semibold tracking-wide text-muted-foreground">
+              {list.length} {list.length === 1 ? "CANVAS" : "CANVASES"}
+            </span>
+            <Button variant="ghost" size="sm" onClick={newCanvas}>
+              <PenLine /> New canvas
+            </Button>
+          </div>
+          <ul className="min-h-0 flex-1 overflow-y-auto px-2 pb-3" aria-label="Canvases">
+            {shown.map((c) => (
+              <li key={c.relPath} className="group relative">
+                <button
+                  type="button"
+                  onClick={() => setSelected(c.relPath)}
+                  aria-current={current?.relPath === c.relPath ? "true" : undefined}
+                  className={cn(
+                    "flex w-full flex-col gap-1 rounded-md px-2.5 py-2 text-left",
+                    current?.relPath === c.relPath ? "bg-muted" : "hover:bg-muted/60",
+                  )}
+                >
+                  <span className="flex items-center gap-2 font-medium">
+                    <PenLine className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                    <span className="truncate">{c.title}</span>
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {relativeDate(c.modified ?? 0)} · {c.elements}{" "}
+                    {c.elements === 1 ? "drawing" : "drawings"}
+                    {c.bookId ? "" : " · not linked to a book"}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Delete ${c.title}`}
+                  className="absolute top-2 right-2 hidden rounded p-1 text-muted-foreground group-hover:block hover:bg-background hover:text-destructive focus-visible:block"
+                  onClick={() =>
+                    remove.mutate(c.relPath, {
+                      onSuccess: () => toast(`“${c.title}” was moved to the trash`),
+                      onError: (e) => toast.error(e.message),
+                    })
+                  }
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              </li>
+            ))}
+            {!isPending && list.length === 0 && (
+              <p className="px-2.5 py-4 text-[12.5px] text-muted-foreground">
+                Canvases are for writing and drawing by hand. Start one here, or from a book with
+                the pen button in the reader. They are Excalidraw files in your Notes folder.
+              </p>
+            )}
+          </ul>
         </div>
-        <ul className="min-h-0 flex-1 overflow-y-auto px-2 pb-3" aria-label="Canvases">
-          {shown.map((c) => (
-            <li key={c.relPath} className="group relative">
-              <button
-                type="button"
-                onClick={() => setSelected(c.relPath)}
-                aria-current={current?.relPath === c.relPath ? "true" : undefined}
-                className={cn(
-                  "flex w-full flex-col gap-1 rounded-md px-2.5 py-2 text-left",
-                  current?.relPath === c.relPath ? "bg-muted" : "hover:bg-muted/60",
-                )}
-              >
-                <span className="flex items-center gap-2 font-medium">
-                  <PenLine className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="truncate">{c.title}</span>
-                </span>
-                <span className="text-[11px] text-muted-foreground">
-                  {relativeDate(c.modified ?? 0)} · {c.elements}{" "}
-                  {c.elements === 1 ? "drawing" : "drawings"}
-                  {c.bookId ? "" : " · not linked to a book"}
-                </span>
-              </button>
-              <button
-                type="button"
-                aria-label={`Delete ${c.title}`}
-                className="absolute top-2 right-2 hidden rounded p-1 text-muted-foreground group-hover:block hover:bg-background hover:text-destructive focus-visible:block"
-                onClick={() =>
-                  remove.mutate(c.relPath, {
-                    onSuccess: () => toast(`“${c.title}” was moved to the trash`),
-                    onError: (e) => toast.error(e.message),
-                  })
-                }
-              >
-                <Trash2 className="size-3.5" />
-              </button>
-            </li>
-          ))}
-          {!isPending && list.length === 0 && (
-            <p className="px-2.5 py-4 text-[12.5px] text-muted-foreground">
-              Canvases are for writing and drawing by hand. Start one here, or from a book with the
-              pen button in the reader. They are Excalidraw files in your Notes folder.
-            </p>
-          )}
-        </ul>
-      </div>
+      </ResizablePanel>
       {current ? (
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex h-11 shrink-0 items-center gap-2 border-b px-4">
@@ -455,49 +458,51 @@ function Notebooks({ search }: { search: string }) {
 
   return (
     <div className="flex min-h-0 flex-1 border-t">
-      <div className="flex w-80 shrink-0 flex-col border-r bg-sidebar">
-        <div className="flex items-center justify-between px-3 py-2">
-          <span className="text-[11px] font-semibold tracking-wide text-muted-foreground">
-            {list.length} {list.length === 1 ? "NOTEBOOK" : "NOTEBOOKS"}
-          </span>
-          <Button variant="ghost" size="sm" onClick={newNote} title="New note">
-            <FilePlus2 /> New note
-          </Button>
+      <ResizablePanel id="notes.notebooks" initial={320} side="left" label="notebook list">
+        <div className="flex min-w-0 flex-1 flex-col border-r bg-sidebar">
+          <div className="flex items-center justify-between px-3 py-2">
+            <span className="text-[11px] font-semibold tracking-wide text-muted-foreground">
+              {list.length} {list.length === 1 ? "NOTEBOOK" : "NOTEBOOKS"}
+            </span>
+            <Button variant="ghost" size="sm" onClick={newNote} title="New note">
+              <FilePlus2 /> New note
+            </Button>
+          </div>
+          <ul className="min-h-0 flex-1 overflow-y-auto px-2 pb-3" aria-label="Notebooks">
+            {shown.map((n) => (
+              <li key={n.relPath}>
+                <button
+                  type="button"
+                  onClick={() => setSelected(n.relPath)}
+                  aria-current={current?.relPath === n.relPath ? "true" : undefined}
+                  className={cn(
+                    "flex w-full flex-col gap-1 rounded-md px-2.5 py-2 text-left",
+                    current?.relPath === n.relPath ? "bg-muted" : "hover:bg-muted/60",
+                  )}
+                >
+                  <span className="flex items-center gap-2 font-medium">
+                    <NotebookText className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                    <span className="truncate">{n.title}</span>
+                  </span>
+                  <span className="line-clamp-2 text-[12px] text-muted-foreground">
+                    {n.excerpt || "Empty"}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {relativeDate(n.modified ?? 0)} · {n.words} {n.words === 1 ? "word" : "words"}
+                    {n.bookId ? "" : " · not linked to a book"}
+                  </span>
+                </button>
+              </li>
+            ))}
+            {!isPending && list.length === 0 && (
+              <p className="px-2.5 py-4 text-[12.5px] text-muted-foreground">
+                Open a book and its notebook panel, or start a note here. Notes are Markdown files
+                in your Notes folder.
+              </p>
+            )}
+          </ul>
         </div>
-        <ul className="min-h-0 flex-1 overflow-y-auto px-2 pb-3" aria-label="Notebooks">
-          {shown.map((n) => (
-            <li key={n.relPath}>
-              <button
-                type="button"
-                onClick={() => setSelected(n.relPath)}
-                aria-current={current?.relPath === n.relPath ? "true" : undefined}
-                className={cn(
-                  "flex w-full flex-col gap-1 rounded-md px-2.5 py-2 text-left",
-                  current?.relPath === n.relPath ? "bg-muted" : "hover:bg-muted/60",
-                )}
-              >
-                <span className="flex items-center gap-2 font-medium">
-                  <NotebookText className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="truncate">{n.title}</span>
-                </span>
-                <span className="line-clamp-2 text-[12px] text-muted-foreground">
-                  {n.excerpt || "Empty"}
-                </span>
-                <span className="text-[11px] text-muted-foreground">
-                  {relativeDate(n.modified ?? 0)} · {n.words} {n.words === 1 ? "word" : "words"}
-                  {n.bookId ? "" : " · not linked to a book"}
-                </span>
-              </button>
-            </li>
-          ))}
-          {!isPending && list.length === 0 && (
-            <p className="px-2.5 py-4 text-[12.5px] text-muted-foreground">
-              Open a book and its notebook panel, or start a note here. Notes are Markdown files in
-              your Notes folder.
-            </p>
-          )}
-        </ul>
-      </div>
+      </ResizablePanel>
       {current ? (
         <NoteEditor
           key={current.relPath}

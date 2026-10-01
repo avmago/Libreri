@@ -1,3 +1,4 @@
+import { ResizablePanel } from "@/components/ResizablePanel";
 import type * as React from "react";
 import { useState } from "react";
 import {
@@ -210,122 +211,131 @@ export function ContentsPanel({
   const voices = annotations.filter((a) => a.kind === "voice");
   const captures = annotations.filter((a) => a.kind === "capture");
   return (
-    <aside
-      aria-label="Contents and marks"
-      className={cn(
-        "flex shrink-0 flex-col border-r bg-sidebar",
-        panel === "links" ? "w-80" : "w-64",
-      )}
+    <ResizablePanel
+      key={panel === "links" ? "links" : "side"}
+      id={panel === "links" ? "reader.links" : "reader.contents"}
+      initial={panel === "links" ? 320 : 256}
+      min={200}
+      max={640}
+      side="left"
+      label="contents and marks"
     >
-      <div role="tablist" className="flex h-10 shrink-0 items-end gap-1 border-b px-3">
-        {(
-          [
-            ["contents", "Contents"],
-            ["marks", `Marks${marks.length ? ` (${marks.length})` : ""}`],
-            ...(markup
-              ? ([["markup", `Markup${markupCount ? ` (${markupCount})` : ""}`]] as const)
-              : []),
-            ...(links ? ([["links", `Links${linkCount ? ` (${linkCount})` : ""}`]] as const) : []),
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            role="tab"
-            type="button"
-            aria-selected={panel === id}
-            onClick={() => setPanel(id)}
-            className={cn(
-              "-mb-px border-b-2 px-2 pb-2 text-[12.5px] font-medium",
-              panel === id
-                ? "border-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      {panel === "markup" && markup ? (
-        markup
-      ) : panel === "links" && links ? (
-        links
-      ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto px-1.5 py-2">
-          {panel === "contents" ? (
-            toc.length ? (
-              <TocTree items={toc} depth={0} current={section} onGo={onGo} />
-            ) : (
-              <p className="px-3 py-6 text-center text-muted-foreground">
-                This book has no table of contents.
-              </p>
-            )
-          ) : marks.length ? (
-            <div className="flex flex-col gap-3">
-              {bookmarks.length > 0 && (
-                <section>
-                  <h3 className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground">
-                    BOOKMARKS
-                  </h3>
-                  <ul>
-                    {bookmarks.map((a) => (
-                      <MarkRow key={a.id} a={a} onGo={onShow} onDelete={onDelete} />
-                    ))}
-                  </ul>
-                </section>
+      <aside
+        aria-label="Contents and marks"
+        className="flex min-w-0 flex-1 flex-col border-r bg-sidebar"
+      >
+        <div role="tablist" className="flex h-10 shrink-0 items-end gap-1 border-b px-3">
+          {(
+            [
+              ["contents", "Contents"],
+              ["marks", `Marks${marks.length ? ` (${marks.length})` : ""}`],
+              ...(markup
+                ? ([["markup", `Markup${markupCount ? ` (${markupCount})` : ""}`]] as const)
+                : []),
+              ...(links
+                ? ([["links", `Links${linkCount ? ` (${linkCount})` : ""}`]] as const)
+                : []),
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              role="tab"
+              type="button"
+              aria-selected={panel === id}
+              onClick={() => setPanel(id)}
+              className={cn(
+                "-mb-px border-b-2 px-2 pb-2 text-[12.5px] font-medium",
+                panel === id
+                  ? "border-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
               )}
-              {captures.length > 0 && (
-                <section>
-                  <h3 className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground">
-                    PAPER NOTES
-                  </h3>
-                  <ul>
-                    {captures.map((a) => (
-                      <MarkRow
-                        key={a.id}
-                        a={a}
-                        onGo={onShow}
-                        onDelete={onDelete}
-                        onOpenCapture={onOpenCapture}
-                      />
-                    ))}
-                  </ul>
-                </section>
-              )}
-              {voices.length > 0 && (
-                <section>
-                  <h3 className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground">
-                    VOICE NOTES
-                  </h3>
-                  <ul>
-                    {voices.map((a) => (
-                      <MarkRow key={a.id} a={a} onGo={onShow} onDelete={onDelete} />
-                    ))}
-                  </ul>
-                </section>
-              )}
-              {highlights.length > 0 && (
-                <section>
-                  <h3 className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground">
-                    HIGHLIGHTS
-                  </h3>
-                  <ul>
-                    {highlights.map((a) => (
-                      <MarkRow key={a.id} a={a} onGo={onShow} onDelete={onDelete} />
-                    ))}
-                  </ul>
-                </section>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2 px-4 py-8 text-center text-muted-foreground">
-              <Highlighter className="size-5" aria-hidden />
-              <p>
-                Select text to highlight it, or add a bookmark or a voice note from the toolbar.
-              </p>
-            </div>
-          )}
+            >
+              {label}
+            </button>
+          ))}
         </div>
-      )}
-    </aside>
+        {panel === "markup" && markup ? (
+          markup
+        ) : panel === "links" && links ? (
+          links
+        ) : (
+          <div className="min-h-0 flex-1 overflow-y-auto px-1.5 py-2">
+            {panel === "contents" ? (
+              toc.length ? (
+                <TocTree items={toc} depth={0} current={section} onGo={onGo} />
+              ) : (
+                <p className="px-3 py-6 text-center text-muted-foreground">
+                  This book has no table of contents.
+                </p>
+              )
+            ) : marks.length ? (
+              <div className="flex flex-col gap-3">
+                {bookmarks.length > 0 && (
+                  <section>
+                    <h3 className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground">
+                      BOOKMARKS
+                    </h3>
+                    <ul>
+                      {bookmarks.map((a) => (
+                        <MarkRow key={a.id} a={a} onGo={onShow} onDelete={onDelete} />
+                      ))}
+                    </ul>
+                  </section>
+                )}
+                {captures.length > 0 && (
+                  <section>
+                    <h3 className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground">
+                      PAPER NOTES
+                    </h3>
+                    <ul>
+                      {captures.map((a) => (
+                        <MarkRow
+                          key={a.id}
+                          a={a}
+                          onGo={onShow}
+                          onDelete={onDelete}
+                          onOpenCapture={onOpenCapture}
+                        />
+                      ))}
+                    </ul>
+                  </section>
+                )}
+                {voices.length > 0 && (
+                  <section>
+                    <h3 className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground">
+                      VOICE NOTES
+                    </h3>
+                    <ul>
+                      {voices.map((a) => (
+                        <MarkRow key={a.id} a={a} onGo={onShow} onDelete={onDelete} />
+                      ))}
+                    </ul>
+                  </section>
+                )}
+                {highlights.length > 0 && (
+                  <section>
+                    <h3 className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground">
+                      HIGHLIGHTS
+                    </h3>
+                    <ul>
+                      {highlights.map((a) => (
+                        <MarkRow key={a.id} a={a} onGo={onShow} onDelete={onDelete} />
+                      ))}
+                    </ul>
+                  </section>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2 px-4 py-8 text-center text-muted-foreground">
+                <Highlighter className="size-5" aria-hidden />
+                <p>
+                  Select text to highlight it, or add a bookmark or a voice note from the toolbar.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </aside>
+    </ResizablePanel>
   );
 }

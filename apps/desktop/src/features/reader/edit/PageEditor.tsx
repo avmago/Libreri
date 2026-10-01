@@ -1,3 +1,4 @@
+import { ResizablePanel } from "@/components/ResizablePanel";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ask } from "@tauri-apps/plugin-dialog";
@@ -689,25 +690,34 @@ export function PageEditor({
               />
             ))}
           </div>
-          <aside className="flex w-60 shrink-0 flex-col gap-2 border-l p-4 text-[13px]">
-            <h3 className="font-semibold">Changes</h3>
-            {changes.length ? (
-              <ul className="flex list-disc flex-col gap-1 pl-4">
-                {changes.map((c) => (
-                  <li key={c}>{c[0]!.toUpperCase() + c.slice(1)}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-muted-foreground">
-                None yet. Drag pages to reorder them; select pages to turn, delete, crop, redact or
-                correct them.
+          <ResizablePanel
+            id="edit.changes"
+            initial={240}
+            min={200}
+            max={480}
+            side="right"
+            label="changes"
+          >
+            <aside className="flex min-w-0 flex-1 flex-col gap-2 overflow-auto border-l p-4 text-[13px]">
+              <h3 className="font-semibold">Changes</h3>
+              {changes.length ? (
+                <ul className="flex list-disc flex-col gap-1 pl-4">
+                  {changes.map((c) => (
+                    <li key={c}>{c[0]!.toUpperCase() + c.slice(1)}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-muted-foreground">
+                  None yet. Drag pages to reorder them; select pages to turn, delete, crop, redact
+                  or correct them.
+                </p>
+              )}
+              <p className="mt-2 text-[12px] text-muted-foreground">
+                Saving keeps the current file as an earlier version. Notes, highlights and markup
+                move with their pages.
               </p>
-            )}
-            <p className="mt-2 text-[12px] text-muted-foreground">
-              Saving keeps the current file as an earlier version. Notes, highlights and markup move
-              with their pages.
-            </p>
-          </aside>
+            </aside>
+          </ResizablePanel>
         </div>
       )}
 

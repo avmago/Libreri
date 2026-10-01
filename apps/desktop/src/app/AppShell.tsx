@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { ResizablePanel } from "@/components/ResizablePanel";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toggleReadingFullscreen, useFullscreen, useFullscreenSync } from "@/lib/fullscreen";
 import {
   Archive,
@@ -639,26 +640,28 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
       <div className="relative min-h-0 flex-1">
         <ShortcutScope active={activeTab === null && ui.settings === null}>
           <div className={cn("absolute inset-0 flex", activeTab !== null && "hidden")}>
-            <nav
-              aria-label="Library"
-              className={cn(
-                "flex shrink-0 flex-col gap-2 border-r bg-sidebar pt-2 transition-[width]",
-                ui.sidebarCollapsed ? "w-14 items-center" : "w-60",
-              )}
-            >
-              <div className={cn("px-2.5", ui.sidebarCollapsed && "px-0")}>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Show or hide sidebar"
-                  title="Show or hide sidebar"
-                  onClick={ui.toggleSidebar}
-                >
-                  <PanelLeft />
-                </Button>
-              </div>
-              <LibrarySidebar library={library} collapsed={ui.sidebarCollapsed} />
-            </nav>
+            <SidebarColumn collapsed={ui.sidebarCollapsed}>
+              <nav
+                aria-label="Library"
+                className={cn(
+                  "flex min-w-0 flex-1 flex-col gap-2 border-r bg-sidebar pt-2",
+                  ui.sidebarCollapsed && "items-center",
+                )}
+              >
+                <div className={cn("px-2.5", ui.sidebarCollapsed && "px-0")}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Show or hide sidebar"
+                    title="Show or hide sidebar"
+                    onClick={ui.toggleSidebar}
+                  >
+                    <PanelLeft />
+                  </Button>
+                </div>
+                <LibrarySidebar library={library} collapsed={ui.sidebarCollapsed} />
+              </nav>
+            </SidebarColumn>
             <main className="min-w-0 flex-1">{home}</main>
           </div>
         </ShortcutScope>
@@ -721,5 +724,22 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
       <ImportDialog />
       <DropOverlay />
     </div>
+  );
+}
+
+/** The library sidebar: resizable, or a narrow strip of icons when collapsed. */
+function SidebarColumn({ collapsed, children }: { collapsed: boolean; children: ReactNode }) {
+  if (collapsed) return <div className="flex w-14 shrink-0">{children}</div>;
+  return (
+    <ResizablePanel
+      id="library.sidebar"
+      initial={240}
+      min={200}
+      max={480}
+      side="left"
+      label="sidebar"
+    >
+      {children}
+    </ResizablePanel>
   );
 }

@@ -1,3 +1,4 @@
+import { ResizablePanel } from "@/components/ResizablePanel";
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { Eye, NotebookPen, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -102,88 +103,97 @@ export function NotebookPanel({
   };
 
   return (
-    <aside aria-label="Notebook" className="flex w-80 shrink-0 flex-col border-l bg-sidebar">
-      <div className="flex h-10 shrink-0 items-center gap-1 border-b pr-2 pl-3">
-        <NotebookPen className="size-4 text-muted-foreground" aria-hidden />
-        <span className="flex-1 truncate text-[12.5px] font-medium">Notebook</span>
-        <span className="text-[11px] text-muted-foreground" aria-live="polite">
-          {save.isPending || dirty ? "Saving…" : notebook ? "Saved" : ""}
-        </span>
-        {notebook && (
-          <VoiceNoteButton
-            v={voice}
+    <ResizablePanel
+      id="reader.notebook"
+      initial={320}
+      min={260}
+      max={720}
+      side="right"
+      label="notebook"
+    >
+      <aside aria-label="Notebook" className="flex min-w-0 flex-1 flex-col border-l bg-sidebar">
+        <div className="flex h-10 shrink-0 items-center gap-1 border-b pr-2 pl-3">
+          <NotebookPen className="size-4 text-muted-foreground" aria-hidden />
+          <span className="flex-1 truncate text-[12.5px] font-medium">Notebook</span>
+          <span className="text-[11px] text-muted-foreground" aria-live="polite">
+            {save.isPending || dirty ? "Saving…" : notebook ? "Saved" : ""}
+          </span>
+          {notebook && (
+            <VoiceNoteButton
+              v={voice}
+              className="size-7"
+              label="Record a voice note in the notebook"
+            />
+          )}
+          {mode === "edit" && notebook && (
+            <DictateButton target={editor} lang={lang} className="size-7" />
+          )}
+          <div className="ml-1 flex rounded-md border p-0.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn("size-6", mode === "preview" && "bg-muted")}
+              aria-label="Preview"
+              aria-pressed={mode === "preview"}
+              onClick={() => setMode("preview")}
+            >
+              <Eye className="!size-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn("size-6", mode === "edit" && "bg-muted")}
+              aria-label="Edit Markdown"
+              aria-pressed={mode === "edit"}
+              onClick={() => setMode("edit")}
+            >
+              <Pencil className="!size-3.5" />
+            </Button>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
             className="size-7"
-            label="Record a voice note in the notebook"
-          />
-        )}
-        {mode === "edit" && notebook && (
-          <DictateButton target={editor} lang={lang} className="size-7" />
-        )}
-        <div className="ml-1 flex rounded-md border p-0.5">
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn("size-6", mode === "preview" && "bg-muted")}
-            aria-label="Preview"
-            aria-pressed={mode === "preview"}
-            onClick={() => setMode("preview")}
+            aria-label="Close notebook"
+            onClick={onClose}
           >
-            <Eye className="!size-3.5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn("size-6", mode === "edit" && "bg-muted")}
-            aria-label="Edit Markdown"
-            aria-pressed={mode === "edit"}
-            onClick={() => setMode("edit")}
-          >
-            <Pencil className="!size-3.5" />
+            <X />
           </Button>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-7"
-          aria-label="Close notebook"
-          onClick={onClose}
-        >
-          <X />
-        </Button>
-      </div>
-      <VoiceNoteBar v={voice} onDone={addVoice} className="border-b px-3 py-1.5" />
-      {notebook && (
-        <p
-          className="truncate border-b px-3 py-1.5 font-mono text-[10.5px] text-muted-foreground"
-          title={notebook.relPath}
-        >
-          {notebook.relPath}
-        </p>
-      )}
-      <div className="min-h-0 flex-1">
-        {isPending ? (
-          <p className="p-4 text-muted-foreground">Opening notebook…</p>
-        ) : error ? (
-          <p className="p-4 text-destructive">{String(error)}</p>
-        ) : mode === "edit" ? (
-          <textarea
-            ref={editor}
-            aria-label="Notebook (Markdown)"
-            value={value}
-            onChange={(e) => scheduleSave(e.target.value)}
-            className="size-full resize-none bg-transparent px-3 py-3 font-mono text-[12.5px] leading-relaxed outline-none"
-          />
-        ) : (
-          <div
-            ref={preview}
-            className="lb-doc lb-notebook size-full overflow-y-auto !px-4 !pt-3 !pb-10"
-            onClick={onPreviewClick}
-            onDoubleClick={() => setMode("edit")}
-            // Rendered from the user's own Markdown with raw HTML disabled.
-            dangerouslySetInnerHTML={{ __html: html }}
-          />
+        <VoiceNoteBar v={voice} onDone={addVoice} className="border-b px-3 py-1.5" />
+        {notebook && (
+          <p
+            className="truncate border-b px-3 py-1.5 font-mono text-[10.5px] text-muted-foreground"
+            title={notebook.relPath}
+          >
+            {notebook.relPath}
+          </p>
         )}
-      </div>
-    </aside>
+        <div className="min-h-0 flex-1">
+          {isPending ? (
+            <p className="p-4 text-muted-foreground">Opening notebook…</p>
+          ) : error ? (
+            <p className="p-4 text-destructive">{String(error)}</p>
+          ) : mode === "edit" ? (
+            <textarea
+              ref={editor}
+              aria-label="Notebook (Markdown)"
+              value={value}
+              onChange={(e) => scheduleSave(e.target.value)}
+              className="size-full resize-none bg-transparent px-3 py-3 font-mono text-[12.5px] leading-relaxed outline-none"
+            />
+          ) : (
+            <div
+              ref={preview}
+              className="lb-doc lb-notebook size-full overflow-y-auto !px-4 !pt-3 !pb-10"
+              onClick={onPreviewClick}
+              onDoubleClick={() => setMode("edit")}
+              // Rendered from the user's own Markdown with raw HTML disabled.
+              dangerouslySetInnerHTML={{ __html: html }}
+            />
+          )}
+        </div>
+      </aside>
+    </ResizablePanel>
   );
 }
