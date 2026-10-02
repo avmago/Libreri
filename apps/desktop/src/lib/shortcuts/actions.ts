@@ -85,6 +85,12 @@ export const ACTIONS = {
     keys: "Mod+Shift+9",
     whileTyping: true,
   },
+  "go.calendar": {
+    label: "Go to the reading calendar",
+    group: "General",
+    keys: "Mod+Shift+8",
+    whileTyping: true,
+  },
   "go.search": {
     label: "Search inside books, details and notes",
     group: "General",

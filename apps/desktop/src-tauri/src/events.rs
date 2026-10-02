@@ -416,6 +416,14 @@ pub struct VoiceDownload {
     pub error: Option<String>,
 }
 
+/// A choice from the running timer's menu in the menu bar or tray:
+/// "pause", "skip" or "stop".
+#[derive(Debug, Clone, Serialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct TimerTrayAction {
+    pub action: String,
+}
+
 /// Progress of downloading an extra canvas font.
 #[derive(Debug, Clone, Serialize, Type, Event)]
 #[serde(rename_all = "camelCase")]

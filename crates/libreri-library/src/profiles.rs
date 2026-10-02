@@ -115,6 +115,10 @@ impl Library {
                 continue;
             };
             let name = e.file_name().to_string_lossy().into_owned();
+            if name.ends_with(crate::study::SUFFIX) {
+                // The reading calendar: read where it lies, nothing to restore.
+                continue;
+            }
             if let Some(id) = name.strip_suffix(".collections.json") {
                 if let (Ok(id), Ok(list)) = (
                     id.parse::<ProfileId>(),

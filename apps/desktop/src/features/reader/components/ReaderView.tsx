@@ -103,6 +103,7 @@ import { AddLinkDialog, CopyViewer, LinksPanel, linkOf, type LinkInfo } from "..
 import { useListening } from "../listening/store";
 import { AddToLibraryDialog, openBook } from "@/features/feeds";
 import { usePlayer } from "@/features/podcasts";
+import { TimerButton, TodayReading, onBreak, reportReading } from "@/features/study";
 import { ListenBar, type ListenMode } from "../listening/ListenBar";
 import { FocusOverlay } from "../adhd/FocusOverlay";
 import { useAdhd, useAdhdPause } from "../adhd/state";
@@ -569,6 +570,32 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   const r = () => rendererRef.current;
   const isPdf = isPaged(fileType);
   const readAloud = useReadAloud(rendererRef);
+  // Study: where reading is, for the timer and reading goals.
+  const studyTitle = book?.metadata.title ?? tab.title;
+  useEffect(() => {
+    if (!active || !location) return;
+    reportReading({
+      bookId,
+      title: studyTitle,
+      page: location.page ?? null,
+      pages: location.pages ?? null,
+      progress: location.progress,
+    });
+  }, [active, location, bookId, studyTitle]);
+  useEffect(() => {
+    if (!active) return;
+    return () => reportReading(null);
+  }, [active]);
+  // A focus break pauses reading aloud.
+  const readStatus = readAloud.status;
+  const pauseReading = readAloud.pause;
+  useEffect(
+    () =>
+      onBreak(() => {
+        if (active && readStatus === "playing") pauseReading();
+      }),
+    [active, readStatus, pauseReading],
+  );
   // The floating player: read aloud, or the linked audiobook.
   const [listen, setListen] = useState<ListenMode | null>(null);
   // Read aloud stopped by itself (the end, no text, a voice that failed):
@@ -1484,6 +1511,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
             <Printer />
           </Button>
         )}
+        <TimerButton />
         <AppearanceMenu
           isPdf={isPdf}
           zoomLabel={zoomLabel}
@@ -1997,6 +2025,12 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
         </div>
         <span className="tabular-nums">{Math.round((location?.progress ?? 0) * 100)}%</span>
         <span className="flex-1" />
+        <TodayReading
+          onOpen={() => {
+            useTabs.getState().activate(null);
+            useLibraryView.getState().setNav({ kind: "calendar" });
+          }}
+        />
         {adhd.enabled && (
           <button
             type="button"

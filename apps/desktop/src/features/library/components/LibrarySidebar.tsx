@@ -2,6 +2,7 @@ import { useState } from "react";
 import { LibreriMark } from "@/components/LibreriMark";
 import {
   AlertTriangle,
+  CalendarDays,
   Bookmark,
   BookOpen,
   ChevronRight,
@@ -197,6 +198,9 @@ function Rail() {
     { nav: { kind: "notes" }, label: "Notes", Icon: NotebookText },
     ...(keepsData ? [{ nav: { kind: "feeds" } as Nav, label: "Feeds", Icon: Rss }] : []),
     ...(keepsData ? [{ nav: { kind: "podcasts" } as Nav, label: "Podcasts", Icon: Podcast }] : []),
+    ...(keepsData
+      ? [{ nav: { kind: "calendar" } as Nav, label: "Calendar", Icon: CalendarDays }]
+      : []),
     ...(editLibrary ? [{ nav: { kind: "organize" } as Nav, label: "Organize", Icon: Tags }] : []),
     { nav: { kind: "folder", path: "" }, label: "Folders", Icon: Folder },
   ];
@@ -413,6 +417,9 @@ export function LibrarySidebar({
           <NavItem nav={{ kind: "notes" }} label="Notes" Icon={NotebookText} count={0} />
           {keepsData && <FeedsNavItem />}
           {keepsData && <PodcastsNavItem />}
+          {keepsData && (
+            <NavItem nav={{ kind: "calendar" }} label="Calendar" Icon={CalendarDays} count={0} />
+          )}
           {editLibrary && (
             <NavItem nav={{ kind: "organize" }} label="Organize" Icon={Tags} count={0} />
           )}

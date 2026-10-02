@@ -40,6 +40,7 @@ mod profiles;
 mod reading;
 mod scan;
 mod sidecar;
+mod study;
 mod text;
 mod versions;
 pub mod voice;

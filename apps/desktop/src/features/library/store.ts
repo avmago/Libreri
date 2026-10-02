@@ -16,6 +16,7 @@ export type Nav =
   | { kind: "notes" }
   | { kind: "feeds" }
   | { kind: "podcasts" }
+  | { kind: "calendar" }
   | { kind: "search"; query?: string }
   | { kind: "organize" };
 
@@ -205,6 +206,8 @@ export function navTitle(nav: Nav): string {
       return "Feeds";
     case "podcasts":
       return "Podcasts";
+    case "calendar":
+      return "Calendar";
     case "organize":
       return "Organize";
     case "search":

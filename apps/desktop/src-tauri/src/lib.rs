@@ -258,6 +258,10 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::voices::set_voice_on,
             commands::voices::speak_natural,
             commands::voices::unload_voices,
+            commands::study::study_read,
+            commands::study::study_write,
+            commands::study::save_calendar_file,
+            commands::study::timer_tray,
             commands::spell::spell_dictionaries,
             commands::spell::download_dictionary,
             commands::spell::cancel_dictionary_download,
@@ -295,6 +299,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::MathsDownload,
             events::OcrModelDownload,
             events::VoiceDownload,
+            events::TimerTrayAction,
         ])
 }
 

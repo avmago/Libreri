@@ -600,6 +600,27 @@ export const commands = {
 	speakNatural: (voice: string, text: string, speed: number | null) => typedError<string, AppError>(__TAURI_INVOKE("speak_natural", { voice, text, speed })),
 	/**  Frees the memory of the voice last used (reading aloud stopped). */
 	unloadVoices: () => __TAURI_INVOKE<void>("unload_voices"),
+	/**  The signed-in profile's reading calendar (JSON), or None at first. */
+	studyRead: () => typedError<string | null, AppError>(__TAURI_INVOKE("study_read")),
+	studyWrite: (json: string) => typedError<null, AppError>(__TAURI_INVOKE("study_write", { json })),
+	/**  Writes the calendar as an .ics file where the person chose to save it. */
+	saveCalendarFile: (path: string, ics: string) => typedError<null, AppError>(__TAURI_INVOKE("save_calendar_file", { path, ics })),
+	/**
+	 *  Shows the running timer in the menu bar (macOS), the taskbar and tray
+	 *  (Windows) or the tray (Linux); None takes it away. Menu choices arrive
+	 *  as `TimerTrayAction`.
+	 */
+	timerTray: (timer: {
+	/**  "15:32", shown next to the icon (macOS menu bar, Linux where it can). */
+	text: string,
+	/**  "Focus · round 3 of 4 · The Lighthouse". */
+	detail: string,
+	/**  How far through (0–1), for the taskbar button; None for a stopwatch. */
+	progress: number | null,
+	paused: boolean,
+	/**  Offer "Skip" (focus sessions). */
+	canSkip: boolean,
+} | null) => typedError<null, AppError>(__TAURI_INVOKE("timer_tray", { timer })),
 	spellDictionaries: () => __TAURI_INVOKE<DictionaryInfo[]>("spell_dictionaries"),
 	/**  Downloads a dictionary; progress arrives as `DictionaryDownload`. */
 	downloadDictionary: (code: string) => typedError<DictionaryInfo[], AppError>(__TAURI_INVOKE("download_dictionary", { code })),
@@ -652,6 +673,7 @@ export const events = {
 	searchIndexProgress: makeEvent<SearchIndexProgress>("search-index-progress"),
 	sessionChanged: makeEvent<SessionChanged>("session-changed"),
 	speechModelDownload: makeEvent<SpeechModelDownload>("speech-model-download"),
+	timerTrayAction: makeEvent<TimerTrayAction>("timer-tray-action"),
 	voiceDownload: makeEvent<VoiceDownload>("voice-download"),
 };
 
@@ -2399,6 +2421,27 @@ export type TextStatusDto = {
 };
 
 export type Theme = "system" | "light" | "dark" | "highContrast";
+
+/**  The running timer, as the menu bar / taskbar / tray shows it. */
+export type TimerTray = {
+	/**  "15:32", shown next to the icon (macOS menu bar, Linux where it can). */
+	text: string,
+	/**  "Focus · round 3 of 4 · The Lighthouse". */
+	detail: string,
+	/**  How far through (0–1), for the taskbar button; None for a stopwatch. */
+	progress: number | null,
+	paused: boolean,
+	/**  Offer "Skip" (focus sessions). */
+	canSkip: boolean,
+};
+
+/**
+ *  A choice from the running timer's menu in the menu bar or tray:
+ *  "pause", "skip" or "stop".
+ */
+export type TimerTrayAction = {
+	action: string,
+};
 
 export type TopicDto = {
 	code: string,

@@ -98,6 +98,7 @@ Highlights that link back to the page, a notebook per book, handwriting, paper n
 - Works in **narrow windows** down to a third of the screen; side panels slide over the page.
 - **ADHD reading:** bionic reading, a line highlight and a reading mask.
 - **Find in book**, contents, bookmarks, and your place kept per profile.
+- A **study timer** (focus sessions, countdown, stopwatch) that also shows in the menu bar or taskbar, and a **reading calendar** with goals, due dates, streaks and .ics export.
 - **Compare** two versions or two PDFs side by side.
 
 </td>
@@ -291,7 +292,7 @@ Dependencies only point downward: interface → shell → crates → core. Read 
 | [Data portability](docs/data-portability.md) | How books, notes and links are kept, so nothing is locked in |
 | [AI research plan](docs/ai-research-plan.md) | Version 2's research tools and open-science plans |
 | [Phase 9 bugs](docs/phase9-bugs.md) | The Phase 9 bug list and what was fixed |
-| [Decisions](docs/adr) | 30 architecture decision records |
+| [Decisions](docs/adr) | 31 architecture decision records |
 
 ## Licence
 
