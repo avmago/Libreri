@@ -28,6 +28,11 @@ import {
   Search,
   Trash2,
   Unplug,
+  Share2,
+  Link2,
+  Copy,
+  Quote,
+  Mail,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ResizablePanel } from "@/components/ResizablePanel";
@@ -68,6 +73,7 @@ import { useFeedsView, type FeedPlace, type FeedShow } from "../store";
 import { AddFeedDialog, FolderSelect, type AddTab } from "./AddFeedDialog";
 import { AddToLibraryDialog } from "./ItemDialogs";
 import { openBook, openFeedDoc } from "../open";
+import { shareBibtex, shareMailto, shareMarkdown, shareText, shareUrl } from "../share";
 
 const fail = (what: string) => (e: unknown) =>
   toast.error(what, { description: e instanceof Error ? e.message : String(e) });
@@ -983,6 +989,7 @@ function ItemRow({
             {busy ? "Downloading…" : it.pdf ? "Download PDF" : "Download"}
           </Button>
         )}
+        <ShareMenu it={it} />
         <Button
           variant="ghost"
           size="icon"
@@ -1111,5 +1118,68 @@ function AskDialog({ ask, data, onClose }: { ask: Ask; data: FeedsDto; onClose: 
         </div>
       </form>
     </Dialog>
+  );
+}
+
+/** Share: copy the paper's address (or as text, Markdown, BibTeX), or
+ * email it. */
+function ShareMenu({ it }: { it: FeedItem }) {
+  const url = shareUrl(it);
+  const copy = (text: string, what: string) =>
+    void navigator.clipboard.writeText(text).then(
+      () => toast(`${what} copied`, { description: it.title }),
+      () => toast.error("Could not copy"),
+    );
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <Button variant="ghost" size="icon" aria-label={`Share “${it.title}”`} title="Share">
+          <Share2 />
+        </Button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content className={menuContent} align="end" sideOffset={4}>
+          {url && (
+            <div className="max-w-72 truncate px-2 pt-1.5 pb-1 text-[11.5px] text-muted-foreground">
+              {url}
+            </div>
+          )}
+          <DropdownMenu.Item
+            className={menuItem}
+            disabled={!url}
+            onSelect={() => url && copy(url, "Link")}
+          >
+            <Link2 /> Copy link
+          </DropdownMenu.Item>
+          <DropdownMenu.Item
+            className={menuItem}
+            onSelect={() => copy(shareText(it), "Title and link")}
+          >
+            <Copy /> Copy title, authors and link
+          </DropdownMenu.Item>
+          <DropdownMenu.Item
+            className={menuItem}
+            onSelect={() => copy(shareMarkdown(it), "Markdown link")}
+          >
+            <FileText /> Copy as Markdown link
+          </DropdownMenu.Item>
+          {(it.arxivId || it.doi) && (
+            <DropdownMenu.Item
+              className={menuItem}
+              onSelect={() => copy(shareBibtex(it), "BibTeX")}
+            >
+              <Quote /> Copy BibTeX citation
+            </DropdownMenu.Item>
+          )}
+          <DropdownMenu.Separator className={menuSeparator} />
+          <DropdownMenu.Item
+            className={menuItem}
+            onSelect={() => void commands.openExternalUrl(shareMailto(it))}
+          >
+            <Mail /> Email…
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }
