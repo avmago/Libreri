@@ -45,7 +45,7 @@ export function CalendarView() {
   const update = useStudy((s) => s.update);
   const today = dayKey(new Date());
   const [cursor, setCursor] = useState(today);
-  const [view, setView] = useState<"month" | "week">("month");
+  const [view, setView] = useState<"month" | "week" | "day">("month");
   const [selected, setSelected] = useState(today);
   const [goalOpen, setGoalOpen] = useState<Goal | "new" | null>(null);
 
@@ -59,14 +59,22 @@ export function CalendarView() {
   const move = (dir: 1 | -1) => {
     const d = fromKey(cursor);
     if (view === "month") d.setMonth(d.getMonth() + dir, 1);
-    else d.setDate(d.getDate() + dir * 7);
+    else d.setDate(d.getDate() + dir * (view === "week" ? 7 : 1));
     setCursor(dayKey(d));
+    if (view === "day") setSelected(dayKey(d));
   };
 
   const title =
     view === "month"
       ? c.toLocaleDateString(undefined, { month: "long", year: "numeric" })
-      : `${fromKey(weeks[0]![0]!).toLocaleDateString(undefined, { day: "numeric", month: "short" })} – ${fromKey(weeks[0]![6]!).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}`;
+      : view === "day"
+        ? c.toLocaleDateString(undefined, {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+          })
+        : `${fromKey(weeks[0]![0]!).toLocaleDateString(undefined, { day: "numeric", month: "short" })} – ${fromKey(weeks[0]![6]!).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}`;
 
   const exportIcs = async () => {
     const path = await save({
@@ -108,13 +116,16 @@ export function CalendarView() {
         </Button>
         <span className="flex-1" />
         <div role="tablist" aria-label="View" className="flex rounded-lg bg-muted p-0.5">
-          {(["month", "week"] as const).map((v) => (
+          {(["month", "week", "day"] as const).map((v) => (
             <button
               key={v}
               type="button"
               role="tab"
               aria-selected={view === v}
-              onClick={() => setView(v)}
+              onClick={() => {
+                if (v === "day") setCursor(selected);
+                setView(v);
+              }}
               className={cn(
                 "rounded-md px-3 py-1 text-[12.5px] font-medium capitalize",
                 view === v ? "bg-background shadow-sm" : "text-muted-foreground",
@@ -138,88 +149,97 @@ export function CalendarView() {
       </div>
 
       <div className="flex min-h-0 flex-1 gap-4 @max-4xl:flex-col">
-        <div
-          role="grid"
-          aria-label="Reading calendar"
-          className={cn(
-            "grid min-h-[420px] flex-1 grid-cols-7 overflow-hidden rounded-xl border",
-            view === "week" && "min-h-[260px]",
-          )}
-          style={{ gridTemplateRows: `auto repeat(${weeks.length}, minmax(0, 1fr))` }}
-        >
-          {WEEKDAYS.map((d) => (
-            <div
-              key={d}
-              className="border-b bg-muted/40 px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground"
-            >
-              {d}
-            </div>
-          ))}
-          {weeks.flat().map((k) => {
-            const d = days.get(k);
-            const other = view === "month" && !k.startsWith(month);
-            const goals = goalsOn(k);
-            const books = new Set(d?.sessions.map((s) => s.title).filter(Boolean));
-            return (
-              <button
-                key={k}
-                type="button"
-                role="gridcell"
-                aria-selected={selected === k}
-                aria-label={`${fromKey(k).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}${d ? `, read ${duration(d.minutes)}` : ""}${goals.length ? `, ${goals.length} due` : ""}`}
-                onClick={() => setSelected(k)}
-                className={cn(
-                  "flex min-h-0 flex-col items-stretch gap-1 overflow-hidden border-r border-b px-1.5 py-1.5 text-left text-[11.5px] last:border-r-0 hover:bg-muted/40 [&:nth-child(7n)]:border-r-0",
-                  selected === k && "bg-muted/60",
-                )}
+        {view === "day" ? (
+          <DayTimeline day={cursor} today={today} />
+        ) : (
+          <div
+            role="grid"
+            aria-label="Reading calendar"
+            className={cn(
+              "grid min-h-[420px] flex-1 grid-cols-7 overflow-hidden rounded-xl border",
+              view === "week" && "min-h-[260px]",
+            )}
+            style={{ gridTemplateRows: `auto repeat(${weeks.length}, minmax(0, 1fr))` }}
+          >
+            {WEEKDAYS.map((d) => (
+              <div
+                key={d}
+                className="border-b bg-muted/40 px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground"
               >
-                <span
+                {d}
+              </div>
+            ))}
+            {weeks.flat().map((k) => {
+              const d = days.get(k);
+              const other = view === "month" && !k.startsWith(month);
+              const goals = goalsOn(k);
+              const books = new Set(d?.sessions.map((s) => s.title).filter(Boolean));
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  role="gridcell"
+                  aria-selected={selected === k}
+                  aria-label={`${fromKey(k).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}${d ? `, read ${duration(d.minutes)}` : ""}${goals.length ? `, ${goals.length} due` : ""}`}
+                  onClick={() => setSelected(k)}
+                  onDoubleClick={() => {
+                    setCursor(k);
+                    setView("day");
+                  }}
+                  title="Double-click for the day"
                   className={cn(
-                    "self-start rounded-full px-1.5 text-[12px] font-semibold",
-                    other ? "text-muted-foreground/50" : "text-muted-foreground",
-                    k === today && "bg-foreground text-background",
+                    "flex min-h-0 flex-col items-stretch gap-1 overflow-hidden border-r border-b px-1.5 py-1.5 text-left text-[11.5px] last:border-r-0 hover:bg-muted/40 [&:nth-child(7n)]:border-r-0",
+                    selected === k && "bg-muted/60",
                   )}
                 >
-                  {fromKey(k).getDate()}
-                </span>
-                {d && d.minutes > 0 && (
                   <span
-                    aria-hidden
-                    className="h-1.5 rounded-full bg-emerald-600"
-                    style={{
-                      width: `${Math.max(12, Math.min(100, (d.minutes / maxMinutes) * 100))}%`,
-                    }}
-                  />
-                )}
-                {d && d.minutes > 0 && (
-                  <span className="truncate rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
-                    ⏱ {duration(d.minutes)}
-                    {books.size === 1
-                      ? ` · ${[...books][0]}`
-                      : books.size > 1
-                        ? ` · ${books.size} books`
-                        : ""}
-                  </span>
-                )}
-                {goals.map((g) => (
-                  <span
-                    key={g.id}
                     className={cn(
-                      "truncate rounded px-1.5 py-0.5",
-                      g.done
-                        ? "bg-muted text-muted-foreground line-through"
-                        : g.kind === "finish"
-                          ? "bg-indigo-50 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200"
-                          : "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-200",
+                      "self-start rounded-full px-1.5 text-[12px] font-semibold",
+                      other ? "text-muted-foreground/50" : "text-muted-foreground",
+                      k === today && "bg-foreground text-background",
                     )}
                   >
-                    {g.kind === "finish" ? `Finish ${g.title}` : `Due: ${g.title}`}
+                    {fromKey(k).getDate()}
                   </span>
-                ))}
-              </button>
-            );
-          })}
-        </div>
+                  {d && d.minutes > 0 && (
+                    <span
+                      aria-hidden
+                      className="h-1.5 rounded-full bg-emerald-600"
+                      style={{
+                        width: `${Math.max(12, Math.min(100, (d.minutes / maxMinutes) * 100))}%`,
+                      }}
+                    />
+                  )}
+                  {d && d.minutes > 0 && (
+                    <span className="truncate rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+                      ⏱ {duration(d.minutes)}
+                      {books.size === 1
+                        ? ` · ${[...books][0]}`
+                        : books.size > 1
+                          ? ` · ${books.size} books`
+                          : ""}
+                    </span>
+                  )}
+                  {goals.map((g) => (
+                    <span
+                      key={g.id}
+                      className={cn(
+                        "truncate rounded px-1.5 py-0.5",
+                        g.done
+                          ? "bg-muted text-muted-foreground line-through"
+                          : g.kind === "finish"
+                            ? "bg-indigo-50 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200"
+                            : "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-200",
+                      )}
+                    >
+                      {g.kind === "finish" ? `Finish ${g.title}` : `Due: ${g.title}`}
+                    </span>
+                  ))}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <aside className="flex w-[300px] shrink-0 flex-col gap-3 @max-4xl:w-full">
           <DayCard day={selected} today={today} />
@@ -506,5 +526,120 @@ function GoalMenu({
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
+  );
+}
+
+const HOUR = 56;
+
+/** One day hour by hour: reading sessions where they happened, and what
+ * is due that day above. */
+function DayTimeline({ day, today }: { day: string; today: string }) {
+  const sessions = useStudy((s) => s.data.sessions);
+  const goals = useStudy((s) => s.data.goals).filter((g) => g.due === day);
+  const list = (byDay(sessions).get(day)?.sessions ?? [])
+    .slice()
+    .sort((a, b) => a.start.localeCompare(b.start));
+  const minuteOf = (iso: string) => {
+    const d = new Date(iso);
+    return d.getHours() * 60 + d.getMinutes();
+  };
+  const first = list.length ? minuteOf(list[0]!.start) : 8 * 60;
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const startAt = Math.max(0, Math.min(first, day === today ? nowMin : first) - 60);
+  const scroller = (el: HTMLDivElement | null) => {
+    if (el && !el.dataset.placed) {
+      el.dataset.placed = "1";
+      el.scrollTop = (startAt / 60) * HOUR;
+    }
+  };
+  const total = list.reduce((n, s) => n + s.minutes, 0);
+  const pages = list.reduce((n, s) => n + sessionPages(s), 0);
+  const time = (m: number) =>
+    new Date(2000, 0, 1, Math.floor(m / 60), m % 60).toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+
+  return (
+    <div
+      role="region"
+      aria-label="Day"
+      className="flex min-h-[420px] flex-1 flex-col overflow-hidden rounded-xl border"
+    >
+      <div className="flex flex-wrap items-center gap-2 border-b bg-muted/40 px-3 py-2 text-[12px]">
+        <span className="font-semibold text-muted-foreground">All day</span>
+        {goals.length === 0 && <span className="text-muted-foreground">Nothing due</span>}
+        {goals.map((g) => (
+          <span
+            key={g.id}
+            className={cn(
+              "rounded px-1.5 py-0.5",
+              g.done
+                ? "bg-muted text-muted-foreground line-through"
+                : g.kind === "finish"
+                  ? "bg-indigo-50 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200"
+                  : "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-200",
+            )}
+          >
+            {g.kind === "finish" ? `Finish ${g.title}` : `Due: ${g.title}`}
+          </span>
+        ))}
+        <span className="ml-auto text-muted-foreground">
+          {total ? `${duration(total)} read${pages ? ` · ${pages} pages` : ""}` : ""}
+        </span>
+      </div>
+      <div ref={scroller} className="relative min-h-0 flex-1 overflow-auto">
+        <div className="relative" style={{ height: 24 * HOUR }}>
+          {Array.from({ length: 24 }, (_, h) => (
+            <div
+              key={h}
+              className="absolute inset-x-0 flex border-t border-border/60"
+              style={{ top: h * HOUR, height: HOUR }}
+            >
+              <span className="w-16 shrink-0 -translate-y-2 bg-background pr-2 text-right text-[11px] text-muted-foreground tabular-nums">
+                {h ? time(h * 60) : ""}
+              </span>
+            </div>
+          ))}
+          {list.map((s) => {
+            const at = minuteOf(s.start);
+            const n = sessionPages(s);
+            return (
+              <div
+                key={s.id}
+                className="absolute right-3 left-[4.5rem] overflow-hidden rounded-md border-l-[3px] border-emerald-600 bg-emerald-50 px-2 py-1 text-[12px] text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100"
+                style={{
+                  top: (at / 60) * HOUR + 1,
+                  height: Math.max(22, (s.minutes / 60) * HOUR - 2),
+                }}
+                title={`${time(at)}–${time(at + s.minutes)} · ${duration(s.minutes)}${s.title ? ` · ${s.title}` : ""}`}
+              >
+                <div className="truncate">
+                  <span className="font-medium">
+                    {s.title ?? (s.kind === "stopwatch" ? "Stopwatch" : "Reading")}
+                  </span>
+                  <span className="opacity-75">
+                    {" "}
+                    · {time(at)}–{time(at + s.minutes)} · {duration(s.minutes)}
+                    {n ? ` · pages ${s.pageFrom}–${s.pageTo}` : ""}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+          {day === today && (
+            <div
+              aria-hidden
+              className="absolute right-0 left-14 flex items-center"
+              style={{ top: (nowMin / 60) * HOUR }}
+            >
+              <span className="size-2 -translate-x-1 rounded-full bg-red-500" />
+              <span className="h-px flex-1 bg-red-500" />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
