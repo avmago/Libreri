@@ -1,4 +1,5 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef } from "react";
+import { inSeries } from "../series";
 import { revealBook } from "../hooks/useWindowRows";
 import { CoversSkeleton, RowsSkeleton } from "@/components/Placeholders";
 import {
@@ -431,7 +432,12 @@ export function LibraryView() {
     ],
   );
   const { data, isPending, isError, error, refetch, isFetching } = useBooks(query);
-  const books = data ?? NO_BOOKS;
+  const series = view.nav.kind === "series" ? (view.nav.name ?? null) : null;
+  // One series: its books, in order (numbered first).
+  const books = useMemo(
+    () => (series === null ? (data ?? NO_BOOKS) : inSeries(data ?? NO_BOOKS, series)),
+    [data, series],
+  );
   const { data: collections } = useCollections();
   const { data: facets } = useFacets();
   const { data: folderTree = [] } = useFolders();
@@ -553,6 +559,18 @@ export function LibraryView() {
             <div className="flex min-w-0 flex-1 items-baseline gap-3">
               {view.nav.kind === "folder" && view.nav.path !== "" ? (
                 <Breadcrumbs path={view.nav.path} />
+              ) : series !== null ? (
+                <h1 className="flex min-w-0 items-baseline gap-1.5 text-xl font-semibold tracking-tight">
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground"
+                    onClick={() => view.setNav({ kind: "series" })}
+                  >
+                    Series
+                  </button>
+                  <span className="text-muted-foreground">›</span>
+                  <span className="truncate">{series}</span>
+                </h1>
               ) : (
                 <h1 className="truncate text-xl font-semibold tracking-tight">{title}</h1>
               )}

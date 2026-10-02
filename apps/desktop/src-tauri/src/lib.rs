@@ -75,6 +75,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::reader::delete_annotation,
             commands::reader::get_notebook,
             commands::reader::save_notebook,
+            commands::reader::look_up,
             commands::reader::get_session,
             commands::reader::save_session,
             commands::profiles::list_profiles,

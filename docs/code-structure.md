@@ -114,3 +114,4 @@ libreri/
   - text the user writes with a handwriting-style font in Markup or Canvas;
   - generated placeholder covers for books without a cover image.
 - The wireframes' serif/italic text is simulated book content, not a style to copy into the app chrome.
+- **Look up and series (Phase 10):** `features/reader/components/LookupPopover.tsx` → `commands/reader.rs::look_up` → `libreri-metadata/src/lookup.rs` (Wiktionary definitions, Wikipedia summary). `features/library/series.ts` (grouping, order, next book) and `components/SeriesView.tsx`; nav kind `series` (with a name: that series in `LibraryView`).

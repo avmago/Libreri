@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
+  BookA,
   Copy,
   ExternalLink,
   FileText,
@@ -130,9 +131,12 @@ export function SelectionMenu({
   onLink,
   onLatex,
   onCopy,
+  onLookUp,
   onClose,
   notes = true,
 }: {
+  /** Look up the selected word or name (dictionary, Wikipedia). */
+  onLookUp?: () => void;
   rect: DOMRect;
   /** Highlights, comments and notes (not for downloads outside the library). */
   notes?: boolean;
@@ -210,6 +214,17 @@ export function SelectionMenu({
               <Link2 />
             </Button>
           </>
+        )}
+        {onLookUp && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Look up"
+            title="Look up in a dictionary and Wikipedia"
+            onClick={onLookUp}
+          >
+            <BookA />
+          </Button>
         )}
         <Button
           variant="ghost"

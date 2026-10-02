@@ -12,6 +12,7 @@
 
 mod covers;
 mod http;
+pub mod lookup;
 pub mod normalise;
 mod providers;
 

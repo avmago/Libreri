@@ -3,6 +3,7 @@ import { LibreriMark } from "@/components/LibreriMark";
 import {
   AlertTriangle,
   Brain,
+  Layers,
   CalendarDays,
   Bookmark,
   BookOpen,
@@ -50,6 +51,7 @@ import { FolderTree, type FolderEditing } from "./FolderTree";
 
 function same(a: Nav, b: Nav) {
   if (a.kind === "search" && b.kind === "search") return true;
+  if (a.kind === "series" && b.kind === "series") return true;
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
@@ -175,6 +177,7 @@ const LIBRARY_NAV: {
   },
   { nav: { kind: "favorites" }, label: "Favourites", Icon: Heart, count: (f) => f.favorites },
   { nav: { kind: "audio" }, label: "Audiobooks", Icon: Headphones, count: (f) => f.audio },
+  { nav: { kind: "series" }, label: "Series", Icon: Layers, count: () => 0 },
 ];
 
 function SectionTitle({

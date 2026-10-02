@@ -57,6 +57,7 @@ import {
   useLibraryDialogs,
   useLibraryEvents,
   useLibraryView,
+  SeriesView,
 } from "@/features/library";
 import { FindDetailsDialog, useDetailsEvents } from "@/features/details";
 import { HelperDialog } from "@/features/helpers";
@@ -650,6 +651,8 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
       <CalendarView />
     ) : nav.kind === "review" ? (
       <ReviewView />
+    ) : nav.kind === "series" && !nav.name ? (
+      <SeriesView />
     ) : nav.kind === "search" ? (
       <SearchView key={nav.query ?? ""} />
     ) : nav.kind === "organize" ? (

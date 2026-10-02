@@ -164,6 +164,11 @@ export const commands = {
 	/**  The Markdown notebook for a book, created on first use. */
 	getNotebook: (id: string) => typedError<NotebookDto, AppError>(__TAURI_INVOKE("get_notebook", { id })),
 	saveNotebook: (id: string, content: string) => typedError<NotebookDto, AppError>(__TAURI_INVOKE("save_notebook", { id, content })),
+	/**
+	 *  Looks up the selected word or name: meanings from Wiktionary and a
+	 *  summary from Wikipedia, in the book's language.
+	 */
+	lookUp: (query: string, lang: string | null) => typedError<WordLookup, AppError>(__TAURI_INVOKE("look_up", { query, lang })),
 	/**  The reader tabs that were open last time (JSON written by the interface). */
 	getSession: () => typedError<string | null, AppError>(__TAURI_INVOKE("get_session")),
 	saveSession: (session: string) => typedError<null, AppError>(__TAURI_INVOKE("save_session", { session })),
@@ -1243,6 +1248,11 @@ export type Cue = {
 	text: string,
 };
 
+export type Definition = {
+	text: string,
+	examples: string[],
+};
+
 /**  "Fill in missing details" finished (by hand, or after an import). */
 export type DetailsFilled = {
 	jobId: string,
@@ -1873,6 +1883,12 @@ export type MathsSettingsDto = {
 	downloaded: boolean,
 	sizeMb: number,
 	downloading: boolean,
+};
+
+export type Meaning = {
+	/**  "Noun", "Verb"… */
+	partOfSpeech: string,
+	definitions: Definition[],
 };
 
 /**  A word that looks misspelt (UTF-16 offsets, end exclusive). */
@@ -2534,10 +2550,32 @@ export type VoiceNoteDto = {
 	duration: number | null,
 };
 
+export type WikiSummary = {
+	title: string,
+	description: string | null,
+	extract: string,
+	/**  The page's picture as a data: URL (small), so nothing else loads. */
+	image: string | null,
+	url: string,
+	/**  A page listing several meanings of the name. */
+	disambiguation: boolean,
+};
+
 export type WordDto = {
 	text: string,
 	/**  x, y, width, height as fractions of the page from the top left. */
 	rect: [(number | null), (number | null), (number | null), (number | null)],
+};
+
+export type WordLookup = {
+	query: string,
+	/**  The language the meanings are in ("en"), when found. */
+	language: string | null,
+	meanings: Meaning[],
+	wiktionaryUrl: string,
+	wikipedia: WikiSummary | null,
+	/**  What could not be reached (shown, not fatal). */
+	problems: string[],
 };
 
 /* Tauri Specta runtime */

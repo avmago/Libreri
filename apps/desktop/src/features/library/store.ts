@@ -18,6 +18,8 @@ export type Nav =
   | { kind: "podcasts" }
   | { kind: "calendar" }
   | { kind: "review" }
+  /** Series: every series, or one series' books in order. */
+  | { kind: "series"; name?: string }
   | { kind: "search"; query?: string }
   | { kind: "organize" };
 
@@ -211,6 +213,8 @@ export function navTitle(nav: Nav): string {
       return "Calendar";
     case "review":
       return "Daily review";
+    case "series":
+      return nav.name ?? "Series";
     case "organize":
       return "Organize";
     case "search":

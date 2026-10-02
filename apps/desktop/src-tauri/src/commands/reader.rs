@@ -205,3 +205,25 @@ pub async fn export_marked_up(
     }
     Ok(())
 }
+
+/// Looks up the selected word or name: meanings from Wiktionary and a
+/// summary from Wikipedia, in the book's language.
+#[tauri::command]
+#[specta::specta]
+pub async fn look_up(
+    app: tauri::AppHandle,
+    query: String,
+    lang: Option<String>,
+) -> AppResult<libreri_metadata::lookup::WordLookup> {
+    use tauri::Manager;
+    let q = query.trim().to_owned();
+    if q.is_empty() || q.chars().count() > 80 {
+        return Err(AppError::invalid("select a word or a name to look up"));
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let http = app.state::<AppState>().http.clone();
+        libreri_metadata::lookup::lookup(http.as_ref(), &q, lang.as_deref())
+    })
+    .await
+    .map_err(|e| AppError::invalid(e.to_string()))
+}

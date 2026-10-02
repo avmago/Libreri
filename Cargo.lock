@@ -3989,6 +3989,7 @@ dependencies = [
 name = "libreri-metadata"
 version = "0.1.0"
 dependencies = [
+ "base64 0.23.1",
  "libreri-core",
  "libreri-formats",
  "serde",

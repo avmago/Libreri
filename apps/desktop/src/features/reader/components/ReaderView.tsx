@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LookupPopover } from "./LookupPopover";
 import { PageSkeleton } from "@/components/Placeholders";
 import { setReadingFullscreen, toggleReadingFullscreen, useFullscreen } from "@/lib/fullscreen";
 import {
@@ -229,6 +230,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   const [lastLeft, setLastLeft] = useState<LeftPanel>("contents");
   const [notebookOpen, setNotebookOpenRaw] = useState(false);
   // A formula shown as LaTeX (clicked, or rebuilt from selected text).
+  const [lookup, setLookup] = useState<{ query: string; rect: DOMRect } | null>(null);
   const [math, setMath] = useState<{
     latex: string;
     rect: DOMRect;
@@ -1978,6 +1980,21 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
           }}
         />
       )}
+      {lookup && (
+        <LookupPopover
+          key={lookup.query}
+          query={lookup.query}
+          rect={lookup.rect}
+          lang={book?.metadata.language}
+          onClose={() => setLookup(null)}
+          onNotebook={(block) => {
+            setLookup(null);
+            if (doc) return notForDocs();
+            setNotebookOpen(true);
+            setNotebookInsert(block);
+          }}
+        />
+      )}
       <AddLinkDialog
         key={linking ?? "no-link"}
         open={linking !== null}
@@ -2098,6 +2115,16 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
             r()?.clearSelection();
             setSelection(null);
           }}
+          onLookUp={
+            (selection.quote.exact ?? "").trim().length > 0 &&
+            (selection.quote.exact ?? "").trim().length <= 80
+              ? () => {
+                  setLookup({ query: selection.quote.exact!.trim(), rect: selection.rect });
+                  r()?.clearSelection();
+                  setSelection(null);
+                }
+              : undefined
+          }
           onCopy={() => {
             void navigator.clipboard.writeText(selection.quote.exact ?? "");
             r()?.clearSelection();

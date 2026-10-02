@@ -13,6 +13,7 @@ export { useBookActions } from "./hooks/useBookActions";
 export { useLibraryEvents } from "./hooks/useLibraryEvents";
 export { WelcomeScreen } from "./components/WelcomeScreen";
 export { LibraryView } from "./components/LibraryView";
+export { SeriesView } from "./components/SeriesView";
 export { LibrarySidebar } from "./components/LibrarySidebar";
 export { BulkEditDialog } from "./components/BulkEditDialog";
 export { SaveCollectionDialog } from "./components/SaveCollectionDialog";
