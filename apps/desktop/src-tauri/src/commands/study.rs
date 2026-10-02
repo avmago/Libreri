@@ -32,6 +32,44 @@ pub fn study_write(state: State<'_, AppState>, json: String) -> AppResult<()> {
     Ok(state.library()?.write_study(&json)?)
 }
 
+/// The signed-in profile's review cards and schedule (JSON), or None.
+#[tauri::command]
+#[specta::specta]
+pub fn review_read(state: State<'_, AppState>) -> AppResult<Option<String>> {
+    Ok(state.library()?.read_review()?)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn review_write(state: State<'_, AppState>, json: String) -> AppResult<()> {
+    Ok(state.library()?.write_review(&json)?)
+}
+
+/// Writes review cards as an Anki deck (.apkg) where the person chose.
+/// Returns how many notes were written.
+#[tauri::command]
+#[specta::specta]
+pub async fn export_anki(
+    path: String,
+    deck: String,
+    notes: Vec<libreri_export::anki::AnkiNote>,
+) -> AppResult<u32> {
+    let p = std::path::PathBuf::from(&path);
+    if !p
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("apkg"))
+    {
+        return Err(AppError::invalid("an Anki deck ends in .apkg"));
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        libreri_export::anki::write_apkg(&p, &deck, &notes)
+            .map(|n| n as u32)
+            .map_err(AppError::invalid)
+    })
+    .await
+    .map_err(|e| AppError::invalid(e.to_string()))?
+}
+
 /// Writes the calendar as an .ics file where the person chose to save it.
 #[tauri::command]
 #[specta::specta]

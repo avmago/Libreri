@@ -14,6 +14,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, menuContent, menuItem } from "@/components/ui/menu";
 import { openBook } from "@/features/feeds";
+import { useLibraryView } from "@/features/library";
+import { useDueCount } from "@/features/review";
 import { commands, unwrap } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
 import { GoalDialog } from "./GoalDialog";
@@ -363,6 +365,7 @@ function DayCard({ day, today }: { day: string; today: string }) {
             </span>
           </div>
         ))}
+        {day === today && <ReviewDue />}
         {next && (
           <button
             type="button"
@@ -641,5 +644,23 @@ function DayTimeline({ day, today }: { day: string; today: string }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Today's review cards, with a way there. */
+function ReviewDue() {
+  const n = useDueCount();
+  if (!n) return null;
+  return (
+    <button
+      type="button"
+      className="flex justify-between gap-2 py-1.5 text-left hover:text-foreground"
+      onClick={() => useLibraryView.getState().setNav({ kind: "review" })}
+    >
+      <span className="truncate">
+        Review: {n} {n === 1 ? "card" : "cards"} due
+      </span>
+      <span className="shrink-0 text-muted-foreground">→</span>
+    </button>
   );
 }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { LibreriMark } from "@/components/LibreriMark";
 import {
   AlertTriangle,
+  Brain,
   CalendarDays,
   Bookmark,
   BookOpen,
@@ -25,6 +26,7 @@ import {
   type LucideIcon,
   X,
 } from "lucide-react";
+import { useDueCount } from "@/features/review";
 import { Button } from "@/components/ui/button";
 import { ContextMenu, menuContent, menuItem } from "@/components/ui/menu";
 import { useFeedsOverview } from "@/features/feeds";
@@ -91,6 +93,12 @@ function FeedsNavItem() {
 function PodcastsNavItem() {
   const count = usePodcastsBadge();
   return <NavItem nav={{ kind: "podcasts" }} label="Podcasts" Icon={Podcast} count={count} />;
+}
+
+/** Daily review, with how many cards are left today. */
+function ReviewNavItem() {
+  const count = useDueCount();
+  return <NavItem nav={{ kind: "review" }} label="Daily review" Icon={Brain} count={count} />;
 }
 
 function JobsStrip() {
@@ -198,6 +206,7 @@ function Rail() {
     { nav: { kind: "notes" }, label: "Notes", Icon: NotebookText },
     ...(keepsData ? [{ nav: { kind: "feeds" } as Nav, label: "Feeds", Icon: Rss }] : []),
     ...(keepsData ? [{ nav: { kind: "podcasts" } as Nav, label: "Podcasts", Icon: Podcast }] : []),
+    ...(keepsData ? [{ nav: { kind: "review" } as Nav, label: "Daily review", Icon: Brain }] : []),
     ...(keepsData
       ? [{ nav: { kind: "calendar" } as Nav, label: "Calendar", Icon: CalendarDays }]
       : []),
@@ -417,6 +426,7 @@ export function LibrarySidebar({
           <NavItem nav={{ kind: "notes" }} label="Notes" Icon={NotebookText} count={0} />
           {keepsData && <FeedsNavItem />}
           {keepsData && <PodcastsNavItem />}
+          {keepsData && <ReviewNavItem />}
           {keepsData && (
             <NavItem nav={{ kind: "calendar" }} label="Calendar" Icon={CalendarDays} count={0} />
           )}

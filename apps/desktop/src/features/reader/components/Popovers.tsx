@@ -12,6 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CardOptionsSection } from "@/features/review";
 import { DictateButton, VoicePlayer, voiceOf } from "@/features/speech";
 import { SpellTextarea } from "@/features/spell";
 import type { Annotation, HighlightColor } from "@/lib/ipc";
@@ -359,6 +360,7 @@ export function AnnotationMenu({
           </div>
         </div>
       )}
+      <CardOptionsSection annotation={annotation} />
     </Floating>
   );
 }

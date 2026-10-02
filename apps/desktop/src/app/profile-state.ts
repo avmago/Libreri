@@ -3,6 +3,7 @@ import { useHelperDialog } from "@/features/helpers";
 import { useLibraryDialogs, useLibraryView } from "@/features/library";
 import { usePortability } from "@/features/portability";
 import { useOcrDialog } from "@/features/search";
+import { useReview } from "@/features/review";
 import { useStudy, useTimer } from "@/features/study";
 import type { StoreApi } from "zustand";
 import { useTabs } from "@/lib/tabs";
@@ -24,6 +25,7 @@ export function resetProfileState() {
   reset(useHelperDialog);
   reset(useTimer);
   reset(useStudy);
+  reset(useReview);
   const ui = useUi.getState();
   ui.closeSettings();
   ui.setPaletteOpen(false);

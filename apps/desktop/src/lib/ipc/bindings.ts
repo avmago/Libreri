@@ -621,6 +621,14 @@ export const commands = {
 	/**  Offer "Skip" (focus sessions). */
 	canSkip: boolean,
 } | null) => typedError<null, AppError>(__TAURI_INVOKE("timer_tray", { timer })),
+	/**  The signed-in profile's review cards and schedule (JSON), or None. */
+	reviewRead: () => typedError<string | null, AppError>(__TAURI_INVOKE("review_read")),
+	reviewWrite: (json: string) => typedError<null, AppError>(__TAURI_INVOKE("review_write", { json })),
+	/**
+	 *  Writes review cards as an Anki deck (.apkg) where the person chose.
+	 *  Returns how many notes were written.
+	 */
+	exportAnki: (path: string, deck: string, notes: AnkiNote[]) => typedError<number, AppError>(__TAURI_INVOKE("export_anki", { path, deck, notes })),
 	spellDictionaries: () => __TAURI_INVOKE<DictionaryInfo[]>("spell_dictionaries"),
 	/**  Downloads a dictionary; progress arrives as `DictionaryDownload`. */
 	downloadDictionary: (code: string) => typedError<DictionaryInfo[], AppError>(__TAURI_INVOKE("download_dictionary", { code })),
@@ -678,6 +686,20 @@ export const events = {
 };
 
 /* Types */
+/**  One note to write. */
+export type AnkiNote = {
+	/**
+	 *  A stable id (the card's key in Libreri), so importing again updates
+	 *  the note instead of adding it twice.
+	 */
+	id: string,
+	/**  "basic" or "cloze". */
+	model: string,
+	/**  Basic: front, back, source. Cloze: text, back extra, source (HTML). */
+	fields: string[],
+	tags: string[],
+};
+
 export type Annotation = {
 	/**  UUID, created by whoever makes the annotation. */
 	id: string,

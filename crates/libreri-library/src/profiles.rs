@@ -115,7 +115,7 @@ impl Library {
                 continue;
             };
             let name = e.file_name().to_string_lossy().into_owned();
-            if name.ends_with(crate::study::SUFFIX) {
+            if name.ends_with(crate::study::SUFFIX) || name.ends_with(crate::study::REVIEW_SUFFIX) {
                 // The reading calendar: read where it lies, nothing to restore.
                 continue;
             }

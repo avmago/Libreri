@@ -6,6 +6,7 @@
 //! formats citations, and reads and writes Libreri archives. No PINs, API
 //! keys or computer-specific paths ever reach an export.
 
+pub mod anki;
 pub mod archive;
 pub mod citation;
 pub mod foreign;

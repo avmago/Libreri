@@ -1,6 +1,6 @@
 # Libreri: architecture (as built, 2026-10-02)
 
-This replaces the agreed concept (v7, 2026-09-26). The concept's decisions are now built, or written up as decision records in `docs/adr/` (31 so far). This page is the map: what Libreri is made of, where data lives, and how the parts talk. For where to put new code, see [code structure](code-structure.md). For how notes keep their links on another computer, see [data portability](data-portability.md).
+This replaces the agreed concept (v7, 2026-09-26). The concept's decisions are now built, or written up as decision records in `docs/adr/` (32 so far). This page is the map: what Libreri is made of, where data lives, and how the parts talk. For where to put new code, see [code structure](code-structure.md). For how notes keep their links on another computer, see [data portability](data-portability.md).
 
 ## Stack
 
@@ -31,14 +31,14 @@ Dependencies only point down.
 |---|---|
 | libreri-core | Book, metadata, profile and settings types; the library layout |
 | libreri-db | SQLite, migrations, repositories |
-| libreri-library | The library folder: import, scan, watcher, sidecars, profiles, reading data, notes, versions, feeds and podcasts files, the study calendar |
+| libreri-library | The library folder: import, scan, watcher, sidecars, profiles, reading data, notes, versions, feeds and podcasts files, the study calendar and review |
 | libreri-jobs | Background jobs with progress and cancel |
 | libreri-profiles | 6-digit PINs (Argon2id), lockout, recovery codes |
 | libreri-formats | Details, covers and text from every format (PDF, EPUB, MOBI/AZW3, FB2, Markdown, RTF, text, comics, DjVu, audio); OCR words |
 | libreri-thumbs | Covers and thumbnails |
 | libreri-metadata | Online details from eight sources |
 | libreri-scan | Barcodes, the phone page, paper-note clean-up |
-| libreri-export | Exports, citations, Libreri archives, imports from other apps |
+| libreri-export | Exports, citations, Libreri archives, Anki decks, imports from other apps |
 | libreri-helpers | Finding, installing and running helper programs; downloads; eSpeak NG speech |
 | libreri-search | Full-text index (FTS5), per computer |
 | libreri-pdf-edit | Page editing, redaction, corrections, forms, markup export, compare |
@@ -59,7 +59,7 @@ My Library/
 ├── Feeds/<profile>/    .feeds.json, .podcasts.json, downloaded papers, articles and episodes
 └── .library-data/      library.db, sidecars, covers, annotations/<profile>/, text/ (OCR),
                         versions/, audio-links/, profiles/<id>.json, <id>.collections.json,
-                        <id>.study.json
+                        <id>.study.json, <id>.review.json
 ```
 
 - **Paths:** only relative paths are stored. The database can be rebuilt from the files, sidecars and backups at any time.
@@ -75,7 +75,7 @@ My Library/
 Profiles have an optional 6-digit PIN, auto-lock, Kids profiles (chosen folders only) and guests (nothing kept).
 
 - **Shared:** books, folders, bibliographic details, covers and categories.
-- **Per profile:** reading data, notes, collections, feeds, podcasts, the reading calendar and preferences.
+- **Per profile:** reading data, notes, collections, feeds, podcasts, the reading calendar, review cards and preferences.
 - **Security:** the signed-in profile belongs to the open library session, so the interface cannot ask for someone else's data (ADR 0010).
 
 ## Reading
@@ -95,7 +95,7 @@ Profiles have an optional 6-digit PIN, auto-lock, Kids profiles (chosen folders 
   - natural voices made on the computer (Kokoro and Piper, ADR 0030).
 - **Older WebKit:** small fixes in `lib/polyfills.ts` cover what the macOS web view lacks.
 
-## Feeds, podcasts, study
+## Feeds, podcasts, study, review
 
 - **Feeds** (ADR 0027): RSS, Atom and arXiv in folders, with downloads in `Feeds/<profile>/`.
   - **Add to library** moves a download in with the feed's details: title, authors, abstract, year, DOI, arXiv id, link, tags, categories, journal and kind. An online lookup then fills the rest.
@@ -105,6 +105,8 @@ Profiles have an optional 6-digit PIN, auto-lock, Kids profiles (chosen folders 
   - A reading calendar (month, week and day), goals and due dates, and a study timer (focus, countdown, stopwatch).
   - Sessions count as reading the open book.
   - While a timer runs it shows in the macOS menu bar and Dock, on the Windows taskbar and tray, or in the Linux tray.
+
+- **Daily review** (ADR 0032): highlights come back as passage, question-and-answer and cloze cards on an FSRS schedule (`ts-fsrs`), chosen in each highlight's menu. Cards are worked out from the highlights; only choices and the schedule are kept. Export to Anki (.apkg).
 
 ## Optional downloads
 
@@ -121,5 +123,5 @@ Each optional download has its own Download and Delete in Settings, runs on the 
 ## Not yet
 
 - Bionic reading on PDF pages: the design (word starts thickened on the page) is waiting for approval.
-- Archives (`.libreri`) do not carry Feeds, podcasts or the reading calendar; backups carry the calendar.
+- Archives (`.libreri`) do not carry Feeds, podcasts, the reading calendar or review; backups carry the calendar and review.
 - Version 2 brings phones and tablets with sync over the home network, printing and sharing, AI research tools, and more ideas (see the [development phases](development-phases.md)).

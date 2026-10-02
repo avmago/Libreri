@@ -98,6 +98,7 @@ Highlights that link back to the page, a notebook per book, handwriting, paper n
 - Works in **narrow windows** down to a third of the screen; side panels slide over the page.
 - **ADHD reading:** bionic reading, a line highlight and a reading mask.
 - **Find in book**, contents, bookmarks, and your place kept per profile.
+- **Daily review:** your highlights come back as cards (passage, question and answer, cloze) on a spaced schedule (FSRS), and export to Anki.
 - A **study timer** (focus sessions, countdown, stopwatch) that also shows in the menu bar or taskbar, and a **reading calendar** (month, week and day) with goals, due dates, streaks and .ics export.
 - **Compare** two versions or two PDFs side by side.
 

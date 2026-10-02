@@ -3849,6 +3849,7 @@ dependencies = [
  "rust_xlsxwriter",
  "serde",
  "serde_json",
+ "sha1_smol",
  "specta",
  "tempfile",
  "thiserror 2.0.21",

@@ -4,6 +4,7 @@ import { toggleReadingFullscreen, useFullscreen, useFullscreenSync } from "@/lib
 import {
   Archive,
   BookOpen,
+  Brain,
   CalendarDays,
   Columns2,
   Download,
@@ -62,6 +63,7 @@ import { HelperDialog } from "@/features/helpers";
 import { NotesHub, flushNotes } from "@/features/notes";
 import { FeedsView, useFeedsBackground } from "@/features/feeds";
 import { PodcastPlayer, PodcastsView, setPodcastSettingsOpener } from "@/features/podcasts";
+import { ReviewView } from "@/features/review";
 import { CalendarView, StudyHost } from "@/features/study";
 import { OcrDialog, SearchView, useSearchEvents } from "@/features/search";
 import { setSpeechSettingsOpener } from "@/features/speech";
@@ -208,7 +210,7 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
   }, []);
   const goHome = useCallback(
     (
-      kind: "all" | "notes" | "feeds" | "podcasts" | "calendar" | "organize" | "search",
+      kind: "all" | "notes" | "feeds" | "podcasts" | "calendar" | "review" | "organize" | "search",
       query?: string,
     ) => {
       tabs.activate(null);
@@ -219,6 +221,7 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
           nav.kind === "feeds" ||
           nav.kind === "podcasts" ||
           nav.kind === "calendar" ||
+          nav.kind === "review" ||
           nav.kind === "organize" ||
           nav.kind === "search"
         )
@@ -277,6 +280,7 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
   useShortcut("go.feeds", () => goHome("feeds"));
   useShortcut("go.podcasts", () => goHome("podcasts"));
   useShortcut("go.calendar", () => goHome("calendar"));
+  useShortcut("go.review", () => session.keepsData && goHome("review"));
   // Feeds: new items are looked for while the library is open.
   useFeedsBackground(session.keepsData);
   useFeedsBackground(session.keepsData, "podcasts");
@@ -361,6 +365,14 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
         icon: CalendarDays,
         shortcut: k("go.calendar"),
         run: () => goHome("calendar"),
+      },
+      {
+        id: "go.review",
+        group: "Go to",
+        label: "Daily review: your highlights as cards",
+        icon: Brain,
+        shortcut: k("go.review"),
+        run: () => goHome("review"),
       },
       {
         id: "go.search",
@@ -636,6 +648,8 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
       <PodcastsView />
     ) : nav.kind === "calendar" ? (
       <CalendarView />
+    ) : nav.kind === "review" ? (
+      <ReviewView />
     ) : nav.kind === "search" ? (
       <SearchView key={nav.query ?? ""} />
     ) : nav.kind === "organize" ? (
