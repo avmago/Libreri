@@ -350,7 +350,13 @@ pub fn html_text(html: &str) -> String {
             continue;
         }
         if bytes[i] == b'&' {
-            if let Some(semi) = rest[..rest.len().min(12)].find(';') {
+            // Entities are short; look a few bytes ahead (on a character
+            // boundary: the text after `&` may be any letters).
+            let mut look = rest.len().min(12);
+            while !rest.is_char_boundary(look) {
+                look -= 1;
+            }
+            if let Some(semi) = rest[..look].find(';') {
                 if let Some(s) = entity(&rest[1..semi]) {
                     out.push_str(&s);
                     i += semi + 1;
@@ -635,5 +641,12 @@ mod tests {
             bytes.extend_from_slice(&u.to_le_bytes());
         }
         assert_eq!(decode_text(&bytes), "héllo");
+    }
+
+    #[test]
+    fn ampersand_before_curly_quotes() {
+        // "&amp; Young’s" put a three-byte letter inside the entity window.
+        let t = html_text("<p>Ernst &amp; Young’s office. E&Y’s partner.</p>");
+        assert_eq!(t, "Ernst & Young’s office. E&Y’s partner.");
     }
 }
