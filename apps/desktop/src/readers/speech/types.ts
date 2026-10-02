@@ -11,6 +11,8 @@ export interface SpeechSource {
   /** The sentence `next` will give, when it is at hand without turning
    * to another chapter (to get it ready to be said). */
   peek?(): SpeechPiece | null;
+  /** What was looked at (to explain why nothing could be read). */
+  describe?(): string;
   /** Marks the sentence being read; with `follow`, turns the page to it. */
   show(piece: SpeechPiece, follow: boolean): void;
   /** Removes the mark. */

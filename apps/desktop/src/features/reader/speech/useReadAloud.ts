@@ -56,7 +56,8 @@ export function useReadAloud(renderer: React.RefObject<Renderer | null>) {
           if (pieces.current.length) toast("Read to the end of the book");
           else
             toast("There is no text to read from here", {
-              description: "Scanned pages can be read aloud after Make searchable (OCR).",
+              description: `Scanned pages can be read aloud after Make searchable (OCR). ${src.describe?.() ?? ""}`,
+              duration: 15_000,
             });
           return;
         }

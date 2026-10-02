@@ -73,6 +73,7 @@ export class WordSpeech implements SpeechSource {
   private queue: WordPiece[] = [];
   private first = true;
   private said = 0;
+  private seen = { from: 0, to: 0, words: 0, sentences: 0 };
   private error: unknown = null;
 
   constructor(
@@ -99,6 +100,10 @@ export class WordSpeech implements SpeechSource {
         return [] as PageWord[];
       });
       let pieces = pagePieces(this.page, words, this.lang);
+      this.seen.from ||= this.page;
+      this.seen.to = this.page;
+      this.seen.words += words.length;
+      this.seen.sentences += pieces.length;
       if (this.first) {
         // Start with the first sentence at or below the top of the view.
         const at = pieces.findIndex((p) => (p.rects[0]?.[1] ?? 0) >= this.top - 0.01);
@@ -110,6 +115,12 @@ export class WordSpeech implements SpeechSource {
     }
     this.said++;
     return this.queue.shift()!;
+  }
+
+  /** What was looked at, when nothing could be read. */
+  describe(): string {
+    const s = this.seen;
+    return `Pages ${s.from}–${s.to} of ${this.pages}: ${s.words} words, ${s.sentences} sentences (from ${Math.round(this.top * 100)}% down the first page).`;
   }
 
   peek(): SpeechPiece | null {

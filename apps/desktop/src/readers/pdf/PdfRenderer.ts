@@ -538,8 +538,31 @@ export class PdfRenderer implements Renderer {
       ];
       words.push(...runWords(it.str, box));
     }
+    if (!words.length) words.push(...this.layerWords(page));
     if (words.length || !this.ocrPages.has(page)) return words;
     return (await this.wordsOf(page)).map((w) => ({ text: w.text, rect: w.rect as SpeechBox }));
+  }
+
+  /** Words of a page's text layer as shown (when the page is drawn). */
+  private layerWords(page: number): PageWord[] {
+    const div = this.viewer.getPageView(page - 1)?.div as HTMLElement | undefined;
+    const spans = div?.querySelectorAll<HTMLElement>(".textLayer span");
+    if (!div || !spans?.length) return [];
+    const r = div.getBoundingClientRect();
+    const out: PageWord[] = [];
+    for (const sp of spans) {
+      const t = sp.textContent ?? "";
+      if (!t.trim() || sp.children.length) continue;
+      const b = sp.getBoundingClientRect();
+      const box: SpeechBox = [
+        (b.left - r.left) / r.width,
+        (b.top - r.top) / r.height,
+        b.width / r.width,
+        b.height / r.height,
+      ];
+      out.push(...runWords(t, box));
+    }
+    return out;
   }
 
   async readAloud(): Promise<SpeechSource | null> {
