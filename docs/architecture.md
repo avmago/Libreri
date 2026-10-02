@@ -122,6 +122,5 @@ Each optional download has its own Download and Delete in Settings, runs on the 
 
 ## Not yet
 
-- Bionic reading on PDF pages: the design (word starts thickened on the page) is waiting for approval.
 - Backups and archives (`.libreri`) do not carry Feeds or podcasts yet (subscriptions export to OPML). They do carry the reading calendar and review.
 - Version 2 brings phones and tablets with sync over the home network, printing and sharing, AI research tools, and more ideas (see the [development phases](development-phases.md)).

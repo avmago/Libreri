@@ -37,7 +37,10 @@ export function isPaged(type: FileType | undefined): boolean {
 
 /** Books whose text Libreri lays out, so bionic reading can change it. */
 export function canBionic(type: FileType | undefined): boolean {
-  return type !== undefined && ["epub", "mobi", "azw3", "fb2", "md", "rtf", "txt"].includes(type);
+  return (
+    type !== undefined &&
+    ["epub", "mobi", "azw3", "fb2", "md", "rtf", "txt", "pdf", "djvu"].includes(type)
+  );
 }
 
 /** Loads the renderer for a format (each is its own chunk). */

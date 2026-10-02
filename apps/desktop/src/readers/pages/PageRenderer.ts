@@ -12,6 +12,8 @@
  * as PDFs (`{type:"pdf-highlight", page, rects}`), so notes, links and
  * exports treat both alike.
  */
+import { clearPageBionic, drawPageBionic } from "../pageBionic";
+import type { BionicOptions } from "../focus";
 import { clipFrom, imageOf } from "../clip";
 import { glyphsOf } from "../math/layout";
 import { bookUrl, commands, unwrap, type Annotation, type WordDto } from "@/lib/ipc";
@@ -63,6 +65,8 @@ interface PageSlot {
 }
 
 export class PageRenderer implements Renderer {
+  private bionic: BionicOptions | null = null;
+  private bionicFrames = new Map<number, number>();
   readonly paged = true;
   private markup: MarkupLayer | null = null;
   private pixelSizes: [number, number][] = [];
@@ -314,6 +318,7 @@ export class PageRenderer implements Renderer {
     for (const s of this.slots) {
       const layer = s.div.isConnected ? s.div.querySelector<HTMLElement>(".lb-page-text") : null;
       if (layer) fitWordLayer(s.div, layer);
+      if (layer) this.scheduleBionic(s.n);
     }
   }
 
@@ -468,9 +473,35 @@ export class PageRenderer implements Renderer {
 
   // ---------- highlights ----------
 
+  /** Bionic reading on DjVu pages with text (see PdfRenderer). */
+  setBionic(options: BionicOptions | null) {
+    this.bionic = options;
+    for (const s of this.slots) {
+      if (options) this.scheduleBionic(s.n);
+      else clearPageBionic(s.div);
+    }
+  }
+
+  private scheduleBionic(page: number) {
+    const s = this.slots[page - 1];
+    if (!this.bionic || !s?.div.isConnected || !s.div.querySelector(".lb-page-text")) return;
+    cancelAnimationFrame(this.bionicFrames.get(page) ?? 0);
+    const id = requestAnimationFrame(() =>
+      this.bionicFrames.set(
+        page,
+        requestAnimationFrame(() => {
+          this.bionicFrames.delete(page);
+          if (this.bionic && s.div.clientWidth > 0) drawPageBionic(s.div, this.bionic.fixation);
+        }),
+      ),
+    );
+    this.bionicFrames.set(page, id);
+  }
+
   private drawPage(page: number) {
     const s = this.slots[page - 1];
     if (!s) return;
+    this.scheduleBionic(page);
     let layer = s.div.querySelector<HTMLElement>(".lb-pdf-hl-layer");
     if (!layer) {
       layer = document.createElement("div");

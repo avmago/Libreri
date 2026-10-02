@@ -120,7 +120,7 @@ export function ReaderSettings() {
       >
         <Row
           label="Bionic reading"
-          help="The start of each word is bold, so the eye jumps from word to word. For EPUB, MOBI, FB2, Markdown and text books, not PDFs or scans."
+          help="The start of each word is bold, so the eye jumps from word to word. On PDFs, DjVu and scanned pages with OCR, word starts are thickened on the page itself."
         >
           <Switch
             label="Bionic reading"

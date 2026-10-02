@@ -7,6 +7,8 @@
  * (`{type:"pdf-highlight", page, rects}`) plus the quoted text, and drawn in
  * a layer on top of each rendered page.
  */
+import { clearPageBionic, drawPageBionic } from "../pageBionic";
+import type { BionicOptions } from "../focus";
 import { clipFrom } from "../clip";
 import { glyphsOf } from "../math/layout";
 import type { PDFDocumentProxy } from "pdfjs-dist";
@@ -69,6 +71,8 @@ export class PdfRenderer implements Renderer {
   private ocrTexts: string[] | null = null;
   /** The sentence read aloud: its page and line boxes. */
   private spoken: { page: number; rects: SpeechBox[] } | null = null;
+  private bionic: BionicOptions | null = null;
+  private bionicFrames = new Map<number, number>();
   /** Finding in OCR text, when PDF.js finds nothing in the PDF's own text. */
   private ocrFind: { query: string; hits: { page: number; index: number }[]; at: number } | null =
     null;
@@ -460,6 +464,7 @@ export class PdfRenderer implements Renderer {
     // A hidden tab has no page size; markup is mounted when it is shown.
     if (div.clientWidth > 0) this.markup?.mount(pageNumber, div);
     this.drawSpoken(pageNumber);
+    this.scheduleBionic(pageNumber);
     let layer = div.querySelector<HTMLElement>(".lb-pdf-hl-layer");
     if (!layer) {
       layer = document.createElement("div");
@@ -499,6 +504,35 @@ export class PdfRenderer implements Renderer {
         layer.append(r);
       }
     }
+  }
+
+  /** Bionic reading: thickened word starts drawn over the page, once the
+   * page's picture and text layer (or OCR words) are in place. */
+  setBionic(options: BionicOptions | null) {
+    this.bionic = options;
+    for (let i = 0; i < this.viewer.pagesCount; i++) {
+      const div = this.viewer.getPageView(i)?.div as HTMLElement | undefined;
+      if (!div) continue;
+      if (options) this.scheduleBionic(i + 1);
+      else clearPageBionic(div);
+    }
+  }
+
+  private scheduleBionic(pageNumber: number) {
+    if (!this.bionic) return;
+    cancelAnimationFrame(this.bionicFrames.get(pageNumber) ?? 0);
+    // Two frames: OCR words are fitted to the page in the next one.
+    const id = requestAnimationFrame(() =>
+      this.bionicFrames.set(
+        pageNumber,
+        requestAnimationFrame(() => {
+          this.bionicFrames.delete(pageNumber);
+          const div = this.viewer.getPageView(pageNumber - 1)?.div as HTMLElement | undefined;
+          if (div && this.bionic && div.clientWidth > 0) drawPageBionic(div, this.bionic.fixation);
+        }),
+      ),
+    );
+    this.bionicFrames.set(pageNumber, id);
   }
 
   /** Draws the sentence being read aloud on its page. */
