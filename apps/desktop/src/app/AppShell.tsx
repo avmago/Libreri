@@ -1,4 +1,5 @@
 import { ResizablePanel } from "@/components/ResizablePanel";
+import { checkOnStart } from "@/features/updates";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toggleReadingFullscreen, useFullscreen, useFullscreenSync } from "@/lib/fullscreen";
 import {
@@ -140,6 +141,12 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
   const libraryView = useLibraryView();
   const { setView, toggleDetails, nav, setNav } = libraryView;
   useLibraryEvents();
+  // A little after starting: is there a newer Libreri? (The main window only.)
+  useEffect(() => {
+    if (getCurrentWindow().label !== "main") return;
+    const t = setTimeout(() => void checkOnStart(), 15_000);
+    return () => clearTimeout(t);
+  }, []);
   useDetailsEvents();
   usePortabilityEvents();
   useSearchEvents();
@@ -664,7 +671,7 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
   return (
     <div className="flex h-full flex-col">
       {/* Tab strip */}
-      <div
+      <header
         className={cn(
           "flex h-10 shrink-0 items-end gap-2 border-b bg-sidebar px-3",
           readingFullscreen && "hidden",
@@ -693,7 +700,7 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
             lockShortcut={shortcutFor("profile.switch")}
           />
         </div>
-      </div>
+      </header>
 
       {!session.keepsData && !readingFullscreen && (
         <div className="flex h-8 shrink-0 items-center justify-center gap-3 border-b bg-muted text-[12.5px]">
@@ -712,28 +719,29 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
       <div className="relative min-h-0 flex-1">
         <ShortcutScope active={activeTab === null && ui.settings === null}>
           <div className={cn("absolute inset-0 flex", activeTab !== null && "hidden")}>
-            <SidebarColumn collapsed={sidebarFolded}>
-              <nav
-                aria-label="Library"
-                className={cn(
-                  "flex min-w-0 flex-1 flex-col gap-2 border-r bg-sidebar pt-2",
-                  sidebarFolded && "items-center",
-                )}
-              >
-                <div className={cn("px-2.5", sidebarFolded && "px-0")}>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Show or hide sidebar"
-                    title="Show or hide sidebar"
-                    onClick={ui.toggleSidebar}
-                  >
-                    <PanelLeft />
-                  </Button>
+            <nav aria-label="Library" className="flex shrink-0">
+              <SidebarColumn collapsed={sidebarFolded}>
+                <div
+                  className={cn(
+                    "flex min-w-0 flex-1 flex-col gap-2 border-r bg-sidebar pt-2",
+                    sidebarFolded && "items-center",
+                  )}
+                >
+                  <div className={cn("px-2.5", sidebarFolded && "px-0")}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Show or hide sidebar"
+                      title="Show or hide sidebar"
+                      onClick={ui.toggleSidebar}
+                    >
+                      <PanelLeft />
+                    </Button>
+                  </div>
+                  <LibrarySidebar library={library} collapsed={sidebarFolded} />
                 </div>
-                <LibrarySidebar library={library} collapsed={sidebarFolded} />
-              </nav>
-            </SidebarColumn>
+              </SidebarColumn>
+            </nav>
             <main className="min-w-0 flex-1">{home}</main>
           </div>
         </ShortcutScope>

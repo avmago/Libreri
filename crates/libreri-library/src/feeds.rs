@@ -76,9 +76,8 @@ impl Library {
     pub fn write_feeds_file(&self, name: &str, json: &str) -> Result<()> {
         let name = state_name(name)?;
         let dir = self.feeds_folder()?;
-        let tmp = dir.join(format!("{name}.tmp"));
-        fs::write(&tmp, json)?;
-        fs::rename(&tmp, dir.join(name))?;
+        // Written aside (a name of its own) and synced, then swapped in.
+        crate::paths::write_atomic(&dir.join(name), json.as_bytes())?;
         Ok(())
     }
 
@@ -121,7 +120,7 @@ impl Library {
         bytes: &[u8],
     ) -> Result<String> {
         let (path, rel) = self.new_feed_file(folders, title, ext)?;
-        fs::write(&path, bytes)?;
+        crate::paths::write_atomic(&path, bytes)?;
         Ok(rel)
     }
 

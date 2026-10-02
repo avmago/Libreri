@@ -1,3 +1,4 @@
+import { UpdatesGroup } from "./Updates";
 import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/input";
 import { useProfilePrefs } from "@/features/profiles";
@@ -67,6 +68,7 @@ export function GeneralSettings({
           />
         </Row>
       </Group>
+      <UpdatesGroup />
     </>
   );
 }

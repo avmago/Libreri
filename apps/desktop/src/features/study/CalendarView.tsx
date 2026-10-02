@@ -155,7 +155,7 @@ export function CalendarView() {
           <DayTimeline day={cursor} today={today} />
         ) : (
           <div
-            role="grid"
+            role="group"
             aria-label="Reading calendar"
             className={cn(
               "grid min-h-[420px] flex-1 grid-cols-7 overflow-hidden rounded-xl border",
@@ -180,8 +180,7 @@ export function CalendarView() {
                 <button
                   key={k}
                   type="button"
-                  role="gridcell"
-                  aria-selected={selected === k}
+                  aria-pressed={selected === k}
                   aria-label={`${fromKey(k).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}${d ? `, read ${duration(d.minutes)}` : ""}${goals.length ? `, ${goals.length} due` : ""}`}
                   onClick={() => setSelected(k)}
                   onDoubleClick={() => {
@@ -197,7 +196,7 @@ export function CalendarView() {
                   <span
                     className={cn(
                       "self-start rounded-full px-1.5 text-[12px] font-semibold",
-                      other ? "text-muted-foreground/50" : "text-muted-foreground",
+                      other ? "font-normal text-muted-foreground" : "text-muted-foreground",
                       k === today && "bg-foreground text-background",
                     )}
                   >

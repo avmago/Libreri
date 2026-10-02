@@ -869,7 +869,7 @@ function ItemRow({
   return (
     <li className="group flex gap-3 border-b px-5 py-3 hover:bg-muted/40">
       <span className="mt-1.5 flex w-2 shrink-0 justify-center">
-        {unread && <span className="size-2 rounded-full bg-primary" aria-label="New" />}
+        {unread && <span role="img" className="size-2 rounded-full bg-primary" aria-label="New" />}
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <button

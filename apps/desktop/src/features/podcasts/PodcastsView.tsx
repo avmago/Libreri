@@ -394,7 +394,7 @@ function Episodes({ data, onShows }: { data: FeedsDto; onShows?: () => void }) {
   const title = feed?.title ?? LISTS.find((l) => l.id === place.id)?.label ?? "";
   const loading = queue ? queued.isLoading : items.isLoading;
   return (
-    <main className="flex min-w-0 flex-1 flex-col">
+    <section aria-label="Episodes" className="flex min-w-0 flex-1 flex-col">
       {onShows && <SideOverButton label="Shows and lists" onOpen={onShows} />}
       {feed ? (
         <ShowHeader feed={feed} />
@@ -483,7 +483,7 @@ function Episodes({ data, onShows }: { data: FeedsDto; onShows?: () => void }) {
         )}
       </div>
       <AddToLibraryDialog space="podcasts" item={adding} onClose={() => setAdding(null)} />
-    </main>
+    </section>
   );
 }
 
@@ -657,7 +657,11 @@ function EpisodeRow({
           )}
         >
           {unread && (
-            <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" aria-label="New" />
+            <span
+              role="img"
+              className="mt-1.5 size-2 shrink-0 rounded-full bg-primary"
+              aria-label="New"
+            />
           )}
           <span>{it.title}</span>
         </button>

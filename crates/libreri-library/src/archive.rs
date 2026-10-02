@@ -456,7 +456,7 @@ impl Library {
             if let Some(dir) = path.parent() {
                 let _ = fs::create_dir_all(dir);
             }
-            let _ = fs::write(&path, bytes);
+            let _ = write_atomic(&path, bytes);
         }
     }
 

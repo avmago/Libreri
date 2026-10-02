@@ -26,7 +26,7 @@ impl Library {
         let dir = self.notes_folder()?.join(dir);
         fs::create_dir_all(&dir)?;
         let file = crate::paths::unique_path(&dir, &format!("{}.{ext}", file_name(title)));
-        fs::write(&file, bytes)?;
+        crate::paths::write_atomic(&file, bytes)?;
         crate::paths::rel_of(self.layout(), &file).ok_or(Error::BookNotFound)
     }
 

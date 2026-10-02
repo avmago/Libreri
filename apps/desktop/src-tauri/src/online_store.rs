@@ -31,7 +31,13 @@ impl OnlineStore {
             fs::create_dir_all(dir)?;
         }
         let tmp = self.path.with_extension("json.tmp");
-        fs::write(&tmp, serde_json::to_vec_pretty(settings)?)?;
+        {
+            use std::io::Write;
+            let mut f = fs::File::create(&tmp)?;
+            f.write_all(&serde_json::to_vec_pretty(settings)?)?;
+            // On disk before it replaces the old file (a crash keeps one whole).
+            f.sync_all()?;
+        }
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;

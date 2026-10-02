@@ -45,12 +45,11 @@ export function TabStrip({ onMoveToWindow }: { onMoveToWindow: (bookId: string) 
         return (
           <div
             key={t.bookId}
-            role="tab"
-            tabIndex={0}
-            aria-selected={isActive}
+            // The tab and its close button side by side (a button may not
+            // sit inside a tab for screen readers).
+            role="presentation"
             title={`${t.title}\nDrag out of the window to open it in its own window`}
             onClick={() => !drag.current?.moved && activate(t.bookId)}
-            onKeyDown={(e) => e.key === "Enter" && activate(t.bookId)}
             onAuxClick={(e) => e.button === 1 && close(t.bookId)}
             onPointerDown={(e) => {
               if (e.button !== 0) return;
@@ -74,15 +73,30 @@ export function TabStrip({ onMoveToWindow }: { onMoveToWindow: (bookId: string) 
             }}
             className={cn(tabClass(isActive), "max-w-56 cursor-default pr-1.5 select-none")}
           >
-            {inSplit ? (
-              <Columns2 className="size-3.5 shrink-0" aria-label="In split view" />
-            ) : (
-              <Icon className="size-3.5 shrink-0" aria-hidden />
-            )}
-            <span className="truncate">{t.title}</span>
+            <span
+              role="tab"
+              tabIndex={0}
+              aria-selected={isActive}
+              aria-description="Delete closes it"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") activate(t.bookId);
+                else if (e.key === "Delete" || e.key === "Backspace") close(t.bookId);
+              }}
+              className="flex min-w-0 items-center gap-1.5 rounded outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {inSplit ? (
+                <Columns2 className="size-3.5 shrink-0" aria-label="In split view" />
+              ) : (
+                <Icon className="size-3.5 shrink-0" aria-hidden />
+              )}
+              <span className="truncate">{t.title}</span>
+            </span>
             <button
               type="button"
-              aria-label={`Close ${t.title}`}
+              // For the pointer; keyboards close a tab with Delete (or Mod+W).
+              tabIndex={-1}
+              aria-hidden
+              title={`Close ${t.title}`}
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();

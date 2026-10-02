@@ -40,5 +40,16 @@
       "entitlements": "./Entitlements.plist",
       "minimumSystemVersion": "13.3"
     }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": [
+        "https://github.com/avmg0/Libreri/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

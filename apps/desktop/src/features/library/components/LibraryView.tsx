@@ -678,6 +678,10 @@ export function LibraryView() {
         </header>
         <ActiveFilters />
         <div
+          // Focusable, so the arrow and page keys scroll it.
+          tabIndex={0}
+          role="region"
+          aria-label="Book list"
           className="flex min-h-0 flex-1 flex-col overflow-y-auto border-t"
           data-drop-folder={view.nav.kind === "folder" ? view.nav.path : undefined}
           onClick={(e) => {

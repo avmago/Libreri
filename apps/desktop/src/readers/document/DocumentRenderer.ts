@@ -129,6 +129,8 @@ export class DocumentRenderer implements Renderer {
 
     this.scroller = document.createElement("div");
     this.scroller.className = "lb-doc-scroller";
+    // Focusable, so the arrow and page keys scroll it (and screen readers reach it).
+    this.scroller.tabIndex = 0;
     this.article = document.createElement("article");
     this.article.className = `lb-doc lb-doc-${this.kind === "rtf" ? "md" : this.kind}`;
     if (this.kind !== "txt") {

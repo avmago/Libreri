@@ -76,6 +76,10 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::reader::get_notebook,
             commands::reader::save_notebook,
             commands::reader::look_up,
+            commands::updates::update_status,
+            commands::updates::set_update_check,
+            commands::updates::update_check,
+            commands::updates::update_install,
             commands::reader::get_session,
             commands::reader::save_session,
             commands::profiles::list_profiles,
@@ -305,6 +309,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::OcrModelDownload,
             events::VoiceDownload,
             events::TimerTrayAction,
+            commands::updates::UpdateProgress,
         ])
 }
 
@@ -314,6 +319,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(builder.invoke_handler())
         .register_asynchronous_uri_scheme_protocol("book", protocol::handle)

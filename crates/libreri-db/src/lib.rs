@@ -56,6 +56,11 @@ impl Database {
         // `libreri-library` guarantees a single writer, and `close()`
         // checkpoints so synced folders only ever see one clean file.
         conn.pragma_update(None, "journal_mode", "WAL")?;
+        // With WAL, NORMAL never corrupts the database when Libreri or the
+        // computer stops suddenly; at worst the last moment's change is
+        // lost after a power cut. FULL waited for the disk on every change
+        // (a scan of 10,000 books took twice as long).
+        conn.pragma_update(None, "synchronous", "NORMAL")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
         conn.pragma_update(None, "busy_timeout", 5000)?;
         let mut db = Self { conn };

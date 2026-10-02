@@ -6,7 +6,7 @@ use std::time::Duration;
 
 /// The User-Agent sent with every request: the app and where to find it,
 /// never anything about the reader.
-pub const USER_AGENT: &str = "Libreri/0.1 (+https://github.com/avmago/Libreri)";
+pub const USER_AGENT: &str = "Libreri/0.1 (+https://github.com/avmg0/Libreri)";
 
 /// Biggest answer read (JSON, XML or a cover image).
 pub const MAX_BODY: u64 = 12 * 1024 * 1024;

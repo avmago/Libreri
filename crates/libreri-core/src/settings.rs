@@ -49,6 +49,8 @@ pub struct AppSettings {
     /// Downloaded natural voices switched off ("kokoro", "piper:<voice>",
     /// ADR 0030); every other downloaded one is on.
     pub voices_off: Vec<String>,
+    /// Do not look for a new version of Libreri when it starts.
+    pub updates_off: bool,
 }
 
 /// Speech recognition: which downloaded model to use and how.

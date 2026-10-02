@@ -9,7 +9,8 @@
   --foreground: #09090b;
   --sidebar: #fafafa;
   --muted: #f4f4f5;
-  --muted-foreground: #71717a;
+  /* 4.8:1 on --muted (WCAG AA for small text); zinc-500 was 4.4:1. */
+  --muted-foreground: #6b6b74;
   --border: #e4e4e7;
   --input: #e4e4e7;
   --ring: #18181b;

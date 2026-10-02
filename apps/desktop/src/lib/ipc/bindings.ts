@@ -169,6 +169,21 @@ export const commands = {
 	 *  summary from Wikipedia, in the book's language.
 	 */
 	lookUp: (query: string, lang: string | null) => typedError<WordLookup, AppError>(__TAURI_INVOKE("look_up", { query, lang })),
+	updateStatus: () => __TAURI_INVOKE<UpdateStatus>("update_status"),
+	setUpdateCheck: (on: boolean) => typedError<null, AppError>(__TAURI_INVOKE("set_update_check", { on })),
+	/**  Looks for a newer version. None when this is the newest. */
+	updateCheck: () => typedError<{
+	version: string,
+	current: string,
+	/**  What is new (the release notes), when given. */
+	notes: string | null,
+	date: string | null,
+} | null, AppError>(__TAURI_INVOKE("update_check")),
+	/**
+	 *  Downloads and installs the new version (its signature is checked), then
+	 *  restarts Libreri. Progress arrives as `UpdateProgress`.
+	 */
+	updateInstall: () => typedError<null, AppError>(__TAURI_INVOKE("update_install")),
 	/**  The reader tabs that were open last time (JSON written by the interface). */
 	getSession: () => typedError<string | null, AppError>(__TAURI_INVOKE("get_session")),
 	saveSession: (session: string) => typedError<null, AppError>(__TAURI_INVOKE("save_session", { session })),
@@ -692,6 +707,7 @@ export const events = {
 	sessionChanged: makeEvent<SessionChanged>("session-changed"),
 	speechModelDownload: makeEvent<SpeechModelDownload>("speech-model-download"),
 	timerTrayAction: makeEvent<TimerTrayAction>("timer-tray-action"),
+	updateProgress: makeEvent<UpdateProgress>("update-progress"),
 	voiceDownload: makeEvent<VoiceDownload>("voice-download"),
 };
 
@@ -2511,6 +2527,28 @@ export type TranscriptDto = {
 export type UnsearchableDto = {
 	id: string,
 	state: TextState,
+};
+
+export type UpdateDto = {
+	version: string,
+	current: string,
+	/**  What is new (the release notes), when given. */
+	notes: string | null,
+	date: string | null,
+};
+
+/**  Download progress of an update (bytes so far, of total when known). */
+export type UpdateProgress = {
+	done: number | null,
+	total: number | null,
+};
+
+export type UpdateStatus = {
+	/**  Look for a new version when Libreri starts. */
+	checkOnStart: boolean,
+	current: string,
+	/**  False in builds made without the updater key (development builds). */
+	available: boolean,
 };
 
 export type VersionDto = {

@@ -45,3 +45,4 @@ pub(crate) async fn blocking<T: Send + 'static>(
         .await
         .map_err(|e| AppError::new(AppErrorKind::Io, e.to_string()))?
 }
+pub mod updates;

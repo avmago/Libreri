@@ -1578,7 +1578,7 @@ pub fn podcast_write_transcript(app: AppHandle, id: String) -> AppResult<String>
         let out = written_path(&file);
         let save = |w: &Written| {
             let json = serde_json::to_string(w).map_err(|e| failed(e.to_string()))?;
-            std::fs::write(&out, json).map_err(|e| failed(e.to_string()))
+            libreri_library::write_atomic(&out, json.as_bytes()).map_err(|e| failed(e.to_string()))
         };
         let mut written = Written {
             complete: false,

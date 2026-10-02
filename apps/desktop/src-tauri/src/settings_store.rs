@@ -32,8 +32,6 @@ impl SettingsStore {
         if let Some(dir) = self.path.parent() {
             fs::create_dir_all(dir)?;
         }
-        let tmp = self.path.with_extension("json.tmp");
-        fs::write(&tmp, serde_json::to_vec_pretty(settings)?)?;
-        fs::rename(tmp, &self.path)
+        libreri_library::write_atomic(&self.path, &serde_json::to_vec_pretty(settings)?)
     }
 }

@@ -36,6 +36,9 @@ mod organize;
 mod own_words;
 mod pages;
 mod paths;
+/// Writes a file aside, syncs it to disk, then swaps it in: a crash or a
+/// full disk never leaves half a file.
+pub use paths::write_atomic;
 mod profiles;
 mod reading;
 mod scan;
@@ -428,6 +431,9 @@ fn read_info(layout: &LibraryLayout) -> Result<LibraryInfo> {
     }
     Ok(serde_json::from_str(&fs::read_to_string(path)?)?)
 }
+
+#[cfg(test)]
+mod scale_tests;
 
 #[cfg(test)]
 pub(crate) mod testutil {
