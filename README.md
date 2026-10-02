@@ -98,7 +98,7 @@ Highlights that link back to the page, a notebook per book, handwriting, paper n
 - Works in **narrow windows** down to a third of the screen; side panels slide over the page.
 - **ADHD reading:** bionic reading, a line highlight and a reading mask.
 - **Find in book**, contents, bookmarks, and your place kept per profile.
-- A **study timer** (focus sessions, countdown, stopwatch) that also shows in the menu bar or taskbar, and a **reading calendar** with goals, due dates, streaks and .ics export.
+- A **study timer** (focus sessions, countdown, stopwatch) that also shows in the menu bar or taskbar, and a **reading calendar** (month, week and day) with goals, due dates, streaks and .ics export.
 - **Compare** two versions or two PDFs side by side.
 
 </td>
@@ -137,7 +137,8 @@ Highlights that link back to the page, a notebook per book, handwriting, paper n
 - Follow **RSS and Atom**: arXiv categories and searches, journals, newsletters and blogs, or import OPML.
 - Feeds in **folders**, items filtered by topic.
 - **Download** papers (PDF) and articles (a clean Markdown copy), and **read them in the full reader** with themes, ADHD reading, read aloud and maths.
-- **Add to library** moves a download in, with the feed's details.
+- **Add to library** moves a download in with the feed's details (authors, abstract, DOI, arXiv id, categories, journal), and looks up the rest online.
+- **Share** a paper: copy its link, a citation (BibTeX) or a Markdown link, or email it.
 
 </td>
 <td valign="top">
@@ -287,11 +288,12 @@ Dependencies only point downward: interface → shell → crates → core. Read 
 
 | Document | About |
 |---|---|
+| [Architecture](docs/architecture.md) | The map as built: stack, layers, crates, the library folder, optional downloads |
 | [Development phases](docs/development-phases.md) | What each phase delivers, version 2, and the decisions behind them |
 | [Code structure](docs/code-structure.md) | Where code goes, feature by feature |
 | [Data portability](docs/data-portability.md) | How books, notes and links are kept, so nothing is locked in |
 | [AI research plan](docs/ai-research-plan.md) | Version 2's research tools and open-science plans |
-| [Phase 9 bugs](docs/phase9-bugs.md) | The Phase 9 bug list and what was fixed |
+| [Phase 9 bugs](docs/phase9-bugs.md) | The Phase 9 bug list, the bugs found on the Mac, and what was fixed |
 | [Decisions](docs/adr) | 31 architecture decision records |
 
 ## Licence

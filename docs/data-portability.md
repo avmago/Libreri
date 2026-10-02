@@ -93,3 +93,10 @@ Requirement (user, 2026-09-27): when the database, metadata and every kind of no
   - Downloads are ordinary PDFs and Markdown files (front matter with title, authors, date, publisher, address, DOI, tags and abstract), in folders named like the feed folders.
   - Adding an item to the library moves the file into `Books/` as a normal book with the feed's details.
   - Backups and archives do not hold `Feeds/` yet; export the subscriptions to OPML to keep them.
+
+## Phase 9 additions (2026-10-02)
+- **Podcasts** (ADR 0028) live beside the feeds: `Feeds/<profile>/.podcasts.json` (shows, folders, episodes, Up next, places, per-show speed) and downloaded episodes as ordinary audio files. Podcast Index keys are per computer (`online-sources.json`), never exported. Like feeds, backups and archives do not hold them yet; shows export to OPML.
+- **Reading calendar** (ADR 0031): `.library-data/profiles/<profile>.study.json` holds sessions (start, minutes, book id, pages), goals and timer settings. Book ids follow books through aliases like every other link. It is in backups and survives a rebuild; Libreri archives do not carry it yet. Goals and sessions can also be exported as an .ics calendar.
+- **RTF books** are read as Markdown made from the file; anchors are character offsets into that text, with the quoted text as fallback, like Markdown.
+- **Per computer, never exported:** OCR models (app data `ocr-models/`), natural voices and ONNX Runtime (app data `voices/`), and which voices are switched off (app settings `voicesOff`). The voice chosen for each language is a profile preference, so it travels with the profile; on a computer without that voice, Libreri picks another for the language.
+- **Feed papers added to the library** become ordinary books: their details (title, authors, abstract, year, DOI, arXiv id, link, tags, categories, journal) are in the database and the sidecar.
