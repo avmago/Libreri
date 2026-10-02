@@ -8,7 +8,7 @@
  * policy blocks them.
  */
 import type { Annotation, HighlightColor } from "@/lib/ipc";
-import type { PageTheme } from "../themes";
+import { softLink, type PageTheme } from "../themes";
 import { DomSpeech } from "../speech/dom";
 import type { SpeechSource } from "../speech/types";
 import type {
@@ -439,7 +439,11 @@ export class EbookRenderer implements Renderer {
       ${
         t
           ? `html, body { color: ${t.fg} !important; background: ${t.bg} !important; }
-      a:link, a:visited { color: ${t.link} !important; }`
+      a[href], a[href] * { color: ${softLink(t)} !important;
+        text-decoration: underline 1px !important;
+        text-decoration-color: ${softLink(t)}66 !important;
+        text-underline-offset: 0.18em; }
+      a[href]:hover, a[href]:hover * { text-decoration-color: ${softLink(t)} !important; }`
           : ""
       }
       body { line-height: ${this.lineHeight}; hyphens: auto; }

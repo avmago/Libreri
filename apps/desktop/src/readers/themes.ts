@@ -105,3 +105,19 @@ export const PAGE_THEMES: PageTheme[] = [
 export function pageTheme(id: PageThemeId): PageTheme {
   return PAGE_THEMES.find((t) => t.id === id) ?? PAGE_THEMES[0]!;
 }
+
+/** A theme's link colour, softened toward its text so links read quietly. */
+export function softLink(t: Pick<PageTheme, "link" | "fg">): string {
+  const rgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const [l, f] = [rgb(t.link), rgb(t.fg)];
+  return (
+    "#" +
+    l
+      .map((v, i) =>
+        Math.round(v * 0.7 + f[i]! * 0.3)
+          .toString(16)
+          .padStart(2, "0"),
+      )
+      .join("")
+  );
+}
