@@ -158,6 +158,9 @@ impl JobQueue {
                         sink: Arc::clone(&sink),
                     };
                     if ctx.check_cancelled().is_err() {
+                        // Dropped before telling anyone, so whatever the job
+                        // held (a "busy" flag, files) is let go first.
+                        drop(task.work);
                         sink.emit(JobEvent::Cancelled { id: task.id });
                     } else {
                         sink.emit(JobEvent::Started {
