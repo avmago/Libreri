@@ -86,6 +86,8 @@ fn source() -> (tempfile::TempDir, Library, BookId) {
     lib.sign_in(&sam.id, Some(PIN)).unwrap();
     lib.save_annotation(highlight(&optics.id, H2, "Sam's note"))
         .unwrap();
+    lib.write_study(r#"{"version":1,"sessions":[{"id":"sam1","minutes":15}]}"#)
+        .unwrap();
     lib.sign_out().unwrap();
     lib.sign_in(&owner(&lib).id, None).unwrap();
     // OCR text read earlier travels with the book.
@@ -101,6 +103,15 @@ fn source() -> (tempfile::TempDir, Library, BookId) {
         }],
     };
     lib.save_ocr(&optics.id, &ocr).unwrap();
+    lib.write_study(&format!(
+        r#"{{"version":1,"sessions":[{{"id":"s1","minutes":25,"bookId":"{}"}}]}}"#,
+        optics.id
+    ))
+    .unwrap();
+    lib.write_review(&format!(
+        r#"{{"version":1,"settings":{{"newPerDay":7}},"sched":{{"{H1}:passage":{{"due":"2026-10-03"}}}}}}"#
+    ))
+    .unwrap();
     (dir, lib, optics.id)
 }
 
@@ -182,6 +193,11 @@ fn everything_comes_back_in_a_new_library_at_another_path() {
     let ocr = b.ocr_text(&optics).unwrap().expect("OCR text came along");
     assert_eq!(ocr.pages[0].text, "Rays of light");
     assert_eq!(b.collections().unwrap()[0].name, "Light");
+    // The reading calendar and the daily review came along.
+    let study = b.read_study().unwrap().expect("the calendar came along");
+    assert!(study.contains(r#""id":"s1""#) && study.contains(&optics.to_string()));
+    let review = b.read_review().unwrap().expect("the review came along");
+    assert!(review.contains(&format!("{H1}:passage")) && review.contains(r#""newPerDay":7"#));
 
     // Sam's notes went to a new Sam, without the PIN (exports never carry it).
     let sam = b
@@ -193,6 +209,7 @@ fn everything_comes_back_in_a_new_library_at_another_path() {
     assert!(!sam.has_pin());
     b.sign_in(&sam.id, None).unwrap();
     assert_eq!(b.annotations(&optics).unwrap()[0].id, H2);
+    assert!(b.read_study().unwrap().unwrap().contains("sam1"));
 
     // Importing again changes nothing.
     b.sign_out().unwrap();
@@ -206,6 +223,15 @@ fn everything_comes_back_in_a_new_library_at_another_path() {
     assert!(again.profiles_created.is_empty());
     assert_eq!(b.annotations(&optics).unwrap().len(), 1);
     assert_eq!(b.books(&BookQuery::default()).unwrap().len(), 2);
+    assert_eq!(
+        b.read_study()
+            .unwrap()
+            .unwrap()
+            .matches(r#""id":"s1""#)
+            .count(),
+        1,
+        "sessions are not doubled"
+    );
 
     // A rebuilt index keeps it all.
     b.rebuild_index(&NoProgress).unwrap();
@@ -236,6 +262,10 @@ fn backups_keep_pins_and_restore_the_owner() {
         1
     );
     assert_eq!(owner(&c).name, owner(&a).name);
+    // Backups carry the reading calendar and daily review too.
+    let o = owner(&c).id;
+    assert!(c.profiles_dir().join(format!("{o}.study.json")).is_file());
+    assert!(c.profiles_dir().join(format!("{o}.review.json")).is_file());
 
     // Notes are kept for the missing book, and reconnect when it comes back.
     let book = c.book(&optics).unwrap();

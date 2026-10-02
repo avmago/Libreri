@@ -19,7 +19,7 @@ Status: accepted (2026-10-02). Built.
 ## How it works
 
 - **Storage:**
-  - Each profile's calendar is one JSON document in `.library-data/profiles/<profile>.study.json`, so it is in backups and survives a rebuild of the index.
+  - Each profile's calendar is one JSON document in `.library-data/profiles/<profile>.study.json`, so it survives a rebuild of the index. Backups and whole-library exports (with notes) carry it, and an import merges it into the profile's own (sessions and goals joined without doubles, book ids moved to where the books landed, settings here kept).
   - The app owns its shape (sessions, goals, focus lengths, options). The library only checks it is a JSON object under 8 MB.
   - Guests keep none.
 - **Sessions** record:
@@ -41,5 +41,4 @@ Status: accepted (2026-10-02). Built.
 
 ## Not yet
 
-- Archives (`.libreri`) do not carry the calendar; backups do.
 - The timer belongs to the main window; book windows do not show it.

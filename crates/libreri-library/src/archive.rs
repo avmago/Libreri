@@ -362,6 +362,17 @@ impl Library {
                     &collections,
                 )?;
             }
+            // The reading calendar and daily review: with notes, for the
+            // whole library (they span every book, so an export of chosen
+            // books leaves them out).
+            if opts.notes && opts.books.is_none() {
+                for suffix in crate::study::DOC_SUFFIXES {
+                    let doc = self.profiles_dir().join(format!("{}{suffix}", p.id));
+                    if doc.is_file() {
+                        zip.add_file(&format!(".library-data/profiles/{}{suffix}", p.id), &doc)?;
+                    }
+                }
+            }
             let (_, files) = self.note_files(&p.id)?;
             let folder = crate::reading::notes_folder_name(&p.name);
             for f in files {
@@ -618,6 +629,21 @@ impl Library {
                 self.merge_personal(target, to, backup, &mut report)?;
             }
             self.merge_collections(archive_profile, target, &mut zip)?;
+            let books: HashMap<String, String> = placed
+                .iter()
+                .filter(|(from, to)| from != to)
+                .map(|(from, to)| (from.to_string(), to.to_string()))
+                .collect();
+            for suffix in crate::study::DOC_SUFFIXES {
+                let name = format!(".library-data/profiles/{archive_profile}{suffix}");
+                if !zip.has(&name) {
+                    continue;
+                }
+                let bytes = zip.read(&name).map_err(archive_err)?;
+                if let Err(e) = self.merge_profile_doc(target, suffix, &bytes, &books) {
+                    report.warnings.push(format!("{name}: {e}"));
+                }
+            }
         }
 
         self.import_note_files(&manifest, &targets, &mut zip, &mut report)?;

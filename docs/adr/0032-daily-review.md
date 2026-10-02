@@ -20,11 +20,11 @@ Status: accepted (2026-10-02). Built.
   - A session shows one card at a time: Show answer (Space), then Again, Hard, Good or Easy (1–4), each with when the card comes back. Cards due again within minutes come back at the end of the session. *Open in the book* jumps to the highlight.
   - A highlight's menu in the reader has **Review card**: Passage, Q&A and Cloze (picking the words to hide), or Leave out.
   - The calendar's day shows *Review: N cards due*.
-- **Storage:** each profile's review is one JSON document in `.library-data/profiles/<profile>.review.json` (settings, books left out, per-highlight choices, the schedule by card, and a log of answers), next to the calendar. It is in backups and survives a rebuild. Guests keep none.
+- **Storage:** each profile's review is one JSON document in `.library-data/profiles/<profile>.review.json` (settings, books left out, per-highlight choices, the schedule by card, and a log of answers), next to the calendar. It survives a rebuild. Guests keep none.
+- **Backups and archives:** backups and whole-library exports (with notes) carry it; exports of chosen books leave it out. On import it is merged into the profile's own (lists joined without doubles, missing cards and schedules added, settings here kept).
 - **Cards are not stored:** they are worked out from the highlights each time, so editing a highlight or its comment changes its cards, and deleting it removes them. Only the schedule and choices are kept, by highlight id.
 - **Anki:** `libreri-export::anki` writes the legacy `collection.anki2` schema that every Anki version imports, with two note types (*Libreri*: Front, Back, Source; *Libreri Cloze*: Text, Back Extra, Source). Note ids are stable, so importing again updates notes instead of adding them twice. Tags: `libreri` and the book.
 
 ## Not yet
 
-- Archives (`.libreri`) do not carry the review; backups do.
 - Schedules do not come back from Anki.

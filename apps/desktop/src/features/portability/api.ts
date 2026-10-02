@@ -8,6 +8,8 @@ import {
   type ForeignImportDto,
   type ProfileMappingDto,
 } from "@/lib/ipc";
+import { useReview } from "@/features/review";
+import { useStudy } from "@/features/study";
 import { usePortability } from "./store";
 
 const libKey = ["lib"] as const;
@@ -36,6 +38,14 @@ export function useImportArchive() {
   return useMutation({
     mutationFn: ({ path, profiles }: { path: string; profiles: ProfileMappingDto[] }) =>
       unwrap(commands.importArchive(path, profiles)),
+    // The archive may have merged into the reading calendar and the review:
+    // read them again, so the next save does not write the old copy back.
+    onSuccess: () => {
+      useStudy.setState({ loaded: false });
+      void useStudy.getState().load();
+      useReview.setState({ loaded: false });
+      void useReview.getState().load();
+    },
   });
 }
 
