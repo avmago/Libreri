@@ -4,8 +4,9 @@
 
 # Libreri
 
-**Your books, papers, comics, audiobooks and podcasts, in one calm place.**<br>
-Read, highlight, write notes by hand or by voice, and listen, all on your own computer.
+**A quiet home for everything you read, and everything you think about it.**<br>
+Books, papers, comics, audiobooks and podcasts in one library on your own computer,<br>
+with highlights, notes, flashcards and a reading calendar that stay yours.
 
 ![macOS](https://img.shields.io/badge/macOS-13.3%2B-18181b?style=flat-square&logo=apple&logoColor=white)
 ![Windows](https://img.shields.io/badge/Windows-10%2B-18181b?style=flat-square&logo=windows&logoColor=white)
@@ -16,7 +17,7 @@ Read, highlight, write notes by hand or by voice, and listen, all on your own co
 ![React](https://img.shields.io/badge/React-TypeScript-3178c6?style=flat-square&logo=react&logoColor=white)
 ![Local-first](https://img.shields.io/badge/data-local--first-16a34a?style=flat-square)
 
-[Features](#features) · [Screenshots](#screenshots) · [Formats](#formats) · [Your library on disk](#your-library-on-disk) · [Run it](#run-it) · [Docs](#documentation)
+[Why](#why-libreri) · [Screenshots](#screenshots) · [Features](#what-you-can-do) · [Privacy](#what-goes-online) · [Formats](#formats) · [On disk](#your-library-on-disk) · [Install](#install) · [Build](#build-from-source) · [Docs](#documentation)
 
 <br>
 
@@ -28,9 +29,11 @@ Read, highlight, write notes by hand or by voice, and listen, all on your own co
 </div>
 
 > [!NOTE]
-> **Status:** Phases 0–9 are built, and Phase 10 (polish and release) is under way. Version 2 will bring iPhone, iPad and Android apps that sync over your home network, printing and sharing, and AI research tools.
+> Libreri is close to its first public beta. Everything below is built and works on macOS, Windows and Linux; installers are not signed yet, so your system will ask once before opening it.
 
 ## Why Libreri
+
+Most reading apps want your books in their cloud and your notes in their format. Libreri takes the opposite view: your library is a folder you own, your notes are plain Markdown next to it, and the app is simply a good place to read, think and remember.
 
 <table>
 <tr>
@@ -38,21 +41,21 @@ Read, highlight, write notes by hand or by voice, and listen, all on your own co
 
 ### Yours, on disk
 
-Your library is an ordinary folder. Books stay as plain files and notes are Markdown. Move it, sync it or back it up like any other folder: every link still works.
+Books stay as the files they are. Notes, highlights and your reading calendar are kept beside them as readable files. Move the folder, sync it, back it up: every link still works.
 
 </td>
 <td width="33%" valign="top">
 
 ### Private by default
 
-Nothing leaves your computer unless you ask. Online lookups, feeds, podcasts and model downloads are opt-in, and the speech, voice, OCR and maths models run on your computer.
+Nothing leaves your computer unless you ask for it. The speech, voice, OCR and maths models run on your machine. There are no accounts, no tracking, no ads.
 
 </td>
 <td width="33%" valign="top">
 
-### Made for study
+### Built for study
 
-Highlights that link back to the page, a notebook per book, handwriting, paper notes from your phone, maths as LaTeX, and full-text search across everything.
+Highlights that link back to the page, a notebook per book, maths everywhere, flashcards from your own highlights, and search across every word you own.
 
 </td>
 </tr>
@@ -62,117 +65,100 @@ Highlights that link back to the page, a notebook per book, handwriting, paper n
 
 <table>
 <tr>
-<td width="50%"><img src="assets/screenshots/reader.png" alt="Reading a paper with maths, a table of contents and the paper page theme"><br><sub><b>Reading</b>: KaTeX maths, contents, page themes, read aloud and notes</sub></td>
-<td width="50%"><img src="assets/screenshots/feeds.png" alt="Feeds: arXiv categories, journals and newsletters in folders, with new items to download"><br><sub><b>Feeds</b>: arXiv, journals and newsletters, downloaded and added to the library</sub></td>
+<td width="50%"><img src="assets/screenshots/reader.png" alt="Reading a paper with maths, a table of contents and the paper page theme"><br><sub><b>Reading</b>: maths, contents, page themes, read aloud and notes</sub></td>
+<td width="50%"><img src="assets/screenshots/feeds.png" alt="Feeds: arXiv categories, journals and newsletters in folders, with new items to download"><br><sub><b>Feeds</b>: arXiv, journals and newsletters, straight into the library</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="assets/screenshots/podcasts.png" alt="Podcasts: shows with artwork, episodes, Up next and the player at the bottom"><br><sub><b>Podcasts</b>: follow shows, keep your place, listen while you read</sub></td>
+<td width="50%"><img src="assets/screenshots/podcasts.png" alt="Podcasts: shows with artwork, episodes, Up next and the player at the bottom"><br><sub><b>Podcasts</b>: follow shows and listen while you read</sub></td>
 <td width="50%"><img src="assets/screenshots/library-dark.png" alt="The library in the dark theme"><br><sub><b>Dark theme</b>: the whole app, plus nine page themes for books</sub></td>
 </tr>
 </table>
 
-## Features
+## What you can do
 
-<table>
-<tr>
-<td width="50%" valign="top">
+### Keep a library
 
-#### Library
+- **Bring books in** by dragging files or whole folders. Duplicates are recognised by their content, and books you move on disk are found again.
+- **Organise** with real folders, tags, categories, ratings, reading status and favourites, and save any search as a **smart collection**.
+- **Series** get their own view: every series with its covers, how far you are, and the next book to read.
+- **Grid, list and shelf** views stay smooth with 10,000 books and more.
+- **Fill in details** by ISBN, DOI, arXiv id or title from eight free sources, with covers. Scan a barcode with your camera or phone.
+- **Search inside every book**, scans included: Tesseract reads scanned pages, or download PaddleOCR-VL to read tables and formulas too.
+- **Look after it:** a health check, version history for edited PDFs, and automatic backups.
 
-- **Drag in** files and whole folders. Duplicates are caught by content, and moved files are found again.
-- **Real folders**, plus tags, categories, series, ratings, reading status and favourites.
-- **Grid, list and shelf** views, filters, **smart collections** and bulk edit.
-- **Online details** by ISBN, DOI, arXiv id or title from eight sources, with covers and **barcode scanning**.
-- **Full-text search** inside every book, with **OCR** for scans: Tesseract, or an optional PaddleOCR-VL download that also reads tables and formulas.
-- Health check, PDF version history and automatic **backups**.
+### Read comfortably
 
-</td>
-<td width="50%" valign="top">
+- **Tabs**, split view and separate windows, all remembered when you come back.
+- **Nine page themes**, dark PDFs, brightness, contrast, text size and spacing; full screen, focus mode, two-page spreads, manga and webtoon modes.
+- **Zoom** with buttons, Ctrl+scroll or a pinch, and **print** PDFs.
+- **Look up** a word or a name you select: its meanings from Wiktionary, or a short Wikipedia summary, in the book's language.
+- **ADHD reading:** bionic reading (on ebooks *and* on PDF and scanned pages), a line highlight under the pointer, and a reading mask.
+- Works in **narrow windows**, down to a third of the screen.
 
-#### Reading
+### Take notes that last
 
-- **Tabs**, split view and separate windows, remembered between launches.
-- **9 page themes**, dark PDFs, brightness, contrast, text size and spacing.
-- **Full screen**, focus mode, two-page spreads, manga and webtoon modes.
-- **Zoom** with buttons, Ctrl+scroll or a two-finger pinch, and **print** PDFs (all pages, the page shown or a range).
-- Works in **narrow windows** down to a third of the screen; side panels slide over the page.
-- **ADHD reading:** bionic reading, a line highlight and a reading mask.
-- **Find in book**, contents, bookmarks, and your place kept per profile.
-- **Daily review:** your highlights come back as cards (passage, question and answer, cloze) on a spaced schedule (FSRS), and export to Anki.
-- A **study timer** (focus sessions, countdown, stopwatch) that also shows in the menu bar or taskbar, and a **reading calendar** (month, week and day) with goals, due dates, streaks and .ics export.
-- **Compare** two versions or two PDFs side by side.
-
-</td>
-</tr>
-<tr>
-<td valign="top">
-
-#### Notes
-
-- **Highlights** in four colours, **comments**, and a **Markdown notebook** per book.
-- **Markup** on PDF and comic pages: pen, shapes, stamps, signatures and a measure tool.
+- **Highlights** in four colours and **comments**, which can hold **maths** (`$x^2$`, `$$\int f$$`) drawn as you type.
+- A **Markdown notebook** for every book, plus notes that belong to no book.
+- **Markup** on PDF and comic pages: pen, shapes, stamps, signatures and a measuring tool.
 - **Handwriting canvases** beside the book, with *clip from page* and *ink to text*.
-- **Paper notes** from the camera or your phone, cleaned and made searchable.
+- **Paper notes** photographed with your camera or phone, cleaned up and made searchable.
 - **Voice notes** and **dictation**, written down on your computer.
-- **Maths as LaTeX**, from text or from a picture of the page.
-- A **Notes hub** across books, exported to Markdown and Obsidian.
+- **Maths as LaTeX**, copied from the text or read from a picture of the page.
+- A **Notes hub** that gathers everything across books, and exports to Markdown and Obsidian.
 
-</td>
-<td valign="top">
+### Remember what you read
 
-#### Listening
+- **Daily review** turns your highlights into flashcards on a spaced schedule (FSRS, the method modern Anki uses): passages to complete, questions from your comments, and cloze cards that hide chosen words or whole formulas. Export them to **Anki** at any time.
+- A **reading calendar** with month, week and day views, reading goals ("finish by…"), due dates, streaks and the pages a day to stay on track. Export it to any calendar app.
+- A **study timer** with focus sessions, a countdown and a stopwatch. It counts as reading the open book, offers to note what you took away at each break, and shows in the macOS menu bar or the Windows and Linux tray.
 
-- **Read aloud** with sentence highlighting, page turning and maths read as words, in the system's voices or **natural voices** made on your computer: **Kokoro** (54 voices in nine languages) and **Piper** (40+ languages, only voices free to use).
-- **Audiobooks** with chapters, sleep timer, bookmarks and media keys.
-- **Link an audiobook to its ebook:** the book follows the audio.
-- **Podcasts:** search Apple Podcasts (or Podcast Index with your own key), follow shows, stream or download episodes, **Up next**, per-show speed, and a player that keeps going while you read.
-- One **floating player** for read aloud, audiobooks and podcasts, which folds into a small box you can move to either side.
+### Listen
 
-</td>
-</tr>
-<tr>
-<td valign="top">
+- **Read aloud** with the sentence highlighted and the page turning by itself, maths read as words, in your system's voices or **natural voices made on your computer**: Kokoro (54 voices in nine languages) and Piper (40+ languages, only voices free to use).
+- **Audiobooks** with chapters, sleep timer and bookmarks, and an audiobook **linked to its ebook** so the page follows the voice.
+- **Podcasts:** find shows (Apple Podcasts, or Podcast Index with your own key), follow them, stream or download, with Up next and a speed for each show. Transcripts and chapters follow along; shows without a transcript can be **written down on your computer**. **Note this moment** saves what was said into the notebook of the book you are reading, linked to the page.
+- One **floating player** for all of it, which folds into a small box.
 
-#### Feeds
+### Follow new research
 
-- Follow **RSS and Atom**: arXiv categories and searches, journals, newsletters and blogs, or import OPML.
-- Feeds in **folders**, items filtered by topic.
-- **Download** papers (PDF) and articles (a clean Markdown copy), and **read them in the full reader** with themes, ADHD reading, read aloud and maths.
-- **Add to library** moves a download in with the feed's details (authors, abstract, DOI, arXiv id, categories, journal), and looks up the rest online.
-- **Share** a paper: copy its link, a citation (BibTeX) or a Markdown link, or email it.
+- **Feeds** for arXiv categories and searches, journals, newsletters and blogs (RSS, Atom, OPML), in folders.
+- **Download** papers and articles (as clean Markdown), read them in the full reader, and **add them to your library** with authors, abstract, DOI, arXiv id and journal already filled in.
+- **Share** a paper as a link, a BibTeX citation or a Markdown link.
 
-</td>
-<td valign="top">
-
-#### PDF editing
+### Edit PDFs safely
 
 - **Pages:** reorder, rotate, delete, insert, crop, extract, split and merge.
-- **Redaction** that really removes the text, **text corrections** and **forms**.
-- Compression, and OCR text written into the PDF.
-- Every save keeps the previous **version**, with your notes moved to the right pages.
+- **Redaction** that truly removes the text, **text corrections** and **forms**.
+- Make files smaller, and write OCR text into scans.
+- Every save keeps the **previous version**, and your notes move to the right pages.
 
-</td>
-</tr>
-<tr>
-<td valign="top">
+### Share a computer
 
-#### People and privacy
+- **Profiles** with 6-digit PINs, auto-lock, **Kids** profiles limited to chosen folders, and **guests** who leave nothing behind.
+- Everyone keeps their own notes, places, collections, feeds, podcasts, flashcards and calendar.
 
-- **Profiles** with 6-digit PINs, auto-lock, Kids profiles and guests who leave nothing behind.
-- Everyone keeps their own notes, places, collections, feeds and podcasts.
+### Work your way
 
-</td>
-<td valign="top">
-
-#### Keyboard and portability
-
-- **100+ rebindable shortcuts**, a command palette (Ctrl+K) and optional Vim keys.
-- **Spell check** in 45+ languages, and word completion that learns from your books.
+- **100+ keyboard shortcuts**, all changeable, a command palette (Ctrl+K), and optional Vim keys.
+- **Accessible:** screen-reader labels, strong contrast and visible keyboard focus throughout.
+- **Spell check** in 45+ languages, with word completion that learns from your books.
 - **Export** to Libreri archives, CSV, Excel, JSON, BibTeX, RIS, CSL-JSON, Obsidian and Calibre; **import** from Calibre, Zotero, Mendeley, Goodreads and StoryGraph.
+- **Backups and archives** carry everything: books, notes, flashcards, the calendar, feeds and podcasts.
+- **Updates itself** when a new version is out, after asking you.
 
-</td>
-</tr>
-</table>
+## What goes online
+
+Only what you ask for, and only the minimum:
+
+| When you… | Libreri contacts | It sends |
+|---|---|---|
+| Fill in a book's details | Open Library, Google Books, Crossref, arXiv, OpenAlex, Semantic Scholar (ISBNdb and ComicVine with your own key) | The ISBN, DOI, arXiv id or title |
+| Look up a word | Wiktionary, Wikipedia | The selected words and the book's language |
+| Follow feeds or podcasts | The feed's own site; Apple Podcasts or Podcast Index to search | The address, or your search words |
+| Download a voice, model or dictionary | Its official download site | Nothing about you |
+| Check for updates | GitHub (Libreri's releases) | Nothing about you |
+
+Your books, notes, highlights and reading habits never leave your computer.
 
 ## Formats
 
@@ -180,20 +166,20 @@ Highlights that link back to the page, a notebook per book, handwriting, paper n
 |---|---|
 | **Documents** | PDF (with forms), DjVu |
 | **Ebooks** | EPUB, MOBI, AZW3, FB2 (DRM-free) |
-| **Text** | Markdown (KaTeX maths, Mermaid, code), RTF, plain text |
+| **Text** | Markdown (maths, Mermaid diagrams, code), RTF, plain text |
 | **Comics** | CBZ, CBR, CB7, CBT, CBA |
 | **Audio** | MP3, M4B, M4A, AAC, OGG, Opus, FLAC, and podcasts |
 
-Some formats use **helper programs** that Libreri installs for you with one click (Homebrew, winget, apt, dnf, pacman or zypper):
+A few formats use small **helper programs**, which Libreri installs with one click (Homebrew, winget, apt, dnf, pacman or zypper):
 
 | Helper | Used for |
 |---|---|
 | DjVuLibre | DjVu books |
-| Tesseract | OCR, searchable scans, ink to text on Linux |
+| Tesseract | OCR and searchable scans |
 | unar | CBR, CB7 and CBA comics |
-| eSpeak NG | Read aloud where the system has no voices; turns words into sounds for natural voices |
+| eSpeak NG | Read aloud where the system has no voices, and natural voices |
 
-Optional **downloads**, all run on your computer, each with its own Delete button: natural voices for read aloud (Kokoro and Piper, with ONNX Runtime), speech models (whisper.cpp) for voice notes and dictation, the PaddleOCR-VL model, the pix2tex maths model, spell-check dictionaries, OCR languages and extra canvas fonts.
+Optional **downloads**, each with its own Delete button: natural voices (Kokoro and Piper), speech models (whisper.cpp), the PaddleOCR-VL model, the pix2tex maths model, dictionaries, OCR languages and canvas fonts.
 
 ## Your library on disk
 
@@ -202,12 +188,21 @@ My Library/
 ├── Books/              your books and audiobooks, in your own folders
 ├── Notes/<profile>/    notebooks, canvases, voice notes, paper notes, web pages
 ├── Feeds/<profile>/    papers, articles and podcast episodes you downloaded
-└── .library-data/      Libreri's catalogue, covers, sidecars and versions
+└── .library-data/      the catalogue, covers, versions, and a JSON copy of every
+                        book's details, your highlights, flashcards and calendar
 ```
 
-Only relative paths are stored, so a library can be moved, synced or opened on another computer. The catalogue can be rebuilt from the files and the JSON sidecars at any time. See [data portability](docs/data-portability.md).
+Only relative paths are stored, so a library can be moved, synced or opened on another computer. The catalogue can be rebuilt from the files at any time, and nothing is ever kept only inside the database. Every file is written aside and swapped in, so a sudden quit never leaves half a file. More in [data portability](docs/data-portability.md).
 
-## Run it
+## Install
+
+Download the installer for your system from [Releases](https://github.com/avmg0/Libreri/releases): a `.dmg` for macOS (Apple Silicon or Intel), an `.msi` or `.exe` for Windows, and an AppImage, `.deb` or `.rpm` for Linux.
+
+Until the builds are signed, macOS asks before opening Libreri the first time: right-click the app, choose **Open**, then **Open** again. Windows may show SmartScreen: choose **More info**, then **Run anyway**.
+
+After that, Libreri tells you when a new version is ready (Settings › General › Updates).
+
+## Build from source
 
 **You need**
 
@@ -218,18 +213,15 @@ Only relative paths are stored, so a library can be moved, synced or opened on a
   - **Linux:** `libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev`.
   - **Windows:** Microsoft C++ Build Tools and WebView2 (included with Windows 11).
 
-**Start**
+**Run**
 
 ```sh
 pnpm install
-pnpm dev          # the app with hot reload
-```
-
-The development build is much slower than the finished app. To judge speed, build it:
-
-```sh
+pnpm dev          # the app, with hot reload
 pnpm build        # installers in target/release/bundle/
 ```
+
+The development build is much slower than the finished app; build it to judge speed.
 
 <details>
 <summary><b>Other commands</b></summary>
@@ -243,7 +235,7 @@ pnpm build        # installers in target/release/bundle/
 | `pnpm gen:ipc` | Regenerates the TypeScript types from the Rust commands |
 | `pnpm icons` | Regenerates the app icons from `assets/app-icon.png` |
 | `cargo run -p libreri-library --release --example seed -- <books> <library>` | Makes a library from a folder of books, for trying things out |
-| `cargo run -p libreri-feeds --example live [addresses…]` | Reads feeds on the internet, to check the feed reader |
+| `cargo test -p libreri-library --release scale -- --ignored --nocapture` | Times everyday work with 10,000 books |
 
 </details>
 
@@ -253,45 +245,43 @@ pnpm build        # installers in target/release/bundle/
 
 ```
 apps/desktop/src          React interface, one folder per feature (features/*); readers/ holds the book renderers
-apps/desktop/src-tauri    Thin Tauri shell: commands, events, the book:// protocol
+apps/desktop/src-tauri    Thin Tauri shell: commands, events, the book:// protocol, the updater
 
-crates/libreri-core       Domain types, ids and the library layout (no app dependencies)
+crates/libreri-core       Domain types, ids and the library layout
 crates/libreri-db         SQLite and migrations
-crates/libreri-library    Library folders: import, scan, watcher, sidecars, profiles, notes, versions, feeds
-crates/libreri-jobs       Background job queue with progress and cancel
+crates/libreri-library    The library folder: import, scan, sidecars, profiles, notes, versions, feeds, study and review
+crates/libreri-jobs       Background jobs with progress and cancel
 crates/libreri-profiles   6-digit PINs (Argon2id), lockout and recovery codes
-crates/libreri-formats    Details, covers and text from every format (RTF to Markdown too); OCR
-crates/libreri-thumbs     Covers and grid thumbnails
-crates/libreri-metadata   Online details from eight sources
-crates/libreri-scan       Barcodes, the phone page, and paper-note clean-up
-crates/libreri-export     Exports, citations and Libreri archives
+crates/libreri-formats    Details, covers and text from every format; OCR words
+crates/libreri-thumbs     Covers and thumbnails
+crates/libreri-metadata   Online details from eight sources; word look-up
+crates/libreri-scan       Barcodes, the phone page, paper-note clean-up
+crates/libreri-export     Exports, citations, Libreri archives, Anki decks
 crates/libreri-helpers    Finding and installing helper programs; downloads
-crates/libreri-search     Full-text search index (SQLite FTS5)
+crates/libreri-search     Full-text search (SQLite FTS5)
 crates/libreri-pdf-edit   Page editing, redaction, markup export, forms
-crates/libreri-speech     Voice notes, dictation and audiobook sync (whisper.cpp)
+crates/libreri-speech     Voice notes, dictation, audiobook sync, transcripts (whisper.cpp)
 crates/libreri-spell      Spell check and word suggestions
 crates/libreri-maths      Maths from pictures (pix2tex with candle)
-crates/libreri-links      Links: video details, offline copies, the local player
-crates/libreri-feeds      RSS, Atom and OPML; arXiv; podcasts (Apple and Podcast Index search)
-crates/libreri-ocr        Optional OCR models (PaddleOCR-VL), downloaded and run on this computer
-crates/libreri-voices     Natural voices for read aloud (Kokoro, Piper) with ONNX Runtime
-
-docs/                     Architecture, code structure and data portability
+crates/libreri-links      Links to pages and videos, offline copies, the local player
+crates/libreri-feeds      RSS, Atom, OPML, arXiv and podcasts
+crates/libreri-ocr        Optional OCR models (PaddleOCR-VL)
+crates/libreri-voices     Natural voices for read aloud (Kokoro, Piper)
 ```
 
-Dependencies only point downward: interface → shell → crates → core. Read [code structure](docs/code-structure.md) before adding code, and [data portability](docs/data-portability.md) before touching anything that links notes to books.
+Dependencies only point downward: interface → shell → crates → core.
 
 </details>
 
-**Built with** Tauri 2, Rust, SQLite, React, TypeScript, Tailwind and shadcn/ui. Books are drawn with PDF.js, foliate-js, KaTeX and Mermaid; models run with candle, whisper.cpp and ONNX Runtime.
+**Built with** Tauri 2, Rust, SQLite, React, TypeScript, Tailwind and shadcn/ui. Books are drawn with PDF.js, foliate-js, KaTeX and Mermaid; models run with candle, whisper.cpp and ONNX Runtime; flashcards are scheduled with ts-fsrs.
 
 ## Documentation
 
-| Document | About |
+| Document | What it covers |
 |---|---|
-| [Architecture](docs/architecture.md) | The map as built: stack, layers, crates, the library folder, optional downloads |
-| [Code structure](docs/code-structure.md) | Where code goes, feature by feature |
-| [Data portability](docs/data-portability.md) | How books, notes and links are kept, so nothing is locked in |
+| [Architecture](docs/architecture.md) | How Libreri is built: the stack, the layers, every crate, the library folder and the optional downloads |
+| [Code structure](docs/code-structure.md) | Where each feature lives, from the interface down to the crates, and the rules for adding code |
+| [Data portability](docs/data-portability.md) | How books, notes, highlights and links are kept, moved, backed up and restored, so nothing is ever locked in |
 
 ## Licence
 

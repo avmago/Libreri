@@ -122,4 +122,4 @@ Each optional download has its own Download and Delete in Settings, runs on the 
 
 ## Not yet
 
-- Version 2 brings phones and tablets with sync over the home network, printing and sharing, AI research tools, and more ideas (see the [development phases](development-phases.md)).
+- Version 2 brings phones and tablets with sync over the home network, printing and sharing, AI research tools, and more ideas.
