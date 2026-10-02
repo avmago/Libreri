@@ -72,6 +72,8 @@ export class WordSpeech implements SpeechSource {
   private page: number;
   private queue: WordPiece[] = [];
   private first = true;
+  private said = 0;
+  private error: unknown = null;
 
   constructor(
     start: number,
@@ -87,8 +89,15 @@ export class WordSpeech implements SpeechSource {
 
   async next(): Promise<SpeechPiece | null> {
     while (!this.queue.length) {
-      if (this.page > this.pages) return null;
-      const words = await this.wordsOf(this.page).catch(() => [] as PageWord[]);
+      if (this.page > this.pages) {
+        // Nothing read because every page failed: say why.
+        if (!this.said && this.error) throw this.error;
+        return null;
+      }
+      const words = await this.wordsOf(this.page).catch((e: unknown) => {
+        this.error = e;
+        return [] as PageWord[];
+      });
       let pieces = pagePieces(this.page, words, this.lang);
       if (this.first) {
         // Start with the first sentence at or below the top of the view.
@@ -99,6 +108,7 @@ export class WordSpeech implements SpeechSource {
       this.queue = pieces;
       this.page++;
     }
+    this.said++;
     return this.queue.shift()!;
   }
 

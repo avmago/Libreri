@@ -35,7 +35,19 @@ export function useReadAloud(renderer: React.RefObject<Renderer | null>) {
     while (id === run.current) {
       index.current++;
       if (index.current >= pieces.current.length) {
-        const p = await src.next();
+        let p: SpeechPiece | null;
+        try {
+          p = await src.next();
+        } catch (err) {
+          if (id !== run.current) return;
+          src.clear();
+          setStatus("off");
+          setSentence("");
+          toast.error("The text could not be read from this book", {
+            description: err instanceof Error ? err.message : String(err),
+          });
+          return;
+        }
         if (id !== run.current) return;
         if (!p) {
           src.clear();
