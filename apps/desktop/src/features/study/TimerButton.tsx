@@ -17,13 +17,15 @@ export function TimerButton() {
   // Where the panel goes: under the button, kept on screen. It is drawn on
   // top of everything (a portal), so the page never covers it.
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  // Open for this button only: every open book has its own clock (the
+  // hidden tabs' too), and a shared "open" let them close each other's.
+  const [open, setOpen] = useState(false);
   const toggle = (el: HTMLElement) => {
-    if (open) return t.setOpen(false);
+    if (open) return setOpen(false);
     const r = el.getBoundingClientRect();
     setPos({ top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) });
-    t.setOpen(true);
+    setOpen(true);
   };
-  const { open, setOpen } = t;
 
   useEffect(() => {
     if (!open) return;

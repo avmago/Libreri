@@ -46,9 +46,6 @@ interface TimerState {
   began: number | null;
   context: Context | null;
   card: BreakCard | null;
-  /** The popover in the reader's toolbar. */
-  open: boolean;
-  setOpen: (o: boolean) => void;
   setMode: (m: TimerMode) => void;
   start: () => void;
   pause: () => void;
@@ -182,8 +179,6 @@ export const useTimer = create<TimerState>((set, get) => {
     mode: "focus",
     ...idle,
     card: null,
-    open: false,
-    setOpen: (open) => set({ open }),
     setMode: (mode) => {
       if (get().status !== "idle") get().stop();
       set({ mode });
