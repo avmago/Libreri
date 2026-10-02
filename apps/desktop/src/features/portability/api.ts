@@ -35,12 +35,15 @@ export function useArchiveSummary(path: string | null) {
 }
 
 export function useImportArchive() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ path, profiles }: { path: string; profiles: ProfileMappingDto[] }) =>
       unwrap(commands.importArchive(path, profiles)),
     // The archive may have merged into the reading calendar and the review:
     // read them again, so the next save does not write the old copy back.
     onSuccess: () => {
+      // Feeds, podcasts and everything else may have changed.
+      void qc.invalidateQueries();
       useStudy.setState({ loaded: false });
       void useStudy.getState().load();
       useReview.setState({ loaded: false });

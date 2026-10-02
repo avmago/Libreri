@@ -46,6 +46,7 @@ const ALLOWED: &[&str] = &[
     ".library-data/versions/",
     ".library-data/audio-links/",
     "Notes/",
+    "Feeds/",
     "Books/",
     "database/",
 ];
@@ -434,6 +435,15 @@ impl ArchiveReader {
     pub fn has(&self, name: &str) -> bool {
         let name = self.entry(name);
         is_safe_name(&name) && self.zip.index_for_name(&name).is_some()
+    }
+
+    /// An entry's size when unpacked.
+    pub fn size(&mut self, name: &str) -> Result<u64, ArchiveError> {
+        let name = &self.entry(name);
+        self.zip
+            .by_name(name)
+            .map(|e| e.size())
+            .map_err(|_| ArchiveError::Damaged(format!("{name} is missing")))
     }
 
     /// Reads a small entry (JSON, Markdown) into memory, at most `MAX_JSON`.

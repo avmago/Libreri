@@ -495,3 +495,64 @@ fn a_title_alone_does_not_match_another_book() {
     assert_eq!(same_work(&[], Some(300), &two), None, "which one?");
     assert_eq!(same_work(&smith, Some(300), &two), None);
 }
+
+#[test]
+fn feeds_and_podcasts_travel_with_their_downloads() {
+    let (dir, a, _) = source();
+    let rel = a
+        .save_feed_file(&["arXiv".into()], "A paper", "pdf", b"%PDF-1.4 paper")
+        .unwrap();
+    let mut st = libreri_feeds::State::default();
+    let feed = st
+        .add_feed("https://example.org/rss", "Example", None, None)
+        .unwrap();
+    st.items.push(libreri_feeds::FeedItem {
+        id: format!("{feed}-k1"),
+        feed: feed.clone(),
+        source: "Example".into(),
+        entry: libreri_feeds::FeedEntry {
+            key: "k1".into(),
+            title: "A paper".into(),
+            ..Default::default()
+        },
+        found_at: "2026-10-01T00:00:00Z".into(),
+        read: true,
+        file: Some(rel.clone()),
+        book: None,
+        download_error: None,
+        position: None,
+        played: false,
+    });
+    a.write_feeds(&st.to_json()).unwrap();
+    a.write_feeds_file(".podcasts.json", &libreri_feeds::State::default().to_json())
+        .unwrap();
+
+    // With book files: the download comes too.
+    let archive = dir.path().join("feeds.libreri");
+    export(&a, &archive, true, true);
+    let b = new_library(dir.path(), "FB");
+    b.import_archive(&archive, &ArchiveImport::default(), &NoProgress)
+        .unwrap();
+    let got = libreri_feeds::State::from_json(&b.read_feeds().unwrap().unwrap()).unwrap();
+    assert_eq!(got.feeds.len(), 1);
+    assert_eq!(got.items.len(), 1);
+    let file = got.items[0].file.clone().expect("the download came along");
+    assert!(file.starts_with("Feeds/"), "{file}");
+    assert!(b.layout().resolve_relative(&file).unwrap().is_file());
+    assert!(b.read_feeds_file(".podcasts.json").unwrap().is_some());
+    // Again: nothing doubles.
+    b.import_archive(&archive, &ArchiveImport::default(), &NoProgress)
+        .unwrap();
+    let again = libreri_feeds::State::from_json(&b.read_feeds().unwrap().unwrap()).unwrap();
+    assert_eq!((again.feeds.len(), again.items.len()), (1, 1));
+
+    // Without book files: subscriptions only, the item no longer claims a file.
+    let light = dir.path().join("light.libreri");
+    export(&a, &light, false, true);
+    let c = new_library(dir.path(), "FC");
+    c.import_archive(&light, &ArchiveImport::default(), &NoProgress)
+        .unwrap();
+    let got = libreri_feeds::State::from_json(&c.read_feeds().unwrap().unwrap()).unwrap();
+    assert_eq!(got.items.len(), 1);
+    assert_eq!(got.items[0].file, None);
+}

@@ -572,8 +572,174 @@ impl State {
     }
 }
 
+impl State {
+    /// Brings in another library's subscriptions (from an archive): folders
+    /// by name, feeds by address, items by feed and key. Nothing here is
+    /// lost; what is new gets ids of this state. `file` maps a download's
+    /// path in the other library to its path here (None: not brought along).
+    /// Returns how many feeds were added.
+    pub fn absorb(&mut self, other: State, file: impl Fn(&str) -> Option<String>) -> u32 {
+        let mut folders = std::collections::HashMap::new();
+        for f in &other.folders {
+            let path = other.folder_path(Some(&f.id));
+            let names: Vec<&str> = path.iter().map(String::as_str).collect();
+            if let Ok(Some(id)) = self.add_folder_path(&names, None) {
+                if f.auto_download {
+                    if let Some(mine) = self.folders.iter_mut().find(|x| x.id == id) {
+                        mine.auto_download = true;
+                    }
+                }
+                folders.insert(f.id.clone(), id);
+            }
+        }
+        let mut feeds = std::collections::HashMap::new();
+        let mut added = 0;
+        for f in other.feeds {
+            if let Some(mine) = self.feeds.iter().find(|x| x.url == f.url) {
+                feeds.insert(f.id.clone(), mine.id.clone());
+                continue;
+            }
+            let id = self.new_id('s');
+            feeds.insert(f.id.clone(), id.clone());
+            self.feeds.push(Feed {
+                id,
+                folder: f.folder.as_ref().and_then(|x| folders.get(x).cloned()),
+                ..f
+            });
+            added += 1;
+        }
+        let mut items = std::collections::HashMap::new();
+        for it in other.items {
+            let Some(feed) = feeds.get(&it.feed).cloned() else {
+                continue;
+            };
+            let id = item_id(&feed, &it.entry.key);
+            items.insert(it.id.clone(), id.clone());
+            let here = it.file.as_deref().and_then(&file);
+            if let Some(mine) = self.items.iter_mut().find(|x| x.id == id) {
+                mine.read |= it.read;
+                mine.played |= it.played;
+                if mine.position.unwrap_or(0.0) < it.position.unwrap_or(0.0) {
+                    mine.position = it.position;
+                }
+                if mine.file.is_none() {
+                    mine.file = here;
+                }
+                if mine.book.is_none() {
+                    mine.book = it.book;
+                }
+                continue;
+            }
+            if self.gone.contains_key(&gone_key(&feed, &it.entry.key)) {
+                continue;
+            }
+            self.items.push(FeedItem {
+                id,
+                feed,
+                file: here,
+                ..it
+            });
+        }
+        for (k, when) in other.gone {
+            let Some((feed, key)) = k.split_once(' ') else {
+                continue;
+            };
+            if let Some(feed) = feeds.get(feed) {
+                self.gone.entry(gone_key(feed, key)).or_insert(when);
+            }
+        }
+        for q in other.queue {
+            if let Some(id) = items.get(&q) {
+                if !self.queue.contains(id) {
+                    self.queue.push(id.clone());
+                }
+            }
+        }
+        added
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn absorbs_another_librarys_feeds_without_losing_anything() {
+        let mut here = State::default();
+        let sci = here.add_folder("Science", None).unwrap();
+        let a = here
+            .add_feed("https://a/rss", "A", None, Some(&sci))
+            .unwrap();
+        here.items.push(FeedItem {
+            id: item_id(&a, "k1"),
+            feed: a.clone(),
+            source: "A".into(),
+            entry: FeedEntry {
+                key: "k1".into(),
+                title: "One".into(),
+                ..Default::default()
+            },
+            found_at: "2026-10-01T00:00:00Z".into(),
+            read: false,
+            file: None,
+            book: None,
+            download_error: None,
+            position: Some(10.0),
+            played: false,
+        });
+        let mut there = State {
+            next_id: 50,
+            ..Default::default()
+        };
+        let f = there.add_folder("Science", None).unwrap();
+        let sub = there.add_folder("Physics", Some(&f)).unwrap();
+        let a2 = there
+            .add_feed("https://a/rss", "A", None, Some(&f))
+            .unwrap();
+        let b2 = there
+            .add_feed("https://b/rss", "B", None, Some(&sub))
+            .unwrap();
+        for (feed, key) in [(&a2, "k1"), (&b2, "k2")] {
+            there.items.push(FeedItem {
+                id: item_id(feed, key),
+                feed: feed.clone(),
+                source: "x".into(),
+                entry: FeedEntry {
+                    key: key.into(),
+                    title: key.into(),
+                    ..Default::default()
+                },
+                found_at: "2026-10-01T00:00:00Z".into(),
+                read: true,
+                file: Some(format!("Feeds/Old/{key}.pdf")),
+                book: None,
+                download_error: None,
+                position: Some(30.0),
+                played: false,
+            });
+        }
+        there.queue.push(item_id(&b2, "k2"));
+        let added = here.absorb(there.clone(), |p| {
+            Some(p.replace("Feeds/Old/", "Feeds/New/"))
+        });
+        assert_eq!(added, 1);
+        assert_eq!(here.feeds.len(), 2);
+        assert_eq!(
+            here.folder_path(here.feeds[1].folder.as_deref()),
+            ["Science", "Physics"]
+        );
+        let one = here.item(&item_id(&a, "k1")).unwrap();
+        assert!(one.read);
+        assert_eq!(one.position, Some(30.0));
+        assert_eq!(one.file.as_deref(), Some("Feeds/New/k1.pdf"));
+        let b = here.feeds[1].id.clone();
+        assert_eq!(here.queue, vec![item_id(&b, "k2")]);
+        // Again: nothing doubles.
+        here.absorb(there, |p| Some(p.to_owned()));
+        assert_eq!(
+            (here.feeds.len(), here.items.len(), here.folders.len()),
+            (2, 2, 2)
+        );
+    }
+
     use super::*;
     use chrono::TimeZone;
 

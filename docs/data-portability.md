@@ -92,7 +92,7 @@ Requirement (user, 2026-09-27): when the database, metadata and every kind of no
   - `.feeds.json` holds the folders, feeds, items and settings (plain JSON). Subscriptions also export and import as standard OPML.
   - Downloads are ordinary PDFs and Markdown files (front matter with title, authors, date, publisher, address, DOI, tags and abstract), in folders named like the feed folders.
   - Adding an item to the library moves the file into `Books/` as a normal book with the feed's details.
-  - Backups and archives do not hold `Feeds/` yet; export the subscriptions to OPML to keep them.
+  - Backups and whole-library exports (with notes) carry each profile's `Feeds/<profile>/` subscriptions (`.feeds.json`, `.podcasts.json`), and its downloads (papers, articles, episodes) when book files are included. Importing joins them with the profile's own: folders by name, feeds by address, items by feed and key, keeping what was read, heard and downloaded.
 
 ## Phase 9 additions (2026-10-02)
 - **Podcasts** (ADR 0028) live beside the feeds: `Feeds/<profile>/.podcasts.json` (shows, folders, episodes, Up next, places, per-show speed) and downloaded episodes as ordinary audio files. Podcast Index keys are per computer (`online-sources.json`), never exported. Like feeds, backups and archives do not hold them yet; shows export to OPML.

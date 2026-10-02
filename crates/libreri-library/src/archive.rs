@@ -193,6 +193,9 @@ pub(crate) fn same_work(
     }
 }
 
+/// The Feeds and Podcasts subscriptions in a profile's feeds folder.
+const FEEDS_STATE: [&str; 2] = [".feeds.json", ".podcasts.json"];
+
 impl Library {
     // ---------- writing ----------
 
@@ -372,6 +375,9 @@ impl Library {
                         zip.add_file(&format!(".library-data/profiles/{}{suffix}", p.id), &doc)?;
                     }
                 }
+            }
+            if opts.notes && opts.books.is_none() {
+                report.files += self.add_feeds_files(&mut zip, &p.name, opts.book_files)?;
             }
             let (_, files) = self.note_files(&p.id)?;
             let folder = crate::reading::notes_folder_name(&p.name);
@@ -647,6 +653,7 @@ impl Library {
         }
 
         self.import_note_files(&manifest, &targets, &mut zip, &mut report)?;
+        self.import_feeds(&manifest, &targets, &mut zip, &mut report)?;
         self.backup_all_profiles()?;
         progress.report(total, total, "");
         Ok(report)
@@ -1120,6 +1127,123 @@ impl Library {
         }
         if added {
             self.backup_collections(target)?;
+        }
+        Ok(())
+    }
+
+    /// A profile's Feeds and Podcasts: the subscriptions always, the
+    /// downloads (papers, articles, episodes) when book files are included.
+    fn add_feeds_files(&self, zip: &mut ArchiveWriter, name: &str, files: bool) -> Result<u32> {
+        let folder = crate::reading::notes_folder_name(name);
+        let dir = self.layout().feeds_dir().join(&folder);
+        if !dir.is_dir() {
+            return Ok(0);
+        }
+        let mut n = 0;
+        for e in walkdir::WalkDir::new(&dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            if !e.file_type().is_file() {
+                continue;
+            }
+            let Ok(inner) = e.path().strip_prefix(&dir) else {
+                continue;
+            };
+            let inner = inner.to_string_lossy().replace('\\', "/");
+            let state = FEEDS_STATE.contains(&inner.as_str());
+            if inner.ends_with(".tmp") || (!state && (!files || inner.starts_with('.'))) {
+                continue;
+            }
+            let name = format!("Feeds/{folder}/{inner}");
+            if !zip.contains(&name) {
+                zip.add_file(&name, e.path())?;
+                n += 1;
+            }
+        }
+        Ok(n)
+    }
+
+    /// Feeds and Podcasts from an archive, into each target profile's own:
+    /// downloads that are not here yet are added, and the subscriptions are
+    /// joined (feeds by address, items by feed and key; see `State::absorb`).
+    fn import_feeds(
+        &self,
+        manifest: &Manifest,
+        targets: &[(ProfileId, ProfileId)],
+        zip: &mut ArchiveReader,
+        report: &mut ArchiveImportReport,
+    ) -> Result<()> {
+        let names = zip.names();
+        for (archive_profile, target) in targets {
+            let Some(ap) = manifest.profiles.iter().find(|p| &p.id == archive_profile) else {
+                continue;
+            };
+            let Some(tname) = self.with_db(|db| db.profile_name(target))? else {
+                continue;
+            };
+            let from = format!("Feeds/{}/", crate::reading::notes_folder_name(&ap.name));
+            let to_folder = crate::reading::notes_folder_name(&tname);
+            let base = self.layout().feeds_dir().join(&to_folder);
+            let mut moved: HashMap<String, String> = HashMap::new();
+            for name in names.iter().filter(|n| n.starts_with(&from)) {
+                let inner = &name[from.len()..];
+                if FEEDS_STATE.contains(&inner) {
+                    continue;
+                }
+                let Some(dest) = libreri_core::LibraryLayout::new(&base).resolve_relative(inner)
+                else {
+                    continue;
+                };
+                let dest = if dest.exists() {
+                    let same = fs::metadata(&dest).map(|m| m.len()).ok() == zip.size(name).ok();
+                    if same {
+                        dest
+                    } else {
+                        let file = dest
+                            .file_name()
+                            .map(|f| f.to_string_lossy().into_owned())
+                            .unwrap_or_default();
+                        unique_path(dest.parent().unwrap_or(&base), &file)
+                    }
+                } else {
+                    dest
+                };
+                if !dest.exists() {
+                    let done = dest
+                        .parent()
+                        .map_or(Ok(()), fs::create_dir_all)
+                        .map_err(io_err)
+                        .and_then(|()| zip.extract(name, &dest).map_err(archive_err));
+                    if let Err(e) = done {
+                        report.warnings.push(format!("{name}: {e}"));
+                        continue;
+                    }
+                }
+                if let Some(rel) = paths::rel_of(self.layout(), &dest) {
+                    moved.insert(name.clone(), rel);
+                }
+            }
+            for state in FEEDS_STATE {
+                let name = format!("{from}{state}");
+                if !zip.has(&name) {
+                    continue;
+                }
+                let bytes = zip.read(&name).map_err(archive_err)?;
+                let Ok(other) = libreri_feeds::State::from_json(&String::from_utf8_lossy(&bytes))
+                else {
+                    report.warnings.push(format!("{name} could not be read"));
+                    continue;
+                };
+                let path = base.join(state);
+                let mut here = match fs::read_to_string(&path) {
+                    Ok(s) => libreri_feeds::State::from_json(&s).unwrap_or_default(),
+                    Err(_) => libreri_feeds::State::default(),
+                };
+                here.absorb(other, |p| moved.get(p).cloned());
+                fs::create_dir_all(&base).map_err(io_err)?;
+                write_atomic(&path, here.to_json().as_bytes()).map_err(io_err)?;
+            }
         }
         Ok(())
     }

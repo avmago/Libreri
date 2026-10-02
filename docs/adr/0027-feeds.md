@@ -25,7 +25,7 @@ Libreri follows RSS and Atom feeds, so new papers, preprints, articles and newsl
 - **Downloads** are `Feeds/<profile>/<folder>/<subfolder>/<feed>/<title>.pdf|md`, mirroring the folders.
 - **Articles are Markdown**, so they are books Libreri can read and other apps can open: the readable part of the page (picked out as for links' offline copies, ADR 0026), converted with `htmd`, pictures inside as data. Front matter carries the title, authors, date, publisher (the feed), address, DOI, tags (the topics) and abstract, which the library reads on import.
 - **Profiles:** the folder follows a renamed profile and goes to the system trash with a deleted one. `book://` serves `Feeds/` files only to their own profile.
-- **Not in backups yet:** backups and archives hold `Books/`, `Notes/` and the catalogue, not `Feeds/`. Subscriptions can be kept with *Export to an OPML file*; downloads can be downloaded again.
+- **Backups and archives (2026-10-02):** Backups and whole-library exports (with notes) carry each profile's `Feeds/<profile>/` subscriptions (`.feeds.json`, `.podcasts.json`), and its downloads (papers, articles, episodes) when book files are included. Importing joins them with the profile's own: folders by name, feeds by address, items by feed and key, keeping what was read, heard and downloaded (`State::absorb`).
 
 ## Reading feeds (`libreri-feeds`)
 
