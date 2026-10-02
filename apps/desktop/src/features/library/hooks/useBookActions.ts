@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { commands, unwrap, type ReadingStatus } from "@/lib/ipc";
 import { useProfilePrefs } from "@/features/profiles";
 import { useTabs } from "@/lib/tabs";
+import { closeGoneEverywhere } from "@/lib/tabs/gone";
 import { canRead } from "@/readers";
 import { useMoveBooks, useSetBookState, useTrashBooks } from "../api";
 import type { BookView } from "../model";
@@ -69,7 +70,7 @@ export function useBookActions() {
       try {
         const n = await trash.mutateAsync(books.map((b) => b.id));
         setSelection([]);
-        useTabs.getState().closeGone(books.map((b) => b.id));
+        closeGoneEverywhere(books.map((b) => b.id));
         toast.success(n === 1 ? "Moved 1 book to the Trash" : `Moved ${n} books to the Trash`);
       } catch (e) {
         toast.error("Could not move to the Trash", { description: errorText(e) });

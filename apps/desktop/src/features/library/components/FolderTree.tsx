@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { ContextMenu, menuContent, menuItem, menuSeparator } from "@/components/ui/menu";
 import { commands, unwrap, type FolderDto } from "@/lib/ipc";
 import { useTabs } from "@/lib/tabs";
+import { closeGoneEverywhere } from "@/lib/tabs/gone";
 import { cn } from "@/lib/utils";
 import { useCreateFolder, useRenameFolder, useTrashFolder } from "../api";
 import { usePermissions } from "@/features/profiles";
@@ -126,7 +127,7 @@ function FolderRow({
           )
         : [];
       await trash.mutateAsync(folder.path);
-      useTabs.getState().closeGone(inside.map((b) => b.id));
+      closeGoneEverywhere(inside.map((b) => b.id));
       if (
         nav.kind === "folder" &&
         (nav.path === folder.path || nav.path.startsWith(`${folder.path}/`))

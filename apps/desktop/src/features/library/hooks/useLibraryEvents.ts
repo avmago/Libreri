@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { listenForGone } from "@/lib/tabs/gone";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { create } from "zustand";
@@ -87,6 +88,7 @@ export function useLibraryEvents() {
       }, 500);
     };
     const unlisten = [
+      listenForGone(),
       events.libraryChanged.listen(refresh),
       events.jobEventPayload.listen(({ payload: e }) => {
         switch (e.kind) {

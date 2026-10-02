@@ -114,9 +114,30 @@ pub(crate) fn notes_folder_name(name: &str) -> String {
 
 /// Two profiles whose notes folders would be the same folder on a
 /// case-insensitive disk (macOS, Windows): "Sam" and "Sam.", "Élise" and
-/// "élise", or two names that both become "Untitled".
+/// "élise", or two names that both become "Untitled". Names are compared in
+/// one Unicode form, so "é" typed as one character and as "e" plus an accent
+/// are the same (macOS and Windows treat those folders as one, or confusingly
+/// as two that look alike).
 pub(crate) fn same_notes_folder(a: &str, b: &str) -> bool {
-    notes_folder_name(a).to_lowercase() == notes_folder_name(b).to_lowercase()
+    use unicode_normalization::UnicodeNormalization;
+    let key = |s: &str| {
+        notes_folder_name(&s.nfc().collect::<String>())
+            .nfc()
+            .collect::<String>()
+            .to_lowercase()
+    };
+    key(a) == key(b)
+}
+
+#[cfg(test)]
+mod folder_tests {
+    #[test]
+    fn names_in_either_unicode_form_share_a_folder() {
+        assert!(super::same_notes_folder("Élise", "E\u{301}lise"));
+        assert!(super::same_notes_folder("élise", "E\u{301}LISE"));
+        assert!(super::same_notes_folder("Sam", "Sam."));
+        assert!(!super::same_notes_folder("Sam", "Samuel"));
+    }
 }
 
 impl Library {
