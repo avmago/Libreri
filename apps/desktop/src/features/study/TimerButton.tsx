@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { PHASE, timerLabel, useNow } from "./label";
 import { Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,17 +13,31 @@ export function TimerButton() {
   const t = useTimer();
   const now = useNow(t.status === "running");
   const ref = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  // Where the panel goes: under the button, kept on screen. It is drawn on
+  // top of everything (a portal), so the page never covers it.
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const toggle = (el: HTMLElement) => {
+    if (open) return t.setOpen(false);
+    const r = el.getBoundingClientRect();
+    setPos({ top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) });
+    t.setOpen(true);
+  };
   const { open, setOpen } = t;
 
   useEffect(() => {
     if (!open) return;
     const away = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      const n = e.target as Node;
+      if (!ref.current?.contains(n) && !panel.current?.contains(n)) setOpen(false);
     };
     const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const resized = () => setOpen(false);
     document.addEventListener("pointerdown", away);
     document.addEventListener("keydown", esc);
+    window.addEventListener("resize", resized);
     return () => {
+      window.removeEventListener("resize", resized);
       document.removeEventListener("pointerdown", away);
       document.removeEventListener("keydown", esc);
     };
@@ -41,7 +56,7 @@ export function TimerButton() {
           aria-label="Study timer"
           title="Study timer: focus sessions, a timer and a stopwatch"
           aria-expanded={open}
-          onClick={() => setOpen(!open)}
+          onClick={(e) => toggle(e.currentTarget)}
         >
           <Timer />
         </Button>
@@ -50,7 +65,7 @@ export function TimerButton() {
           type="button"
           aria-label={`Study timer: ${label.name} ${label.time}`}
           aria-expanded={open}
-          onClick={() => setOpen(!open)}
+          onClick={(e) => toggle(e.currentTarget)}
           className={cn(
             "flex h-7 items-center gap-1.5 rounded-full border py-0.5 pr-2.5 pl-1 text-[12.5px] font-semibold tabular-nums",
             brk
@@ -64,7 +79,14 @@ export function TimerButton() {
           {label.time}
         </button>
       )}
-      {open && <TimerPanel now={now} />}
+      {open &&
+        pos &&
+        createPortal(
+          <div ref={panel} className="fixed z-[60]" style={{ top: pos.top, right: pos.right }}>
+            <TimerPanel now={now} />
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -128,7 +150,7 @@ function TimerPanel({ now }: { now: number }) {
     <div
       role="dialog"
       aria-label="Study timer"
-      className="absolute top-9 right-0 z-40 flex w-80 flex-col gap-3 rounded-xl border bg-popover p-3.5 text-popover-foreground shadow-xl"
+      className="flex w-80 max-w-[calc(100vw-16px)] flex-col gap-3 rounded-xl border bg-popover p-3.5 text-popover-foreground shadow-xl"
     >
       <div role="tablist" aria-label="Timer kind" className="flex rounded-lg bg-muted p-0.5">
         {MODES.map(([m, name]) => (
