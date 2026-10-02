@@ -25,6 +25,8 @@ Status: accepted (2026-10-02). Built.
 - **Cards are not stored:** they are worked out from the highlights each time, so editing a highlight or its comment changes its cards, and deleting it removes them. Only the schedule and choices are kept, by highlight id.
 - **Anki:** `libreri-export::anki` writes the legacy `collection.anki2` schema that every Anki version imports, with two note types (*Libreri*: Front, Back, Source; *Libreri Cloze*: Text, Back Extra, Source). Note ids are stable, so importing again updates notes instead of adding them twice. Tags: `libreri` and the book.
 
+- **Maths:** comments and card text can hold `$…$` and `$$…$$`, drawn with KaTeX on the cards and sent to Anki as `\(…\)` and `\[…\]`. A card's own text (`cards[id].text`) replaces the highlight's on its cards only, for example to write a formula the page gave as jumbled text; a cloze can hide a whole formula.
+
 ## Not yet
 
 - Schedules do not come back from Anki.

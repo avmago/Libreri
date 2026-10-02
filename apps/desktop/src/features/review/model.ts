@@ -3,6 +3,7 @@
  * What is kept per profile, how cards are made from highlights, which are
  * due today, and the Anki notes. Plain functions, tested without a UI.
  */
+import { mathForAnki, splitMath } from "@/lib/math";
 import {
   createEmptyCard,
   fsrs,
@@ -26,6 +27,9 @@ export interface CardOptions {
   kinds?: CardKind[];
   /** Cloze: the words hidden. */
   cloze?: string[];
+  /** The card's own text instead of the highlight's (to fix a formula the
+   * page gave as jumbled text, with `$…$`). */
+  text?: string;
   /** Left out of review. */
   off?: boolean;
 }
@@ -144,9 +148,9 @@ export function buildCards(notes: NoteDto[], data: ReviewData): ReviewCard[] {
   const off = new Set(data.booksOff);
   const out: ReviewCard[] = [];
   for (const { annotation: a, bookTitle, fileType } of notes) {
-    const quote = a.quote?.exact?.trim();
-    if (a.kind !== "highlight" || !quote || off.has(a.bookId)) continue;
     const o = data.cards[a.id];
+    const quote = o?.text?.trim() || a.quote?.exact?.trim();
+    if (a.kind !== "highlight" || !quote || off.has(a.bookId)) continue;
     for (const kind of kindsOf(a.note, o, data.settings.autoNew))
       out.push({
         key: cardKey(a.id, kind),
@@ -309,43 +313,76 @@ export function streak(data: ReviewData, now: Date): number {
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** The passage's opening (about 45% of its words), to recall the rest. */
+/** A passage as words, spaces and whole formulas (`$…$`, `$$…$$`). */
+export function tokens(text: string): { text: string; math: boolean; space: boolean }[] {
+  const out: { text: string; math: boolean; space: boolean }[] = [];
+  for (const p of splitMath(text)) {
+    if (p.kind === "text") {
+      for (const w of p.value.split(/(\s+)/))
+        if (w) out.push({ text: w, math: false, space: !w.trim() });
+    } else {
+      const d = p.kind === "inline" ? "$" : "$$";
+      out.push({ text: `${d}${p.value}${d}`, math: true, space: false });
+    }
+  }
+  return out;
+}
+
+/** The passage's opening (about 45% of its words), to recall the rest.
+ * Formulas are never cut in two. */
 export function opening(quote: string): { start: string; rest: string } {
-  const words = quote.split(/(\s+)/);
-  const count = words.filter((w) => w.trim()).length;
+  const t = tokens(quote);
+  const count = t.filter((w) => !w.space).length;
   if (count < 4) return { start: quote, rest: "" };
   const keep = Math.max(2, Math.round(count * 0.45));
   let seen = 0;
   let i = 0;
-  for (; i < words.length && seen < keep; i++) if (words[i]?.trim()) seen++;
-  return { start: words.slice(0, i).join(""), rest: words.slice(i).join("") };
+  for (; i < t.length && seen < keep; i++) if (!t[i]!.space) seen++;
+  const join = (xs: typeof t) => xs.map((x) => x.text).join("");
+  return { start: join(t.slice(0, i)), rest: join(t.slice(i)) };
 }
 
-/** The passage cut into text and hidden words. */
+/** The passage cut into text and hidden words or formulas. */
 export function clozeParts(quote: string, words: string[]): { text: string; hidden: boolean }[] {
   const ws = words.map((w) => w.trim()).filter(Boolean);
   if (!ws.length) return [{ text: quote, hidden: false }];
-  const re = new RegExp(
-    `(?<![\\p{L}\\p{N}])(${ws
-      .sort((a, b) => b.length - a.length)
-      .map(escape)
-      .join("|")})(?![\\p{L}\\p{N}])`,
-    "gu",
-  );
+  const plain = ws.filter((w) => !w.startsWith("$"));
+  const re = plain.length
+    ? new RegExp(
+        `(?<![\\p{L}\\p{N}])(${plain
+          .sort((a, b) => b.length - a.length)
+          .map(escape)
+          .join("|")})(?![\\p{L}\\p{N}])`,
+        "gu",
+      )
+    : null;
   const out: { text: string; hidden: boolean }[] = [];
-  let last = 0;
-  for (const m of quote.matchAll(re)) {
-    if (m.index > last) out.push({ text: quote.slice(last, m.index), hidden: false });
-    out.push({ text: m[0], hidden: true });
-    last = m.index + m[0].length;
+  const push = (text: string, hidden: boolean) => {
+    const last = out[out.length - 1];
+    if (last && !last.hidden && !hidden) last.text += text;
+    else out.push({ text, hidden });
+  };
+  for (const t of tokens(quote)) {
+    if (t.math || !re) {
+      push(t.text, t.math && ws.includes(t.text));
+      continue;
+    }
+    let last = 0;
+    for (const m of t.text.matchAll(re)) {
+      if (m.index > last) push(t.text.slice(last, m.index), false);
+      push(m[0], true);
+      last = m.index + m[0].length;
+    }
+    if (last < t.text.length) push(t.text.slice(last), false);
   }
-  if (last < quote.length) out.push({ text: quote.slice(last), hidden: false });
   return out;
 }
 
-/** The words of a passage someone can pick for a cloze. */
+/** What someone can pick to hide in a cloze: words, and whole formulas. */
 export function pickableWords(quote: string): string[] {
-  return quote.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? [];
+  return tokens(quote).flatMap((t) =>
+    t.math ? [t.text] : (t.text.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? []),
+  );
 }
 
 // ── Anki ────────────────────────────────────────────────────────────────
@@ -367,18 +404,23 @@ export function ankiNotes(cards: ReviewCard[]): AnkiNote[] {
     const tags = ["libreri", tag(c.bookTitle)];
     if (c.kind === "cloze") {
       const text = clozeParts(c.quote, c.cloze)
-        .map((p) => (p.hidden ? `{{c1::${html(p.text)}}}` : html(p.text)))
+        .map((p) => (p.hidden ? `{{c1::${mathForAnki(p.text)}}}` : mathForAnki(p.text)))
         .join("");
-      return { id: c.key, model: "cloze", fields: [text, html(c.note ?? ""), source], tags };
+      return { id: c.key, model: "cloze", fields: [text, mathForAnki(c.note ?? ""), source], tags };
     }
     if (c.kind === "qa")
       return {
         id: c.key,
         model: "basic",
-        fields: [html(c.note ?? ""), html(c.quote), source],
+        fields: [mathForAnki(c.note ?? ""), mathForAnki(c.quote), source],
         tags,
       };
     const { start } = opening(c.quote);
-    return { id: c.key, model: "basic", fields: [`${html(start)} …`, html(c.quote), source], tags };
+    return {
+      id: c.key,
+      model: "basic",
+      fields: [`${mathForAnki(start)} …`, mathForAnki(c.quote), source],
+      tags,
+    };
   });
 }

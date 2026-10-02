@@ -13,6 +13,7 @@ import {
   kindsOf,
   opening,
   parseReview,
+  pickableWords,
   previews,
   streak,
   type ReviewData,
@@ -143,5 +144,40 @@ describe("anki", () => {
     ]);
     expect(n[3]!.fields[0]).toBe("the {{c1::sea}} is grey");
     expect(n[0]!.tags).toEqual(["libreri", "The_Lighthouse"]);
+  });
+});
+
+describe("maths on cards", () => {
+  it("keeps formulas whole in the opening and the cloze", () => {
+    const q = "Energy is $E = mc^2$ for a body at rest, said Einstein in 1905";
+    const o = opening(q);
+    expect(o.start + o.rest).toBe(q);
+    expect(o.start).toContain("$E = mc^2$");
+    expect(pickableWords(q)).toContain("$E = mc^2$");
+    const parts = clozeParts(q, ["$E = mc^2$", "rest"]);
+    expect(parts.filter((p) => p.hidden).map((p) => p.text)).toEqual(["$E = mc^2$", "rest"]);
+    expect(parts.map((p) => p.text).join("")).toBe(q);
+    // A word inside a formula is not hidden by picking the same word.
+    expect(clozeParts("$x + y$ and x", ["x"]).filter((p) => p.hidden)).toHaveLength(1);
+  });
+
+  it("uses the card's own text, and writes maths for Anki", () => {
+    const d: ReviewData = {
+      ...DEFAULT_REVIEW,
+      cards: {
+        a: { text: "The area is $\\pi r^2$ always", kinds: ["qa", "cloze"], cloze: ["$\\pi r^2$"] },
+      },
+    };
+    const cards = buildCards([note("a", "The area is π r2 always", "Area of a circle $A$?")], d);
+    expect(cards.map((c) => c.quote)).toEqual([
+      "The area is $\\pi r^2$ always",
+      "The area is $\\pi r^2$ always",
+    ]);
+    const [qa, cloze] = ankiNotes(cards);
+    expect(qa!.fields.slice(0, 2)).toEqual([
+      "Area of a circle \\(A\\)?",
+      "The area is \\(\\pi r^2\\) always",
+    ]);
+    expect(cloze!.fields[0]).toBe("The area is {{c1::\\(\\pi r^2\\)}} always");
   });
 });

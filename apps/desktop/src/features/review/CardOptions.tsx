@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Brain } from "lucide-react";
+import { MathText } from "@/components/MathText";
 import type { Annotation } from "@/lib/ipc";
+import { hasMath } from "@/lib/math";
 import { cn } from "@/lib/utils";
 import { KIND_NAME, kindsOf, pickableWords, possibleKinds, type CardKind } from "./model";
 import { useReview } from "./store";
@@ -15,7 +17,11 @@ export function CardOptionsSection({ annotation }: { annotation: Annotation }) {
   const data = useReview((s) => s.data);
   const update = useReview((s) => s.update);
   const [picking, setPicking] = useState(false);
-  const quote = annotation.quote?.exact?.trim();
+  const [editing, setEditing] = useState(false);
+  const exact = annotation.quote?.exact?.trim();
+  const own = data.cards[annotation.id]?.text?.trim();
+  const quote = own || exact;
+  const [draft, setDraft] = useState(quote ?? "");
   if (annotation.kind !== "highlight" || !quote) return null;
   const bookOff = data.booksOff.includes(annotation.bookId);
   const o = data.cards[annotation.id] ?? {};
@@ -41,6 +47,22 @@ export function CardOptionsSection({ annotation }: { annotation: Annotation }) {
     const words = [...next];
     const kinds = on.filter((k) => k !== "cloze");
     setKinds(words.length ? [...kinds, "cloze"] : kinds, { cloze: words });
+  };
+
+  const saveText = (text: string | undefined) => {
+    update((d) => {
+      const cur = d.cards[annotation.id] ?? {};
+      // Hidden words that are no longer in the text go.
+      const words = text ? pickableWords(text) : pickableWords(exact ?? "");
+      return {
+        ...d,
+        cards: {
+          ...d.cards,
+          [annotation.id]: { ...cur, text, cloze: cur.cloze?.filter((w) => words.includes(w)) },
+        },
+      };
+    });
+    setEditing(false);
   };
 
   if (bookOff)
@@ -102,6 +124,67 @@ export function CardOptionsSection({ annotation }: { annotation: Annotation }) {
           })}
         </div>
       )}
+      {!o.off && !editing && (
+        <button
+          type="button"
+          className="self-start text-[11.5px] text-muted-foreground hover:text-foreground"
+          title="Change the card's text, for example to write a formula as $x^2$"
+          onClick={() => {
+            setDraft(quote);
+            setEditing(true);
+          }}
+        >
+          {own ? "Card text changed · Edit" : "Edit the card's text"}
+        </button>
+      )}
+      {!o.off && editing && (
+        <div className="flex flex-col gap-1">
+          <textarea
+            aria-label="Card text"
+            rows={3}
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            className="min-h-16 rounded-md border bg-background px-2 py-1 text-[12.5px]"
+          />
+          {hasMath(draft) && (
+            <div
+              aria-label="Preview"
+              className="max-h-32 overflow-auto rounded-md border px-2 py-1 font-serif text-[13px]"
+            >
+              <MathText text={draft} />
+            </div>
+          )}
+          <div className="flex items-center gap-2 text-[11.5px]">
+            {own && (
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={() => saveText(undefined)}
+              >
+                Use the highlight
+              </button>
+            )}
+            <span className="flex-1" />
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={() => setEditing(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="font-medium text-primary"
+              onClick={() =>
+                saveText(draft.trim() && draft.trim() !== exact ? draft.trim() : undefined)
+              }
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      )}
       {!o.off && (picking || (on.includes("cloze") && chosen.size > 0)) && (
         <div className="flex flex-col gap-1">
           <p className="text-[11.5px] text-muted-foreground">
@@ -120,12 +203,19 @@ export function CardOptionsSection({ annotation }: { annotation: Annotation }) {
                     chosen.has(w) ? "bg-primary text-primary-foreground" : "hover:bg-muted",
                   )}
                 >
-                  {w}
+                  {w.startsWith("$") ? <MathText text={w} /> : w}
                 </button>
               ))}
             </div>
           ) : (
-            <p className="text-[12px]">{[...chosen].join(", ")}</p>
+            <p className="text-[12px]">
+              {[...chosen].map((w, i) => (
+                <span key={w}>
+                  {i > 0 && ", "}
+                  <MathText text={w} />
+                </span>
+              ))}
+            </p>
           )}
           <button
             type="button"

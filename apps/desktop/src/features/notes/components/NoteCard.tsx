@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { MathText } from "@/components/MathText";
 import {
   ArrowUpRight,
   Bookmark,
@@ -206,7 +207,7 @@ export function NoteCard({
                 className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
                 aria-hidden
               />
-              {a.note}
+              <MathText text={a.note} className="min-w-0" />
             </p>
           ))
         )}

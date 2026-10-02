@@ -11,11 +11,13 @@ import {
   Sigma,
   Trash2,
 } from "lucide-react";
+import { MathText } from "@/components/MathText";
 import { Button } from "@/components/ui/button";
 import { CardOptionsSection } from "@/features/review";
 import { DictateButton, VoicePlayer, voiceOf } from "@/features/speech";
 import { SpellTextarea } from "@/features/spell";
 import type { Annotation, HighlightColor } from "@/lib/ipc";
+import { hasMath } from "@/lib/math";
 import { HIGHLIGHT_COLORS, highlightFill } from "@/readers";
 import { cn } from "@/lib/utils";
 import { LinkCard, formatTime, linkOf, playable } from "../weblinks";
@@ -252,9 +254,8 @@ export function AnnotationMenu({
   const [note, setNote] = useState(annotation.note ?? "");
   const link = annotation.kind === "link" ? linkOf(annotation.locator) : null;
   const voice = annotation.kind === "voice" ? voiceOf(annotation.locator) : null;
-  const [editing, setEditing] = useState(
-    startEditing || Boolean(annotation.note) || annotation.kind === "voice",
-  );
+  // A saved comment is shown with its maths drawn; clicking it edits it.
+  const [editing, setEditing] = useState(startEditing || annotation.kind === "voice");
   const box = useRef<HTMLTextAreaElement>(null);
   const commit = () => {
     if ((annotation.note ?? "") !== note.trim())
@@ -327,12 +328,22 @@ export function AnnotationMenu({
         </Button>
       </div>
       {voice && <VoicePlayer path={voice} className="mt-1 w-64" />}
+      {!editing && note.trim() && (
+        <button
+          type="button"
+          title="Edit the comment"
+          onClick={() => setEditing(true)}
+          className="mt-1 w-64 rounded-md bg-muted px-2 py-1.5 text-left text-[13px] leading-relaxed hover:bg-muted/70"
+        >
+          <MathText text={note} />
+        </button>
+      )}
       {editing && (
         <div className="flex w-64 flex-col gap-1.5 px-0.5 pb-0.5">
           <SpellTextarea
             ref={box}
             bookId={annotation.bookId}
-            autoFocus={!voice && (startEditing || !annotation.note)}
+            autoFocus={!voice}
             rows={3}
             aria-label={voice ? "What was said" : "Comment"}
             placeholder={voice ? "What was said (not written down)" : "Write a comment…"}
@@ -346,8 +357,40 @@ export function AnnotationMenu({
             }}
             className="min-h-16 text-[13px]"
           />
+          {!voice && hasMath(note) && (
+            <div
+              aria-label="Preview"
+              className="max-h-40 overflow-auto rounded-md border bg-background px-2 py-1.5 text-[13px] leading-relaxed"
+            >
+              <MathText text={note} />
+            </div>
+          )}
           <div className="flex items-center justify-between">
-            <DictateButton target={box} lang={lang} className="size-7" />
+            <span className="flex items-center gap-0.5">
+              <DictateButton target={box} lang={lang} className="size-7" />
+              {!voice && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7"
+                  aria-label="Insert a formula"
+                  title="Insert a formula: $x^2$ in a line, $$x^2$$ on its own"
+                  onClick={() => {
+                    const el = box.current;
+                    const at = el?.selectionStart ?? note.length;
+                    const end = el?.selectionEnd ?? at;
+                    const picked = note.slice(at, end);
+                    setNote(note.slice(0, at) + `$${picked}$` + note.slice(end));
+                    requestAnimationFrame(() => {
+                      el?.focus();
+                      el?.setSelectionRange(at + 1, at + 1 + picked.length);
+                    });
+                  }}
+                >
+                  <Sigma />
+                </Button>
+              )}
+            </span>
             <Button
               size="sm"
               onClick={() => {

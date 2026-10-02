@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { MathText } from "@/components/MathText";
 import { save } from "@tauri-apps/plugin-dialog";
 import { BookOpen, Brain, Download, Flame } from "lucide-react";
 import { toast } from "sonner";
@@ -421,8 +422,8 @@ function Face({ card, shown }: { card: ReviewCard; shown: boolean }) {
   if (card.kind === "qa")
     return (
       <div className="flex flex-col gap-4">
-        <p className="text-[18px] font-medium">{card.note}</p>
-        {shown && <blockquote className={cn(q, "border-l-2 pl-4")}>{card.quote}</blockquote>}
+        <MathText as="p" text={card.note ?? ""} className="text-[18px] font-medium" />
+        {shown && <MathText as="div" text={card.quote} className={cn(q, "border-l-2 pl-4")} />}
       </div>
     );
   if (card.kind === "cloze")
@@ -432,7 +433,7 @@ function Face({ card, shown }: { card: ReviewCard; shown: boolean }) {
           p.hidden ? (
             shown ? (
               <mark key={i} className="rounded bg-amber-200/70 px-0.5 dark:bg-amber-500/40">
-                {p.text}
+                <MathText text={p.text} />
               </mark>
             ) : (
               <span
@@ -444,7 +445,7 @@ function Face({ card, shown }: { card: ReviewCard; shown: boolean }) {
               </span>
             )
           ) : (
-            <span key={i}>{p.text}</span>
+            <MathText key={i} text={p.text} />
           ),
         )}
       </p>
@@ -453,9 +454,9 @@ function Face({ card, shown }: { card: ReviewCard; shown: boolean }) {
   return (
     <div className="flex flex-col gap-3">
       <p className={q}>
-        {start}
+        <MathText text={start} />
         {shown ? (
-          <span className="rounded bg-amber-200/50 dark:bg-amber-500/30">{rest}</span>
+          <MathText text={rest} className="rounded bg-amber-200/50 dark:bg-amber-500/30" />
         ) : rest ? (
           <span className="text-muted-foreground"> …</span>
         ) : null}
@@ -464,7 +465,11 @@ function Face({ card, shown }: { card: ReviewCard; shown: boolean }) {
         <p className="text-[12.5px] text-muted-foreground">How does the passage go on?</p>
       )}
       {shown && card.note && (
-        <p className="border-l-2 pl-3 text-[13.5px] text-muted-foreground">{card.note}</p>
+        <MathText
+          as="p"
+          text={card.note}
+          className="border-l-2 pl-3 text-[13.5px] text-muted-foreground"
+        />
       )}
     </div>
   );

@@ -1,4 +1,5 @@
 import { ResizablePanel } from "@/components/ResizablePanel";
+import { MathText } from "@/components/MathText";
 import type * as React from "react";
 import { useState } from "react";
 import {
@@ -143,7 +144,7 @@ function MarkRow({
             ) : (
               <>
                 <MessageSquare className="mt-0.5 size-3 shrink-0" aria-hidden />
-                <span className="line-clamp-3">{a.note}</span>
+                <MathText text={a.note} className="line-clamp-3" />
               </>
             )}
           </span>
