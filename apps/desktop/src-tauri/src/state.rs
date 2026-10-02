@@ -631,6 +631,27 @@ impl AppState {
         }))
     }
 
+    /// After a feed item joins the library: fills in what the feed did not
+    /// give from the online sources, when that is on for imports.
+    pub fn fill_after_feed(&self, id: BookId) -> AppResult<()> {
+        let online = self.online_settings();
+        if !online.fill_on_import {
+            return Ok(());
+        }
+        let library = self.library()?;
+        let handle = self.app.clone();
+        let http = Arc::clone(&self.http);
+        self.jobs.submit("Looking up details", move |ctx| {
+            let filled = library
+                .fill_missing_details(&[id], &online, &*http, &JobProgress(ctx))
+                .map_err(job_error)?;
+            let _ = LibraryChanged::default().emit(&handle);
+            let _ = DetailsFilled::new(ctx.id(), &filled).emit(&handle);
+            Ok(())
+        });
+        Ok(())
+    }
+
     /// Fills in missing details of many books; the result arrives as a
     /// `DetailsFilled` event.
     pub fn start_fill_details(&self, ids: Vec<BookId>) -> AppResult<JobId> {

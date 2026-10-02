@@ -217,6 +217,12 @@ impl Library {
         m.doi = d.doi.clone().or(m.doi);
         m.arxiv_id = d.arxiv_id.clone().or(m.arxiv_id);
         m.url = d.url.clone().or(m.url);
+        m.journal = d.journal.clone().or(m.journal);
+        for c in &d.categories {
+            if !m.categories.iter().any(|x| x.eq_ignore_ascii_case(c)) {
+                m.categories.push(c.clone());
+            }
+        }
         for t in &d.tags {
             if !m.tags.iter().any(|x| x.eq_ignore_ascii_case(t)) {
                 m.tags.push(t.clone());
@@ -295,6 +301,11 @@ mod tests {
             authors: vec!["Jane Smith".into()],
             about: Some("About keepers.".into()),
             tags: vec!["sea".into()],
+            categories: vec!["Science/Oceans".into()],
+            journal: Some("Sea Letters".into()),
+            year: Some(2026),
+            doi: Some("10.1000/sea.1".into()),
+            url: Some("https://example.org/keeping".into()),
             content_type: ContentType::Article,
             ..Default::default()
         };
@@ -303,6 +314,16 @@ mod tests {
         assert_eq!(book.metadata.title, "Keeping the Light");
         assert_eq!(book.metadata.authors, ["Jane Smith"]);
         assert_eq!(book.metadata.content_type, ContentType::Article);
+        assert_eq!(book.metadata.about.as_deref(), Some("About keepers."));
+        assert!(book.metadata.tags.iter().any(|t| t == "sea"));
+        assert_eq!(book.metadata.categories, ["Science/Oceans"]);
+        assert_eq!(book.metadata.journal.as_deref(), Some("Sea Letters"));
+        assert_eq!(book.metadata.year, Some(2026));
+        assert_eq!(book.metadata.doi.as_deref(), Some("10.1000/sea.1"));
+        assert_eq!(
+            book.metadata.url.as_deref(),
+            Some("https://example.org/keeping")
+        );
         assert!(book.rel_path.starts_with("Books/"));
         assert!(lib.own_feed_file(&rel).map(|p| !p.exists()).unwrap());
     }

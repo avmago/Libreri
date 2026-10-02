@@ -1034,10 +1034,28 @@ fn details_of(item: &FeedItem, file: &str) -> BookMetadata {
                 .map_or_else(|| t.clone(), |(_, name)| name.to_owned())
         })
         .collect();
+    // arXiv categories also give the category tree: "Computer Science/Machine Learning".
+    let mut categories: Vec<String> = Vec::new();
+    for t in &e.topics {
+        if let Some((group, name)) = libreri_feeds::sources::arxiv_category(t) {
+            let c = format!("{group}/{name}");
+            if !categories.contains(&c) {
+                categories.push(c);
+            }
+        }
+    }
+    let source = Some(item.source.clone()).filter(|s| !s.is_empty());
+    // A journal's feed (a paper with a DOI, not a preprint): the feed is
+    // the journal.
+    let journal = (content_type == ContentType::ResearchPaper)
+        .then(|| source.clone())
+        .flatten();
     let publisher = if e.arxiv_id.is_some() {
         Some("arXiv".to_owned())
+    } else if journal.is_some() {
+        None
     } else {
-        Some(item.source.clone()).filter(|s| !s.is_empty())
+        source
     };
     BookMetadata {
         title: e.title.clone(),
@@ -1053,6 +1071,8 @@ fn details_of(item: &FeedItem, file: &str) -> BookMetadata {
         arxiv_id: e.arxiv_id.clone(),
         url: e.link.clone(),
         tags,
+        categories,
+        journal,
         content_type,
         // A podcast episode: the show is the series.
         series: audio.then(|| item.source.clone()).filter(|s| !s.is_empty()),
@@ -1090,6 +1110,9 @@ pub async fn feed_item_to_library(
         })?;
         changed(&app, 0);
         let _ = crate::events::LibraryChanged::default().emit(&app);
+        // What the feed did not say (journal volume and issue, pages,
+        // language…) from the online sources, as for any import.
+        let _ = state.fill_after_feed(book.clone());
         Ok(book.to_string())
     })
     .await
