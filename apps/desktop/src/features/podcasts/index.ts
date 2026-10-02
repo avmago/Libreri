@@ -3,4 +3,5 @@ export { PodcastControls, PodcastPlayer } from "./PodcastPlayer";
 export { showPodcasts } from "./navigate";
 export { usePodcastsBadge, useIndexStatus, useSetIndexKey } from "./api";
 export { usePlayer } from "./player";
+export { openPodcastLink } from "./moments";
 export { setPodcastSettingsOpener } from "./opener";

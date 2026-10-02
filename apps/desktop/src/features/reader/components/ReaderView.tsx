@@ -102,7 +102,7 @@ import { mathsFromPicture, useMathsSettings } from "../maths/api";
 import { AddLinkDialog, CopyViewer, LinksPanel, linkOf, type LinkInfo } from "../weblinks";
 import { useListening } from "../listening/store";
 import { AddToLibraryDialog, openBook } from "@/features/feeds";
-import { usePlayer } from "@/features/podcasts";
+import { usePlayer, openPodcastLink } from "@/features/podcasts";
 import { TimerButton, TodayReading, onBreak, reportReading } from "@/features/study";
 import { ListenBar, type ListenMode } from "../listening/ListenBar";
 import { FocusOverlay } from "../adhd/FocusOverlay";
@@ -386,6 +386,8 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
             jumpTo: link.page ? pageJump(link.page) : link.annotation,
           });
         }
+      } else if (openPodcastLink(href)) {
+        // An episode's moment plays in the podcast player.
       } else if (/^(https?:|mailto:)/i.test(href)) {
         void commands.openExternalUrl(href).then((r) => {
           if (r.status === "error") toast.error(r.error.message);

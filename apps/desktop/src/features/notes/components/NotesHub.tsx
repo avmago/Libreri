@@ -1,4 +1,5 @@
 import { ResizablePanel } from "@/components/ResizablePanel";
+import { openPodcastLink } from "@/features/podcasts";
 import { useDeferredValue, useMemo, useRef, useState } from "react";
 import {
   BookOpen,
@@ -326,6 +327,8 @@ function openLink(href: string) {
   const link = parseBookLink(href);
   if (link) {
     void openBook(link.bookId, link.page ? `page:${link.page}` : link.annotation);
+  } else if (openPodcastLink(href)) {
+    // Plays the episode from that moment.
   } else if (/^(https?:|mailto:)/i.test(href)) {
     void commands.openExternalUrl(href);
   }

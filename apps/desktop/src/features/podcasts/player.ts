@@ -33,6 +33,11 @@ interface PlayerState {
   rate: number;
   /** Seconds to jump to once the audio is ready. */
   startAt: number;
+  /** The side panel with chapters and the transcript. */
+  panel: boolean;
+  setPanel: (open: boolean) => void;
+  /** Plays an episode from a moment (seconds), e.g. from a note's link. */
+  playAt: (item: FeedItem, seconds: number, feed?: FeedDto | null) => void;
   /** Sleep: stop at this time (ms), or at the end of the episode. */
   sleep: number | "end" | null;
   el: HTMLAudioElement | null;
@@ -66,6 +71,17 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   sleep: null,
   el: null,
   attach: (el) => set({ el }),
+  panel: false,
+  setPanel: (panel) => set({ panel }),
+  playAt: (item, seconds, feed) => {
+    const { episode, el } = get();
+    if (episode?.id === item.id && el) {
+      get().seek(seconds);
+      if (el.paused) void el.play().catch(fail("Could not play the episode"));
+      return;
+    }
+    get().play({ ...item, played: false, position: seconds }, feed);
+  },
 
   play: (item, feed) => {
     const { episode, el, toggle, save } = get();

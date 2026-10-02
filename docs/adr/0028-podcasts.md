@@ -1,6 +1,6 @@
 # 28. Podcasts: find, follow and listen beside a book
 
-Status: accepted (2026-10-01). Part 1 built; part 2 (transcripts, chapters, notes at a moment) planned.
+Status: accepted (2026-10-01). Part 1 built; part 2 (transcripts, chapters, notes at a moment) built 2026-10-02.
 
 Libreri has a **Podcasts** section next to Feeds. Shows are found, followed and played inside Libreri, and keep playing while you read.
 
@@ -24,7 +24,8 @@ Libreri has a **Podcasts** section next to Feeds. Shows are found, followed and 
 - **Find podcasts:** Search (Apple, or Podcast Index with a key), Popular (Podcast Index), Address (an RSS address or a site), OPML file (from other podcast apps). Export to OPML too.
 - **Pictures in search results** load from Apple's image servers (`img-src https://*.mzstatic.com`); other artwork shows the show's initials until it is followed.
 
-## Part 2 (planned)
+## Part 2 (built 2026-10-02)
 
-- Transcripts (the show's own; or written down on this computer with the speech models) that follow along, and chapters.
-- "Note this moment" in the notebook, and linking a moment to the page being read.
+- **Transcript and chapters panel** (a button on the player, in the strip and in a book's floating player): the show's own transcript (WebVTT, SRT, JSON or HTML) follows along with the line being said highlighted; clicking a line or a chapter goes there. Chapters show which one is playing.
+- **Note this moment:** the time, the line being said and an optional thought are written as Markdown into the notebook of the book being read, linked to its page, or into the note "Podcast moments" when no book is open. The moment is a `libreri://podcast/<episode>?t=<seconds>` link; clicking it in a notebook or the Notes hub plays the episode from there.
+- **Not yet:** writing a transcript on this computer (with the speech models) for shows without one; it needs the episode downloaded.

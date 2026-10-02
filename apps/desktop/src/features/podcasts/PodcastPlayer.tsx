@@ -10,6 +10,7 @@ import {
   Plus,
   RotateCcw,
   RotateCw,
+  ScrollText,
   Timer,
   X,
 } from "lucide-react";
@@ -20,6 +21,7 @@ import { DropdownMenu, menuContent, menuItem } from "@/components/ui/menu";
 import { cn } from "@/lib/utils";
 import { clock, initials, RATES } from "./model";
 import { showPodcasts } from "./navigate";
+import { EpisodePanel } from "./EpisodePanel";
 import { usePlayer } from "./player";
 
 const SLEEP = [5, 10, 15, 30, 45, 60];
@@ -119,6 +121,7 @@ export function PodcastPlayer({ hidden }: { hidden?: boolean }) {
           });
         }}
       />
+      <EpisodePanel />
       {episode && !hidden && collapsed && (
         <MiniPlayer
           fixed
@@ -242,6 +245,16 @@ export function PodcastControls({ compact }: { compact: boolean }) {
       )}
       <RateControl />
       <SleepMenu />
+      <Button
+        variant={p.panel ? "outline" : "ghost"}
+        size="icon"
+        aria-label="Transcript and chapters"
+        aria-pressed={p.panel}
+        title="Transcript, chapters, and Note this moment"
+        onClick={() => p.setPanel(!p.panel)}
+      >
+        <ScrollText />
+      </Button>
       <Button
         variant="ghost"
         size="icon"
