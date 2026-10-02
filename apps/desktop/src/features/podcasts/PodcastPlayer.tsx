@@ -115,22 +115,23 @@ export function PodcastPlayer({ hidden }: { hidden?: boolean }) {
         }}
       />
       {episode && !inBar && !hidden && (
+        // Floats over the page like the read-aloud and audiobook player.
         <div
           role="region"
           aria-label="Podcast player"
-          className="flex h-14 shrink-0 items-center gap-2 border-t bg-sidebar px-3 text-[12.5px]"
+          className="fixed bottom-5 left-1/2 z-30 flex w-max max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-1.5 rounded-2xl border bg-popover/95 p-1.5 text-[12.5px] text-popover-foreground shadow-xl backdrop-blur"
         >
-          <Artwork src={episode.artwork} title={episode.show} className="size-9" />
+          <Artwork src={episode.artwork} title={episode.show} className="size-9 rounded-[10px]" />
           <button
             type="button"
-            className="flex min-w-0 max-w-72 flex-col text-left leading-tight"
+            className="flex min-w-0 max-w-64 flex-col px-1 text-left leading-tight"
             title={`${episode.title} — ${episode.show}`}
             onClick={() => showPodcasts({ kind: "show", id: episode.feed })}
           >
             <span className="truncate font-medium">{episode.title}</span>
             <span className="truncate text-[11.5px] text-muted-foreground">{episode.show}</span>
           </button>
-          <PodcastControls compact={false} />
+          <PodcastControls compact />
         </div>
       )}
     </>
@@ -169,10 +170,22 @@ export function PodcastControls({ compact }: { compact: boolean }) {
         <RotateCw />
       </Button>
       {compact ? (
-        <span className="px-1 text-[11.5px] text-muted-foreground tabular-nums">
-          {clock(p.time)}
-          {total ? ` / ${clock(total)}` : ""}
-        </span>
+        <div className="flex shrink-0 flex-col gap-0.5 px-1">
+          <input
+            type="range"
+            aria-label="Position"
+            min={0}
+            max={Math.max(1, Math.round(total))}
+            step={1}
+            value={Math.min(Math.round(p.time), Math.round(total) || 1)}
+            onChange={(e) => p.seek(Number(e.target.value))}
+            className="h-1 w-32 accent-foreground"
+          />
+          <span className="text-[11px] text-muted-foreground tabular-nums">
+            {clock(p.time)}
+            {total ? ` / ${clock(total)}` : ""}
+          </span>
+        </div>
       ) : (
         <div className="flex min-w-32 flex-1 items-center gap-2">
           <span className="w-12 text-right text-[11.5px] text-muted-foreground tabular-nums">
@@ -195,17 +208,15 @@ export function PodcastControls({ compact }: { compact: boolean }) {
       )}
       <RateControl />
       <SleepMenu />
-      {!compact && (
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Up next"
-          title="Up next"
-          onClick={() => showPodcasts({ kind: "list", id: "queue" })}
-        >
-          <ListOrdered />
-        </Button>
-      )}
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Up next"
+        title="Up next"
+        onClick={() => showPodcasts({ kind: "list", id: "queue" })}
+      >
+        <ListOrdered />
+      </Button>
       <Button variant="ghost" size="icon" aria-label="Stop the podcast" onClick={p.stop}>
         <X />
       </Button>

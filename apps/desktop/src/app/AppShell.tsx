@@ -720,7 +720,7 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
         )}
       </div>
 
-      {session.keepsData && <PodcastPlayer hidden={readingFullscreen} />}
+      {session.keepsData && <PodcastPlayer hidden={readingFullscreen || activeTab !== null} />}
 
       <CommandPalette
         open={ui.paletteOpen}

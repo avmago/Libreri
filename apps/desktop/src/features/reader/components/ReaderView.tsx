@@ -585,14 +585,19 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
     setListen(m);
   };
   const podcastLoaded = usePlayer((s) => s.episode !== null);
+  // A podcast playing shows in the book's floating player by itself (the
+  // window's own podcast player hides over books); the toolbar button
+  // hides it.
+  const [podcastHidden, setPodcastHidden] = useState(false);
+  const mode: ListenMode | null = listen ?? (podcastLoaded && !podcastHidden ? "podcast" : null);
   const stopListening = () => {
     readAloud.stop();
     setListen(null);
   };
   const showListenBar =
-    listen === "audio" ||
-    (listen === "podcast" && podcastLoaded) ||
-    (listen === "read" && readAloud.status !== "off");
+    mode === "audio" ||
+    (mode === "podcast" && podcastLoaded) ||
+    (mode === "read" && readAloud.status !== "off");
 
   // An audiobook of this book is playing: follow it.
   const followTo = useListening((s) => s.follow[bookId]);
@@ -1433,8 +1438,16 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
             size="icon"
             aria-label="Podcast"
             title="Show the podcast here"
-            aria-pressed={listen === "podcast"}
-            onClick={() => (listen === "podcast" ? setListen(null) : listenWith("podcast"))}
+            aria-pressed={mode === "podcast"}
+            onClick={() => {
+              if (mode === "podcast") {
+                setPodcastHidden(true);
+                setListen(null);
+              } else {
+                setPodcastHidden(false);
+                listenWith("podcast");
+              }
+            }}
           >
             <Podcast />
           </Button>
@@ -1778,7 +1791,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
           )}
           {showListenBar && !comparing && !editing && status === "ready" && (
             <ListenBar
-              mode={listen ?? "read"}
+              mode={mode ?? "read"}
               onMode={listenWith}
               onClose={stopListening}
               readAloud={readAloud}
