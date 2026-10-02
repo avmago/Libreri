@@ -13,3 +13,16 @@ export {
   useRemoveMathsModel,
   useSetMathsFromPictures,
 } from "./maths/api";
+export {
+  cancelVoiceDownload,
+  openVoicesSettings,
+  piperSample,
+  setVoicesSettingsOpener,
+  useDownloadVoice,
+  useNaturalVoices,
+  usePiperLanguages,
+  usePiperVoices,
+  useRemoveVoice,
+  useSetVoiceOn,
+} from "./speech/natural";
+export { baseLang } from "./speech/choose";

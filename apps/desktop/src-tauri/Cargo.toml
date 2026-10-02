@@ -26,6 +26,7 @@ libreri-speech = { workspace = true, features = ["specta"] }
 libreri-spell = { workspace = true, features = ["specta"] }
 libreri-maths = { workspace = true, features = ["specta"] }
 libreri-ocr = { workspace = true, features = ["specta"] }
+libreri-voices = { workspace = true, features = ["specta"] }
 libreri-links = { workspace = true, features = ["specta"] }
 libreri-feeds = { workspace = true, features = ["specta"] }
 libreri-pdf-edit = { workspace = true, features = ["specta"] }

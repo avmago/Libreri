@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useProfilePrefs } from "@/features/profiles";
 import type { Renderer, SpeechPiece, SpeechSource } from "@/readers";
-import { getEngine, type Engine } from "./engine";
+import { chooseVoice } from "./choose";
+import { getEngine, isNatural, type Engine } from "./engine";
+import { commands } from "@/lib/ipc";
 
 export type ReadAloudStatus = "off" | "starting" | "playing" | "paused" | "noVoices";
 
@@ -46,11 +48,24 @@ export function useReadAloud(renderer: React.RefObject<Renderer | null>) {
       src.show(p, listening.follow);
       setSentence(p.text);
       setNumber(index.current + 1);
-      const finished = await e.speak(p.text, {
-        voice: listening.voice,
-        rate: listening.speechRate,
-        lang: p.lang,
-      });
+      const voice = chooseVoice(e.voices, listening, p.lang);
+      const opts = { voice, rate: listening.speechRate, lang: p.lang };
+      // A natural voice makes the next sentence while this one is said.
+      const next = pieces.current[index.current + 1] ?? src.peek?.() ?? null;
+      if (next && e.prepare) {
+        e.prepare(next.text, { ...opts, voice: chooseVoice(e.voices, listening, next.lang) });
+      }
+      let finished: boolean;
+      try {
+        finished = await e.speak(p.text, opts);
+      } catch (err) {
+        if (id !== run.current) return;
+        setStatus("paused");
+        toast.error("This voice could not read aloud", {
+          description: err instanceof Error ? err.message : String(err),
+        });
+        return;
+      }
       if (!finished || id !== run.current) return;
     }
   }, []);
@@ -109,6 +124,8 @@ export function useReadAloud(renderer: React.RefObject<Renderer | null>) {
   const stop = useCallback(() => {
     run.current++;
     eng.current?.stop();
+    // A natural voice gives its memory back.
+    if (eng.current?.voices.some((v) => isNatural(v.id))) void commands.unloadVoices();
     source.current?.clear();
     source.current = null;
     setStatus("off");

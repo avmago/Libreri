@@ -59,7 +59,7 @@ impl Helper {
             Self::Tesseract => "Reads the text of scanned books (OCR) so they can be searched.",
             Self::Unar => "Opens comics packed as ACE archives (.cba). Optional.",
             Self::Espeak => {
-                "Reads books aloud where the system has no voices of its own (often on Linux). Optional."
+                "Reads books aloud where the system has no voices of its own (often on Linux), and turns words into sounds for natural voices. Optional."
             }
         }
     }
@@ -313,7 +313,7 @@ impl Installer {
             (Self::Zypper, Helper::DjVuLibre) => "djvulibre",
             (Self::Zypper, Helper::Tesseract) => "tesseract-ocr",
             (Self::Zypper, Helper::Unar) => "unar",
-            (Self::Winget, Helper::Espeak) => return None,
+            (Self::Winget, Helper::Espeak) => "eSpeak-NG.eSpeak-NG",
             (_, Helper::Espeak) => "espeak-ng",
         })
     }

@@ -170,14 +170,30 @@ export class DomSpeech implements SpeechSource {
         this.iter = blocks(root);
         continue;
       }
-      const { text, parts, lang } = b.value;
-      for (const s of sentences(text, lang || undefined)) {
-        const range = rangeFor(this.doc!, parts, s.start, s.end);
-        const said = text.slice(s.start, s.end).replace(/\s+/g, " ").trim();
-        if (range && said) this.queue.push({ text: said, lang: lang || undefined, range });
-      }
+      this.fill(b.value);
     }
     return this.queue.shift()!;
+  }
+
+  peek(): SpeechPiece | null {
+    while (!this.queue.length && this.iter) {
+      const b = this.iter.next();
+      if (b.done) {
+        // Put back an iterator that is done; next() turns the chapter.
+        this.iter = (function* () {})();
+        return null;
+      }
+      this.fill(b.value);
+    }
+    return this.queue[0] ?? null;
+  }
+
+  private fill({ text, parts, lang }: { text: string; parts: Part[]; lang: string }) {
+    for (const s of sentences(text, lang || undefined)) {
+      const range = rangeFor(this.doc!, parts, s.start, s.end);
+      const said = text.slice(s.start, s.end).replace(/\s+/g, " ").trim();
+      if (range && said) this.queue.push({ text: said, lang: lang || undefined, range });
+    }
   }
 
   show(piece: SpeechPiece, follow: boolean) {

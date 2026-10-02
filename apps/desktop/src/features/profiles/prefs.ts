@@ -67,6 +67,8 @@ export interface ProfilePrefs {
     speechRate: number;
     /** Voice name (system voices) or eSpeak voice id; null = the default. */
     voice: string | null;
+    /** The voice for books in a language ("en" → "kokoro:af_heart"). */
+    voiceFor: Record<string, string>;
     /** Turn pages to follow what is being read. */
     follow: boolean;
     /** Audiobook speed, 0.5–3. */
@@ -104,6 +106,7 @@ export const DEFAULT_PROFILE_PREFS: ProfilePrefs = {
   listening: {
     speechRate: 1,
     voice: null,
+    voiceFor: {},
     follow: true,
     audioRate: 1,
     skipBack: 15,

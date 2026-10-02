@@ -405,6 +405,17 @@ pub struct OcrModelDownload {
     pub error: Option<String>,
 }
 
+/// Progress of downloading a natural voice ("kokoro", "piper:<voice>").
+#[derive(Debug, Clone, Serialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct VoiceDownload {
+    pub id: String,
+    pub done: f64,
+    pub total: f64,
+    pub finished: bool,
+    pub error: Option<String>,
+}
+
 /// Progress of downloading an extra canvas font.
 #[derive(Debug, Clone, Serialize, Type, Event)]
 #[serde(rename_all = "camelCase")]

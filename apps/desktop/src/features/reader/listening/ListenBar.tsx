@@ -27,6 +27,8 @@ import { useTabs } from "@/lib/tabs";
 import { cn } from "@/lib/utils";
 import { savePosition } from "../api";
 import { getEngine } from "../speech/engine";
+import { baseLang, chooseVoice } from "../speech/choose";
+import { openVoicesSettings } from "../speech/natural";
 import { SPEEDS } from "../speech/speeds";
 import type { ReadAloud } from "../speech/useReadAloud";
 import { useListening } from "./store";
@@ -337,24 +339,34 @@ function PlayControls({
   );
 }
 
-/** Reading aloud with a system voice. */
+const MORE = "__more";
+const GROUP_LABEL = {
+  kokoro: "Natural · Kokoro",
+  piper: "Natural · Piper",
+  system: "This computer",
+} as const;
+
+/** Reading aloud with a natural or a system voice. */
 function ReadPart({ r, lang, onClose }: { r: ReadAloud; lang?: string; onClose: () => void }) {
   const listening = useProfilePrefs((s) => s.prefs.listening);
   const update = useProfilePrefs((s) => s.update);
   const openHelper = useHelperDialog((s) => s.open);
   const sleep = useSleep(() => r.pause());
 
-  // The book's language first, then the rest.
-  const voices = useMemo(() => {
-    const list = [...(r.engine?.voices ?? [])];
-    const want = (lang || navigator.language || "en").slice(0, 2).toLowerCase();
-    return list.sort(
+  // Natural voices first, then the system's; the book's language first.
+  const groups = useMemo(() => {
+    const want = baseLang(lang || navigator.language || "en");
+    const sorted = [...(r.engine?.voices ?? [])].sort(
       (a, b) =>
-        Number(!a.lang.toLowerCase().startsWith(want)) -
-          Number(!b.lang.toLowerCase().startsWith(want)) || a.name.localeCompare(b.name),
+        Number(baseLang(a.lang) !== want) - Number(baseLang(b.lang) !== want) ||
+        a.name.localeCompare(b.name),
     );
+    return (["kokoro", "piper", "system"] as const)
+      .map((g) => ({ g, voices: sorted.filter((v) => v.group === g) }))
+      .filter((x) => x.voices.length);
   }, [r.engine, lang]);
-  const voice = voices.find((v) => v.id === listening.voice);
+  const chosen = r.engine ? chooseVoice(r.engine.voices, listening, lang) : null;
+  const voice = r.engine?.voices.find((v) => v.id === chosen);
   useReportPlay(r.status === "playing", r.status === "starting", () =>
     r.status === "playing" ? r.pause() : r.status === "off" ? void r.start() : r.resume(),
   );
@@ -401,24 +413,43 @@ function ReadPart({ r, lang, onClose }: { r: ReadAloud; lang?: string; onClose: 
         <label className="relative flex items-center gap-1 font-medium">
           <span className="truncate">
             Voice: {voice ? voice.name : "Default"}
-            {voice && <span className="font-normal text-muted-foreground"> ({voice.lang})</span>}
+            {voice && (
+              <span className="font-normal text-muted-foreground">
+                {" "}
+                ({voice.group === "system" ? voice.lang : GROUP_LABEL[voice.group].split(" · ")[1]})
+              </span>
+            )}
           </span>
           <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
           <select
             aria-label="Voice"
             className="absolute inset-0 cursor-pointer opacity-0"
-            value={listening.voice ?? ""}
+            value={chosen ?? ""}
             onChange={(e) => {
-              update({ listening: { voice: e.target.value || null } });
+              if (e.target.value === MORE) {
+                openVoicesSettings();
+                return;
+              }
+              const id = e.target.value || null;
+              const base = baseLang(lang || navigator.language);
+              const voiceFor = { ...listening.voiceFor };
+              if (id) voiceFor[base] = id;
+              else delete voiceFor[base];
+              update({ listening: { voice: id, voiceFor } });
               setTimeout(r.restart, 0);
             }}
           >
             <option value="">Default voice</option>
-            {voices.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.name} ({v.lang})
-              </option>
+            {groups.map(({ g, voices }) => (
+              <optgroup key={g} label={GROUP_LABEL[g]}>
+                {voices.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name} ({v.lang})
+                  </option>
+                ))}
+              </optgroup>
             ))}
+            <option value={MORE}>Get more voices…</option>
           </select>
         </label>
         <span className="truncate text-[11.5px] text-muted-foreground">

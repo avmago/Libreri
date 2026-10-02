@@ -581,6 +581,25 @@ export const commands = {
 	 *  already read with it stays.
 	 */
 	removeOcrModel: (id: string) => typedError<OcrEnginesDto, AppError>(__TAURI_INVOKE("remove_ocr_model", { id })),
+	naturalVoices: () => __TAURI_INVOKE<NaturalVoicesDto>("natural_voices"),
+	/**  The languages of the Piper collection (fetched once a week). */
+	piperLanguages: () => typedError<PiperLanguage[], AppError>(__TAURI_INVOKE("piper_languages")),
+	/**  The Piper voices of a language ("de_DE") free to use. */
+	piperVoices: (code: string) => typedError<PiperList, AppError>(__TAURI_INVOKE("piper_voices", { code })),
+	/**
+	 *  Downloads "kokoro" or "piper:<voice>"; progress arrives as
+	 *  `VoiceDownload`.
+	 */
+	downloadVoice: (id: string) => typedError<NaturalVoicesDto, AppError>(__TAURI_INVOKE("download_voice", { id })),
+	cancelVoiceDownload: () => __TAURI_INVOKE<void>("cancel_voice_download"),
+	/**  Deletes a download ("kokoro", "piper:<voice>"). */
+	removeVoice: (id: string) => typedError<NaturalVoicesDto, AppError>(__TAURI_INVOKE("remove_voice", { id })),
+	/**  Switches a download's voices on or off. */
+	setVoiceOn: (id: string, on: boolean) => typedError<NaturalVoicesDto, AppError>(__TAURI_INVOKE("set_voice_on", { id, on })),
+	/**  Speaks `text` with a natural voice; a WAV file as base64. */
+	speakNatural: (voice: string, text: string, speed: number | null) => typedError<string, AppError>(__TAURI_INVOKE("speak_natural", { voice, text, speed })),
+	/**  Frees the memory of the voice last used (reading aloud stopped). */
+	unloadVoices: () => __TAURI_INVOKE<void>("unload_voices"),
 	spellDictionaries: () => __TAURI_INVOKE<DictionaryInfo[]>("spell_dictionaries"),
 	/**  Downloads a dictionary; progress arrives as `DictionaryDownload`. */
 	downloadDictionary: (code: string) => typedError<DictionaryInfo[], AppError>(__TAURI_INVOKE("download_dictionary", { code })),
@@ -633,6 +652,7 @@ export const events = {
 	searchIndexProgress: makeEvent<SearchIndexProgress>("search-index-progress"),
 	sessionChanged: makeEvent<SessionChanged>("session-changed"),
 	speechModelDownload: makeEvent<SpeechModelDownload>("speech-model-download"),
+	voiceDownload: makeEvent<VoiceDownload>("voice-download"),
 };
 
 /* Types */
@@ -1703,6 +1723,16 @@ export type JobEventPayload = {
 /**  A video site Libreri knows how to embed without asking the site. */
 export type KnownVideo = { provider: "youtube"; id: string } | { provider: "vimeo"; id: string; hash: string | null };
 
+/**  Kokoro, as Settings shows it. */
+export type KokoroInfo = {
+	downloaded: boolean,
+	/**  In MB, with the runtime when that is not here yet. */
+	sizeMb: number,
+	licence: string,
+	homepage: string,
+	voices: number,
+};
+
 /**
  *  The books or folders changed (import, scan, rebuild). The interface
  *  refetches its lists.
@@ -1813,6 +1843,39 @@ export type ModelInfo = {
 	/**  Offered first; the bigger ones are in "More models". */
 	recommended: boolean,
 	downloaded: boolean,
+};
+
+/**  A voice that can read aloud now. */
+export type NaturalVoice = {
+	/**  "kokoro:af_heart" or "piper:de_DE-thorsten-high". */
+	id: string,
+	name: string,
+	/**  BCP 47: "en-US", "de-DE". */
+	lang: string,
+	/**  "English (US)". */
+	language: string,
+	/**  "kokoro" or "piper": the download it belongs to. */
+	pack: string,
+	gender: string | null,
+	/**  Piper's "x_low", "low", "medium" or "high". */
+	quality: string | null,
+};
+
+/**  A downloaded voice, and whether it is switched on. */
+export type NaturalVoiceDto = {
+	on: boolean,
+} & NaturalVoice;
+
+export type NaturalVoicesDto = {
+	/**  Every downloaded voice. */
+	voices: NaturalVoiceDto[],
+	kokoro: KokoroInfo,
+	/**  Downloads switched off ("kokoro", "piper:<voice>"). */
+	off: string[],
+	/**  eSpeak NG is installed (it turns words into sounds for the voices). */
+	espeak: boolean,
+	/**  What is downloading. */
+	downloading: string | null,
 };
 
 export type NewProfile = {
@@ -2028,6 +2091,36 @@ export type PictureDto = {
 	src: string,
 	width: number,
 	height: number,
+};
+
+/**  A language of the Piper collection. */
+export type PiperLanguage = {
+	/**  "de_DE". */
+	code: string,
+	name: string,
+	voices: number,
+};
+
+/**
+ *  The Piper voices of one language that are free to use, and how many
+ *  were left out.
+ */
+export type PiperList = {
+	voices: PiperVoiceInfo[],
+	leftOut: number,
+};
+
+/**  A Piper voice of the collection. */
+export type PiperVoiceInfo = {
+	/**  "piper:de_DE-thorsten-high". */
+	id: string,
+	name: string,
+	lang: string,
+	language: string,
+	quality: string,
+	sizeMb: number,
+	licence: string,
+	downloaded: boolean,
 };
 
 export type PlayerDto = {
@@ -2338,6 +2431,15 @@ export type Voice = {
 	id: string,
 	name: string,
 	lang: string,
+};
+
+/**  Progress of downloading a natural voice ("kokoro", "piper:<voice>"). */
+export type VoiceDownload = {
+	id: string,
+	done: number | null,
+	total: number | null,
+	finished: boolean,
+	error: string | null,
 };
 
 export type VoiceNoteDto = {

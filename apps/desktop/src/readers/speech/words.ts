@@ -102,6 +102,10 @@ export class WordSpeech implements SpeechSource {
     return this.queue.shift()!;
   }
 
+  peek(): SpeechPiece | null {
+    return this.queue[0] ?? null;
+  }
+
   show(piece: SpeechPiece, follow: boolean) {
     const p = piece as WordPiece;
     this.draw(p.page, p.rects);

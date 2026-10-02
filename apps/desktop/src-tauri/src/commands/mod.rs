@@ -32,6 +32,7 @@ pub mod search;
 pub mod settings;
 pub mod speech;
 pub mod spell;
+pub mod voices;
 
 use crate::error::{AppError, AppErrorKind, AppResult};
 

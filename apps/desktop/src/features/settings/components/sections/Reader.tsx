@@ -4,6 +4,7 @@ import { useReaderPrefs } from "@/features/reader";
 import { cn } from "@/lib/utils";
 import { PAGE_THEMES, type PdfDarkMode } from "@/readers";
 import { Group, Row, Slider, Switch } from "../parts";
+import { ReadAloudVoices } from "./ReadAloudVoices";
 
 const PDF_MODES: { value: PdfDarkMode; label: string }[] = [
   { value: "recolour", label: "Recolour text, keep pictures" },
@@ -187,6 +188,7 @@ export function ReaderSettings() {
           </Row>
         )}
       </Group>
+      <ReadAloudVoices />
     </>
   );
 }

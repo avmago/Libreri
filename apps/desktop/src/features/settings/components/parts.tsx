@@ -79,11 +79,15 @@ export function Switch({
   onChange,
   label,
   id,
+  disabled,
+  title,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   label: string;
   id?: string;
+  disabled?: boolean;
+  title?: string;
 }) {
   return (
     <button
@@ -92,9 +96,11 @@ export function Switch({
       role="switch"
       aria-checked={checked}
       aria-label={label}
+      title={title}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cn(
-        "relative h-5 w-9 shrink-0 rounded-full transition-colors",
+        "relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40",
         checked ? "bg-primary" : "bg-muted-foreground/30",
       )}
     >

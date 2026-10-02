@@ -46,6 +46,9 @@ pub struct AppSettings {
     /// What reads scanned pages: `None` for Tesseract, or a downloaded
     /// model ("paddleocr-vl", ADR 0029).
     pub ocr_engine: Option<String>,
+    /// Downloaded natural voices switched off ("kokoro", "piper:<voice>",
+    /// ADR 0030); every other downloaded one is on.
+    pub voices_off: Vec<String>,
 }
 
 /// Speech recognition: which downloaded model to use and how.

@@ -1,15 +1,19 @@
 /**
- * The voices that read aloud: the system's own (Web Speech in the web
- * view: macOS, Windows and many Linux systems), or eSpeak NG through
- * Libreri where the web view has none.
+ * The voices that read aloud: natural voices downloaded in Settings ›
+ * Reader (Kokoro and Piper, ADR 0030), and the system's own (Web Speech
+ * in the web view: macOS, Windows and many Linux systems), or eSpeak NG
+ * through Libreri where the web view has none.
  */
 import { commands, unwrap } from "@/lib/ipc";
 
 export interface Voice {
-  /** Stable name to remember (voiceURI, or eSpeak's voice id). */
+  /** Stable name to remember (voiceURI, eSpeak's voice id, or
+   * "kokoro:af_heart" / "piper:de_DE-thorsten-high"). */
   id: string;
   name: string;
   lang: string;
+  /** Where it comes from: a natural voice's download, or the system. */
+  group: "kokoro" | "piper" | "system";
 }
 
 export interface SpeakOptions {
@@ -19,11 +23,13 @@ export interface SpeakOptions {
 }
 
 export interface Engine {
-  kind: "system" | "espeak";
+  kind: "system" | "espeak" | "mixed";
   voices: Voice[];
   /** Resolves true when the text was spoken to the end, false when stopped. */
   speak(text: string, opts: SpeakOptions): Promise<boolean>;
   stop(): void;
+  /** Gets the next sentence ready while this one is spoken. */
+  prepare?(text: string, opts: SpeakOptions): void;
 }
 
 async function webVoices(): Promise<SpeechSynthesisVoice[]> {
@@ -60,7 +66,12 @@ class WebEngine implements Engine {
   private stopped = false;
 
   constructor(private readonly list: SpeechSynthesisVoice[]) {
-    this.voices = list.map((v) => ({ id: v.voiceURI, name: v.name, lang: v.lang }));
+    this.voices = list.map((v) => ({
+      id: v.voiceURI,
+      name: v.name,
+      lang: v.lang,
+      group: "system" as const,
+    }));
   }
 
   speak(text: string, opts: SpeakOptions): Promise<boolean> {
@@ -96,7 +107,10 @@ class WebEngine implements Engine {
 
 class EspeakEngine implements Engine {
   kind = "espeak" as const;
-  constructor(public voices: Voice[]) {}
+  voices: Voice[];
+  constructor(list: Omit<Voice, "group">[]) {
+    this.voices = list.map((v) => ({ ...v, group: "system" as const }));
+  }
 
   async speak(text: string, opts: SpeakOptions): Promise<boolean> {
     const voice = opts.voice ?? (opts.lang ? opts.lang.toLowerCase() : null);
@@ -110,8 +124,8 @@ class EspeakEngine implements Engine {
 
 let chosen: Promise<Engine | null> | null = null;
 
-/** The engine to use on this computer (found once). */
-export function getEngine(again = false): Promise<Engine | null> {
+/** The system's engine (found once). */
+function systemEngine(again: boolean): Promise<Engine | null> {
   if (again) chosen = null;
   chosen ??= (async () => {
     const web = await webVoices();
@@ -121,4 +135,142 @@ export function getEngine(again = false): Promise<Engine | null> {
     return null;
   })();
   return chosen;
+}
+
+export const isNatural = (id: string | null | undefined) =>
+  !!id && (id.startsWith("kokoro:") || id.startsWith("piper:"));
+
+/**
+ * Natural voices: each sentence is made on this computer as a WAV file and
+ * played. The next sentence is made while this one plays.
+ */
+class NaturalEngine {
+  private audio: HTMLAudioElement | null = null;
+  private finish: ((ok: boolean) => void) | null = null;
+  private cache = new Map<string, Promise<string>>();
+
+  private key(text: string, voice: string, speed: number) {
+    return `${voice}|${speed}|${text}`;
+  }
+
+  /** The model's own speed (0.5–2); the rest is played faster. */
+  private speeds(rate: number) {
+    const native = Math.min(2, Math.max(0.5, rate));
+    return { native, play: Math.min(3, Math.max(0.5, rate)) / native };
+  }
+
+  private make(text: string, voice: string, native: number): Promise<string> {
+    const k = this.key(text, voice, native);
+    let p = this.cache.get(k);
+    if (!p) {
+      p = unwrap(commands.speakNatural(voice, text, native)).then((b64) => {
+        const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+        return URL.createObjectURL(new Blob([bytes], { type: "audio/wav" }));
+      });
+      p.catch(() => this.cache.delete(k));
+      this.cache.set(k, p);
+      // Keep the last few only.
+      while (this.cache.size > 4) {
+        const first = this.cache.keys().next().value!;
+        void this.cache.get(first)?.then(
+          (u) => URL.revokeObjectURL(u),
+          () => {},
+        );
+        this.cache.delete(first);
+      }
+    }
+    return p;
+  }
+
+  prepare(text: string, voice: string, rate: number) {
+    void this.make(text, voice, this.speeds(rate).native).catch(() => {});
+  }
+
+  async speak(text: string, voice: string, rate: number): Promise<boolean> {
+    this.stop();
+    const { native, play } = this.speeds(rate);
+    let stopped = false;
+    const ended = new Promise<boolean>((resolve) => {
+      this.finish = (ok) => {
+        stopped = !ok;
+        resolve(ok);
+      };
+    });
+    // Errors (no eSpeak NG, a damaged download) reach the caller.
+    const url = await Promise.race([this.make(text, voice, native), ended.then(() => null)]);
+    if (url === null || stopped) return false;
+    const a = new Audio(url);
+    a.playbackRate = play;
+    a.preservesPitch = true;
+    this.audio = a;
+    const done = (ok: boolean) => {
+      if (this.audio !== a) return;
+      this.audio = null;
+      const f = this.finish;
+      this.finish = null;
+      f?.(ok);
+    };
+    a.onended = () => done(true);
+    a.onerror = () => done(true);
+    a.play().catch(() => done(false));
+    return ended;
+  }
+
+  stop() {
+    this.audio?.pause();
+    this.audio = null;
+    const f = this.finish;
+    this.finish = null;
+    f?.(false);
+  }
+}
+
+const natural = new NaturalEngine();
+
+/**
+ * Natural voices that are switched on, with the system's: what the voice
+ * menu offers. `speak` sends each voice to the engine it belongs to.
+ */
+class MixedEngine implements Engine {
+  kind = "mixed" as const;
+  voices: Voice[];
+
+  constructor(
+    private readonly system: Engine | null,
+    naturalVoices: Voice[],
+  ) {
+    this.voices = [...naturalVoices, ...(system?.voices ?? [])];
+  }
+
+  speak(text: string, opts: SpeakOptions): Promise<boolean> {
+    if (isNatural(opts.voice)) return natural.speak(text, opts.voice!, opts.rate);
+    if (this.system) return this.system.speak(text, opts);
+    return Promise.resolve(false);
+  }
+
+  prepare(text: string, opts: SpeakOptions) {
+    if (isNatural(opts.voice)) natural.prepare(text, opts.voice!, opts.rate);
+  }
+
+  stop() {
+    natural.stop();
+    this.system?.stop();
+  }
+}
+
+/** The voices of this computer: natural ones (looked up each time, as
+ * they are downloaded or switched off in Settings) and the system's. */
+export async function getEngine(again = false): Promise<Engine | null> {
+  const system = await systemEngine(again);
+  const list = await commands.naturalVoices().catch(() => null);
+  const voices: Voice[] = (list?.voices ?? [])
+    .filter((v) => v.on)
+    .map((v) => ({
+      id: v.id,
+      name: v.name,
+      lang: v.lang,
+      group: v.id.startsWith("kokoro:") ? "kokoro" : "piper",
+    }));
+  if (!voices.length) return system;
+  return new MixedEngine(system, voices);
 }

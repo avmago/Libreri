@@ -81,7 +81,7 @@ import {
   useProfilePrefs,
   useSignOut,
 } from "@/features/profiles";
-import { ReaderView, flushSession, useSession } from "@/features/reader";
+import { ReaderView, flushSession, setVoicesSettingsOpener, useSession } from "@/features/reader";
 import {
   SettingsPage,
   ShortcutsSheet,
@@ -243,6 +243,20 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
 
   // "Settings" in the speech feature's messages (e.g. no model yet).
   useEffect(() => setSpeechSettingsOpener(() => useUi.getState().openSettings("speech")), []);
+  useEffect(
+    () =>
+      setVoicesSettingsOpener(() => {
+        useUi.getState().openSettings("reader");
+        setTimeout(
+          () =>
+            document
+              .querySelector('section[aria-label="Read aloud voices"]')
+              ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+          250,
+        );
+      }),
+    [],
+  );
   useEffect(() => setPodcastSettingsOpener(() => useUi.getState().openSettings("online")), []);
 
   useShortcut("palette.open", () => ui.setPaletteOpen(true));

@@ -249,6 +249,15 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::ocr_models::download_ocr_model,
             commands::ocr_models::cancel_ocr_model_download,
             commands::ocr_models::remove_ocr_model,
+            commands::voices::natural_voices,
+            commands::voices::piper_languages,
+            commands::voices::piper_voices,
+            commands::voices::download_voice,
+            commands::voices::cancel_voice_download,
+            commands::voices::remove_voice,
+            commands::voices::set_voice_on,
+            commands::voices::speak_natural,
+            commands::voices::unload_voices,
             commands::spell::spell_dictionaries,
             commands::spell::download_dictionary,
             commands::spell::cancel_dictionary_download,
@@ -285,6 +294,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::CanvasFontDownload,
             events::MathsDownload,
             events::OcrModelDownload,
+            events::VoiceDownload,
         ])
 }
 
