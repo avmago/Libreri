@@ -12,6 +12,13 @@ use tauri::{AppHandle, Manager, State};
 
 const TRAY: &str = "libreri-timer";
 
+/// What the tray's menu was last built for (detail, paused, can skip).
+fn menu_shown() -> &'static std::sync::Mutex<Option<(String, bool, bool)>> {
+    static M: std::sync::OnceLock<std::sync::Mutex<Option<(String, bool, bool)>>> =
+        std::sync::OnceLock::new();
+    M.get_or_init(Default::default)
+}
+
 /// The signed-in profile's reading calendar (JSON), or None at first.
 #[tauri::command]
 #[specta::specta]
@@ -104,19 +111,34 @@ fn menu(app: &AppHandle, t: &TimerTray) -> tauri::Result<Menu<tauri::Wry>> {
 #[specta::specta]
 pub fn timer_tray(app: AppHandle, timer: Option<TimerTray>) -> AppResult<()> {
     let Some(t) = timer else {
+        *menu_shown()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
         let _ = app.remove_tray_by_id(TRAY);
         set_progress(&app, None, false);
         return Ok(());
     };
     set_progress(&app, t.progress, t.paused);
-    let m = menu(&app, &t).map_err(|e| AppError::invalid(e.to_string()))?;
     let tooltip = format!("{} · {}", t.text, t.detail);
+    // The menu is only rebuilt when what it offers changes: replacing it
+    // every second closed it while it was open.
+    let key = (t.detail.clone(), t.paused, t.can_skip);
+    let mut shown = menu_shown()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     if let Some(tray) = app.tray_by_id(TRAY) {
         let _ = tray.set_title(Some(&t.text));
         let _ = tray.set_tooltip(Some(&tooltip));
-        let _ = tray.set_menu(Some(m));
+        if shown.as_ref() != Some(&key) {
+            let m = menu(&app, &t).map_err(|e| AppError::invalid(e.to_string()))?;
+            let _ = tray.set_menu(Some(m));
+            *shown = Some(key);
+        }
         return Ok(());
     }
+    let m = menu(&app, &t).map_err(|e| AppError::invalid(e.to_string()))?;
+    *shown = Some(key);
+    drop(shown);
     let mut b = TrayIconBuilder::with_id(TRAY)
         .title(&t.text)
         .tooltip(&tooltip)
