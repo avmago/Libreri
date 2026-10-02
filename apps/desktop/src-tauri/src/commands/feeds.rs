@@ -1459,24 +1459,165 @@ pub async fn podcast_episodes(app: AppHandle, ids: Vec<String>) -> AppResult<Vec
     .await
 }
 
-/// An episode's transcript, from the show (none when it has none).
+/// An episode's transcript: the show's own, or one written down on this
+/// computer; and whether one can be written (downloaded, a speech model).
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct TranscriptDto {
+    pub cues: Vec<libreri_feeds::podcasts::Cue>,
+    /// "show", "written" (on this computer, complete), "partial" (being
+    /// written, or stopped part way) or "none".
+    pub source: String,
+    pub downloaded: bool,
+    pub has_model: bool,
+}
+
+/// Where a written transcript is kept: beside the download, hidden.
+fn written_path(audio: &std::path::Path) -> std::path::PathBuf {
+    let name = audio
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    audio.with_file_name(format!(".{name}.transcript.json"))
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct Written {
+    complete: bool,
+    cues: Vec<libreri_feeds::podcasts::Cue>,
+}
+
+fn downloaded_file(state: &AppState, item: &FeedItem) -> Option<std::path::PathBuf> {
+    let rel = item.file.as_deref()?;
+    let lib = state.library().ok()?;
+    lib.own_feed_file(rel).ok().filter(|p| p.is_file())
+}
+
 #[tauri::command]
 #[specta::specta]
-pub async fn podcast_transcript(
-    app: AppHandle,
-    id: String,
-) -> AppResult<Vec<libreri_feeds::podcasts::Cue>> {
+pub async fn podcast_transcript(app: AppHandle, id: String) -> AppResult<TranscriptDto> {
     blocking(move || {
         let state = app.state::<AppState>();
         let item = read(&state, Space::Podcasts, |s| s.item(&id).cloned())?
             .ok_or_else(|| AppError::invalid("that episode is no longer there"))?;
-        let Some(url) = item.entry.transcript.as_deref() else {
-            return Ok(Vec::new());
+        let file = downloaded_file(&state, &item);
+        let has_model = libreri_speech::models(&state.whisper_dir)
+            .iter()
+            .any(|m| m.downloaded);
+        let mut dto = TranscriptDto {
+            cues: Vec::new(),
+            source: "none".into(),
+            downloaded: file.is_some(),
+            has_model,
         };
-        libreri_feeds::podcasts::transcript(url, item.entry.transcript_type.as_deref())
-            .map_err(AppError::invalid)
+        if let Some(url) = item.entry.transcript.as_deref() {
+            match libreri_feeds::podcasts::transcript(url, item.entry.transcript_type.as_deref()) {
+                Ok(cues) if !cues.is_empty() => {
+                    dto.cues = cues;
+                    dto.source = "show".into();
+                    return Ok(dto);
+                }
+                Ok(_) => {}
+                // Offline: a written one may still be there.
+                Err(e) if file.is_none() => return Err(AppError::invalid(e)),
+                Err(_) => {}
+            }
+        }
+        if let Some(w) = file
+            .as_deref()
+            .and_then(|f| std::fs::read_to_string(written_path(f)).ok())
+            .and_then(|s| serde_json::from_str::<Written>(&s).ok())
+        {
+            dto.source = if w.complete { "written" } else { "partial" }.into();
+            dto.cues = w.cues;
+        }
+        Ok(dto)
     })
     .await
+}
+
+/// Minutes of audio written down at a time (saved after each).
+const PIECE_SECONDS: f64 = 300.0;
+
+/// Writes an episode's transcript on this computer with the speech model,
+/// piece by piece (the panel shows each piece as it is done). The episode
+/// must be downloaded. Returns the job id.
+#[tauri::command]
+#[specta::specta]
+pub fn podcast_write_transcript(app: AppHandle, id: String) -> AppResult<String> {
+    let state = app.state::<AppState>();
+    let item = read(&state, Space::Podcasts, |s| s.item(&id).cloned())?
+        .ok_or_else(|| AppError::invalid("that episode is no longer there"))?;
+    let file = downloaded_file(&state, &item)
+        .ok_or_else(|| AppError::invalid("download the episode first"))?;
+    if !libreri_speech::models(&state.whisper_dir)
+        .iter()
+        .any(|m| m.downloaded)
+    {
+        return Err(AppError::new(
+            AppErrorKind::NotFound,
+            "download a speech model first (Settings › Speech)",
+        ));
+    }
+    let language = state
+        .settings
+        .lock()
+        .map(|s| s.speech.language.clone())
+        .unwrap_or(None);
+    let handle = app.clone();
+    let label = format!("Writing down “{}”", item.entry.title);
+    let job = state.jobs.submit(label, move |ctx| {
+        use libreri_jobs::JobError;
+        let failed = |e: String| JobError::Failed(e);
+        let transcriber = handle
+            .state::<AppState>()
+            .transcriber()
+            .map_err(|e| failed(e.to_string()))?;
+        let total = libreri_speech::audio::duration(&file)
+            .ok_or_else(|| failed("the episode's length is unknown".into()))?;
+        let out = written_path(&file);
+        let save = |w: &Written| {
+            let json = serde_json::to_string(w).map_err(|e| failed(e.to_string()))?;
+            std::fs::write(&out, json).map_err(|e| failed(e.to_string()))
+        };
+        let mut written = Written {
+            complete: false,
+            cues: Vec::new(),
+        };
+        let mut at = 0.0;
+        while at < total {
+            ctx.check_cancelled()?;
+            ctx.progress(
+                at as u64,
+                total as u64,
+                Some(format!(
+                    "{} of {} min",
+                    (at / 60.0) as u64,
+                    (total / 60.0).ceil() as u64
+                )),
+            );
+            let (samples, _) =
+                libreri_speech::audio::decode(&file, at, Some(PIECE_SECONDS)).map_err(failed)?;
+            let segs = transcriber
+                .transcribe(&samples, language.as_deref(), None)
+                .map_err(failed)?;
+            written
+                .cues
+                .extend(segs.into_iter().map(|s| libreri_feeds::podcasts::Cue {
+                    start: Some(at + s.start),
+                    end: Some(at + s.end),
+                    speaker: None,
+                    text: s.text,
+                }));
+            at += PIECE_SECONDS;
+            save(&written)?;
+        }
+        written.complete = true;
+        save(&written)?;
+        ctx.progress(total as u64, total as u64, None);
+        Ok(())
+    });
+    Ok(job.to_string())
 }
 
 /// An episode's chapters, from the show (none when it has none).

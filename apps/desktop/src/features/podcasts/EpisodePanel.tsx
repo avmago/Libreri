@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { BookOpen, Loader2, NotebookPen, X } from "lucide-react";
+import { BookOpen, FileAudio, Loader2, NotebookPen, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useReading } from "@/features/study";
-import { commands, unwrap } from "@/lib/ipc";
+import { commands, events, unwrap, type Cue, type TranscriptDto } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
 import { clock } from "./model";
 import { cueAt, momentMarkdown, saidAt, saveMoment } from "./moments";
@@ -38,7 +38,8 @@ export function EpisodePanel() {
     enabled: open && !!id,
     staleTime: Infinity,
   });
-  const cues = useMemo(() => transcript.data ?? [], [transcript.data]);
+  const cues = useMemo(() => transcript.data?.cues ?? [], [transcript.data]);
+  const writing = useWriting(id, () => void transcript.refetch());
   const chs = useMemo(() => chapters.data ?? [], [chapters.data]);
   const current = cueAt(cues, time);
   const chapter = chs.reduce(
@@ -128,34 +129,31 @@ export function EpisodePanel() {
             <Loading />
           ) : transcript.isError ? (
             <Empty>{String((transcript.error as Error).message ?? transcript.error)}</Empty>
-          ) : !cues.length ? (
-            <Empty>This show has no transcript for this episode.</Empty>
+          ) : transcript.data &&
+            transcript.data.source !== "show" &&
+            (!cues.length || writing.job || transcript.data.source === "partial") ? (
+            <>
+              <WriteDown
+                id={id}
+                info={transcript.data}
+                writing={writing}
+                onStart={() => void transcript.refetch()}
+              />
+              {cues.map((c, i) => (
+                <CueLine key={i} i={i} cue={c} current={current} seek={seek} />
+              ))}
+            </>
           ) : (
-            cues.map((c, i) => (
-              <button
-                key={i}
-                type="button"
-                data-cue={i}
-                disabled={c.start === null}
-                onClick={() => c.start !== null && seek(c.start)}
-                className={cn(
-                  "flex w-full gap-2 rounded-md px-2 py-1.5 text-left leading-relaxed",
-                  c.start !== null && "hover:bg-muted",
-                  i === current && "bg-amber-100/80 dark:bg-amber-500/20",
-                  i < current && "text-muted-foreground",
-                )}
-              >
-                {c.start !== null && (
-                  <span className="w-10 shrink-0 pt-px text-[11px] text-muted-foreground tabular-nums">
-                    {clock(c.start)}
-                  </span>
-                )}
-                <span>
-                  {c.speaker && <span className="font-medium">{c.speaker}: </span>}
-                  {c.text}
-                </span>
-              </button>
-            ))
+            <>
+              {transcript.data?.source === "written" && (
+                <p className="px-2 pb-1 text-[11px] text-muted-foreground">
+                  Written down on this computer; it may have mistakes.
+                </p>
+              )}
+              {cues.map((c, i) => (
+                <CueLine key={i} i={i} cue={c} current={current} seek={seek} />
+              ))}
+            </>
           )
         ) : chapters.isLoading ? (
           <Loading />
@@ -272,4 +270,174 @@ function Loading() {
 
 function Empty({ children }: { children: React.ReactNode }) {
   return <p className="p-3 text-muted-foreground">{children}</p>;
+}
+
+function CueLine({
+  i,
+  cue: c,
+  current,
+  seek,
+}: {
+  i: number;
+  cue: Cue;
+  current: number;
+  seek: (t: number) => void;
+}) {
+  return (
+    <button
+      type="button"
+      data-cue={i}
+      disabled={c.start === null}
+      onClick={() => c.start !== null && seek(c.start)}
+      className={cn(
+        "flex w-full gap-2 rounded-md px-2 py-1.5 text-left leading-relaxed",
+        c.start !== null && "hover:bg-muted",
+        i === current && "bg-amber-100/80 dark:bg-amber-500/20",
+        i < current && "text-muted-foreground",
+      )}
+    >
+      {c.start !== null && (
+        <span className="w-10 shrink-0 pt-px text-[11px] text-muted-foreground tabular-nums">
+          {clock(c.start)}
+        </span>
+      )}
+      <span>
+        {c.speaker && <span className="font-medium">{c.speaker}: </span>}
+        {c.text}
+      </span>
+    </button>
+  );
+}
+
+interface Writing {
+  job: string | null;
+  done: number;
+  total: number;
+  start: (job: string) => void;
+}
+
+/** A transcript being written down: the job, and its progress. */
+function useWriting(id: string, onPiece: () => void): Writing {
+  const [state, setState] = useState<{
+    id: string;
+    job: string | null;
+    done: number;
+    total: number;
+  }>({ id, job: null, done: 0, total: 0 });
+  const job = state.id === id ? state.job : null;
+  const piece = useRef(onPiece);
+  useEffect(() => {
+    piece.current = onPiece;
+  });
+  useEffect(() => {
+    if (!job) return;
+    const off = events.jobEventPayload.listen(({ payload: e }) => {
+      if (e.id !== job) return;
+      if (e.kind === "progress") {
+        setState((s) => ({ ...s, done: e.done ?? 0, total: e.total ?? 0 }));
+        piece.current();
+      } else if (e.kind !== "started") {
+        if (e.kind === "failed")
+          toast.error("The transcript could not be written", {
+            description: e.message ?? undefined,
+          });
+        setState((s) => ({ ...s, job: null }));
+        piece.current();
+      }
+    });
+    return () => void off.then((f) => f());
+  }, [job]);
+  return {
+    job,
+    done: state.done,
+    total: state.total,
+    start: (j) => setState({ id, job: j, done: 0, total: 0 }),
+  };
+}
+
+/** No transcript from the show: write one down on this computer. */
+function WriteDown({
+  id,
+  info,
+  writing,
+  onStart,
+}: {
+  id: string;
+  info: TranscriptDto;
+  writing: Writing;
+  onStart: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const go = async () => {
+    setBusy(true);
+    try {
+      if (!info.downloaded) await unwrap(commands.feedItemDownload("podcasts", id));
+      writing.start(await unwrap(commands.podcastWriteTranscript(id)));
+      onStart();
+    } catch (e) {
+      toast.error("Could not write the transcript", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (writing.job) {
+    const job = writing.job;
+    const pct = writing.total ? Math.round((writing.done / writing.total) * 100) : 0;
+    return (
+      <div className="mx-1 mb-2 flex flex-col gap-1.5 rounded-lg border bg-muted/40 p-3 text-[12.5px]">
+        <p className="flex items-center gap-2 font-medium">
+          <Loader2 className="size-3.5 animate-spin" /> Writing it down on this computer
+        </p>
+        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+          <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+        </div>
+        <p className="flex justify-between gap-2 text-[11.5px] text-muted-foreground">
+          <span>
+            {Math.floor(writing.done / 60)} of {Math.ceil(writing.total / 60) || "…"} min · lines
+            appear as each part is done
+          </span>
+          <button
+            type="button"
+            className="shrink-0 hover:text-foreground"
+            onClick={() => void commands.cancelJob(job)}
+          >
+            Stop
+          </button>
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="mx-1 mb-2 flex flex-col gap-2 rounded-lg border bg-muted/40 p-3 text-[12.5px]">
+      <p>
+        {info.source === "partial"
+          ? "Part of this episode was written down before it stopped."
+          : "This show has no transcript for this episode."}
+      </p>
+      {info.hasModel ? (
+        <>
+          <p className="text-[11.5px] text-muted-foreground">
+            Libreri can write one on this computer with your speech model; nothing is sent anywhere.{" "}
+            {info.downloaded
+              ? "An hour of talk takes a few minutes."
+              : "The episode is downloaded first."}
+          </p>
+          <Button size="sm" className="self-start" disabled={busy} onClick={() => void go()}>
+            <FileAudio />
+            {info.source === "partial"
+              ? "Write it down again"
+              : info.downloaded
+                ? "Write it down"
+                : "Download and write it down"}
+          </Button>
+        </>
+      ) : (
+        <p className="text-[11.5px] text-muted-foreground">
+          To write one on this computer, download a speech model in Settings › Speech.
+        </p>
+      )}
+    </div>
+  );
 }

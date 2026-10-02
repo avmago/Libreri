@@ -553,8 +553,13 @@ export const commands = {
 	podcastQueueSet: (ids: string[]) => typedError<null, AppError>(__TAURI_INVOKE("podcast_queue_set", { ids })),
 	/**  Episodes by id (for the queue and the player). */
 	podcastEpisodes: (ids: string[]) => typedError<FeedItem[], AppError>(__TAURI_INVOKE("podcast_episodes", { ids })),
-	/**  An episode's transcript, from the show (none when it has none). */
-	podcastTranscript: (id: string) => typedError<Cue[], AppError>(__TAURI_INVOKE("podcast_transcript", { id })),
+	podcastTranscript: (id: string) => typedError<TranscriptDto, AppError>(__TAURI_INVOKE("podcast_transcript", { id })),
+	/**
+	 *  Writes an episode's transcript on this computer with the speech model,
+	 *  piece by piece (the panel shows each piece as it is done). The episode
+	 *  must be downloaded. Returns the job id.
+	 */
+	podcastWriteTranscript: (id: string) => typedError<string, AppError>(__TAURI_INVOKE("podcast_write_transcript", { id })),
 	/**  An episode's chapters, from the show (none when it has none). */
 	podcastChapters: (id: string) => typedError<Chapter[], AppError>(__TAURI_INVOKE("podcast_chapters", { id })),
 	mathsSettings: () => __TAURI_INVOKE<MathsSettingsDto>("maths_settings"),
@@ -2470,6 +2475,21 @@ export type TopicDto = {
 	/**  arXiv's name for it, when it is an arXiv category. */
 	name: string | null,
 	count: number,
+};
+
+/**
+ *  An episode's transcript: the show's own, or one written down on this
+ *  computer; and whether one can be written (downloaded, a speech model).
+ */
+export type TranscriptDto = {
+	cues: Cue[],
+	/**
+	 *  "show", "written" (on this computer, complete), "partial" (being
+	 *  written, or stopped part way) or "none".
+	 */
+	source: string,
+	downloaded: boolean,
+	hasModel: boolean,
 };
 
 export type UnsearchableDto = {

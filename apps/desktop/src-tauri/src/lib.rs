@@ -237,6 +237,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::feeds::podcast_queue_set,
             commands::feeds::podcast_episodes,
             commands::feeds::podcast_transcript,
+            commands::feeds::podcast_write_transcript,
             commands::feeds::podcast_chapters,
             commands::maths::maths_settings,
             commands::maths::set_maths_from_pictures,
