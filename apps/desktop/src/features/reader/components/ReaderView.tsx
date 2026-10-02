@@ -571,6 +571,13 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   const readAloud = useReadAloud(rendererRef);
   // The floating player: read aloud, or the linked audiobook.
   const [listen, setListen] = useState<ListenMode | null>(null);
+  // Read aloud stopped by itself (the end, no text, a voice that failed):
+  // let the podcast bar, if any, come back.
+  const [seenStatus, setSeenStatus] = useState(readAloud.status);
+  if (seenStatus !== readAloud.status) {
+    setSeenStatus(readAloud.status);
+    if (readAloud.status === "off" && listen === "read") setListen(null);
+  }
   const toggleReadAloud = () => {
     if (listen === "read" && readAloud.status !== "off") {
       readAloud.stop();

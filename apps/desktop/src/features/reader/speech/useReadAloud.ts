@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { useProfilePrefs } from "@/features/profiles";
 import type { Renderer, SpeechPiece, SpeechSource } from "@/readers";
 import { chooseVoice } from "./choose";
-import { getEngine, isNatural, type Engine } from "./engine";
+import { getEngine, isNatural, primeSpeech, type Engine } from "./engine";
 import { commands } from "@/lib/ipc";
 
 export type ReadAloudStatus = "off" | "starting" | "playing" | "paused" | "noVoices";
@@ -29,6 +29,9 @@ export function useReadAloud(renderer: React.RefObject<Renderer | null>) {
     const src = source.current;
     if (!e || !src) return;
     setStatus("playing");
+    // Sentences that "finished" at once, one after another: the voice is
+    // not speaking (rather than racing to the end of the book in silence).
+    let quick = 0;
     while (id === run.current) {
       index.current++;
       if (index.current >= pieces.current.length) {
@@ -38,7 +41,11 @@ export function useReadAloud(renderer: React.RefObject<Renderer | null>) {
           src.clear();
           setStatus("off");
           setSentence("");
-          toast("Read to the end of the book");
+          if (pieces.current.length) toast("Read to the end of the book");
+          else
+            toast("There is no text to read from here", {
+              description: "Scanned pages can be read aloud after Make searchable (OCR).",
+            });
           return;
         }
         pieces.current.push(p);
@@ -56,6 +63,7 @@ export function useReadAloud(renderer: React.RefObject<Renderer | null>) {
         e.prepare(next.text, { ...opts, voice: chooseVoice(e.voices, listening, next.lang) });
       }
       let finished: boolean;
+      const began = Date.now();
       try {
         finished = await e.speak(p.text, opts);
       } catch (err) {
@@ -67,6 +75,14 @@ export function useReadAloud(renderer: React.RefObject<Renderer | null>) {
         return;
       }
       if (!finished || id !== run.current) return;
+      quick = Date.now() - began < 60 && p.text.length > 3 ? quick + 1 : 0;
+      if (quick >= 4) {
+        setStatus("paused");
+        toast.error("The voice is not speaking", {
+          description: "Try another voice in the player, or check the computer's sound.",
+        });
+        return;
+      }
     }
   }, []);
 
@@ -76,6 +92,8 @@ export function useReadAloud(renderer: React.RefObject<Renderer | null>) {
       toast("This book cannot be read aloud");
       return;
     }
+    // Before anything is awaited: WebKit allows sound right after a click.
+    primeSpeech();
     setStatus("starting");
     const e = await getEngine();
     if (!e) {
@@ -106,6 +124,7 @@ export function useReadAloud(renderer: React.RefObject<Renderer | null>) {
   }, []);
 
   const resume = useCallback(() => {
+    primeSpeech();
     index.current = Math.max(-1, index.current - 1);
     void loop(++run.current);
   }, [loop]);
