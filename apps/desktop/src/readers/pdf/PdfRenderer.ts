@@ -522,7 +522,13 @@ export class PdfRenderer implements Renderer {
   private async speechWords(page: number): Promise<PageWord[]> {
     const p = await this.doc.getPage(page);
     const vp = p.getViewport({ scale: 1 });
-    const content = await p.getTextContent();
+    // Old WebKit could not stream a page's text (see lib/polyfills); the
+    // drawn text layer is the fallback.
+    const content = await p.getTextContent().catch((e: unknown) => {
+      if (this.layerWords(page).length) return null;
+      throw e;
+    });
+    if (!content) return this.layerWords(page);
     const words: PageWord[] = [];
     for (const it of content.items) {
       if (!("str" in it) || !it.str.trim()) continue;
