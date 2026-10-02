@@ -1,4 +1,5 @@
-import { memo } from "react";
+import { memo, useState } from "react";
+import { useWindowRows } from "../hooks/useWindowRows";
 import { ArrowDown, ArrowUp, Folder, Heart } from "lucide-react";
 import type { FolderDto, SortKey } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
@@ -114,6 +115,8 @@ export function BookList({
   const selected = useSelectedIds();
   const handlers = useItemHandlers(books);
   const SortIcon = descending ? ArrowDown : ArrowUp;
+  const [anchor, setAnchor] = useState<HTMLDivElement | null>(null);
+  const w = useWindowRows(anchor, books.length, 1, 48);
 
   return (
     <div className="flex flex-col pb-10">
@@ -140,8 +143,16 @@ export function BookList({
       {folders.map((f) => (
         <FolderRow key={f.path} folder={f} onOpen={() => onOpenFolder(f.path)} />
       ))}
-      <div role="listbox" data-shortcuts data-book-list aria-multiselectable aria-label="Books">
-        {books.map((b) => (
+      <div
+        ref={setAnchor}
+        role="listbox"
+        data-shortcuts
+        data-book-list
+        aria-multiselectable
+        aria-label="Books"
+        style={w.on ? { paddingTop: w.before, paddingBottom: w.after } : undefined}
+      >
+        {books.slice(w.start, w.end).map((b) => (
           <BookRow key={b.id} book={b} selected={selected.has(b.id)} handlers={handlers} />
         ))}
       </div>

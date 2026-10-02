@@ -1,4 +1,5 @@
-import { memo } from "react";
+import { memo, useState } from "react";
+import { useGridSize, useWindowRows } from "../hooks/useWindowRows";
 import { Folder, Heart } from "lucide-react";
 import type { FolderDto } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
@@ -94,9 +95,21 @@ export function BookGrid({
 }) {
   const selected = useSelectedIds();
   const handlers = useItemHandlers(books);
+  const [grid, setGrid] = useState<HTMLDivElement | null>(null);
+  const { cols, rowHeight } = useGridSize(grid, 132, 20, {
+    selector: "[data-book-id]",
+    rowGap: 24,
+    fallback: 284,
+  });
+  const items = folders.length + books.length;
+  const w = useWindowRows(grid, items, cols, rowHeight, folders.length);
+  const fromBook = Math.max(0, w.start - folders.length);
+  const toBook = Math.max(0, w.end - folders.length);
 
   return (
     <div
+      ref={setGrid}
+      style={w.on ? { paddingTop: 16 + w.before, paddingBottom: 40 + w.after } : undefined}
       role="listbox"
       data-shortcuts
       aria-multiselectable
@@ -104,10 +117,10 @@ export function BookGrid({
       data-book-grid
       className="grid grid-cols-[repeat(auto-fill,minmax(132px,1fr))] gap-x-5 gap-y-6 px-6 pt-4 pb-10"
     >
-      {folders.map((f) => (
+      {folders.slice(w.start, w.end).map((f) => (
         <FolderTile key={f.path} folder={f} onOpen={() => onOpenFolder(f.path)} />
       ))}
-      {books.map((b) => (
+      {books.slice(fromBook, toBook).map((b) => (
         <BookCard key={b.id} book={b} selected={selected.has(b.id)} handlers={handlers} />
       ))}
     </div>

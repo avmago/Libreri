@@ -7,6 +7,7 @@
  * (`{type:"pdf-highlight", page, rects}`) plus the quoted text, and drawn in
  * a layer on top of each rendered page.
  */
+import { pdfSource } from "./ranges";
 import { clearPageBionic, drawPageBionic } from "../pageBionic";
 import type { BionicOptions } from "../focus";
 import { clipFrom } from "../clip";
@@ -109,7 +110,7 @@ export class PdfRenderer implements Renderer {
     this.links.setViewer(this.viewer);
 
     const task = pdfjs.getDocument({
-      url,
+      ...(await pdfSource(pdfjs, url)),
       disableAutoFetch: true,
       disableStream: true,
       rangeChunkSize: 1 << 20,

@@ -1,4 +1,5 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef } from "react";
+import { revealBook } from "../hooks/useWindowRows";
 import { CoversSkeleton, RowsSkeleton } from "@/components/Placeholders";
 import {
   ArrowDownUp,
@@ -378,7 +379,11 @@ function useArrowKeys(books: BookView[], columns: () => number) {
     const id = books[next]?.id;
     if (!id) return;
     setSelection([id]);
-    document.querySelector(`[data-book-id="${id}"]`)?.scrollIntoView({ block: "nearest" });
+    // In a big library the book may not be drawn yet: scroll to it first.
+    revealBook(next);
+    requestAnimationFrame(() =>
+      document.querySelector(`[data-book-id="${id}"]`)?.scrollIntoView({ block: "nearest" }),
+    );
   };
   useShortcut(
     "books.next",

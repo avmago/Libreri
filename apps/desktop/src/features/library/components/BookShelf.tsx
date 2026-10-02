@@ -1,4 +1,5 @@
-import { memo } from "react";
+import { memo, useState } from "react";
+import { useGridSize, useWindowRows } from "../hooks/useWindowRows";
 import type { FolderDto } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
 import { useItemHandlers, type ItemHandlers } from "../hooks/useBookInteractions";
@@ -65,6 +66,9 @@ export function BookShelf({
 }) {
   const selected = useSelectedIds();
   const handlers = useItemHandlers(books);
+  const [shelves, setShelves] = useState<HTMLDivElement | null>(null);
+  const { cols } = useGridSize(shelves, 150, 0);
+  const w = useWindowRows(shelves, books.length, cols, ROW);
   return (
     <div className="px-6 pt-2 pb-10">
       {folders.length > 0 && (
@@ -80,10 +84,14 @@ export function BookShelf({
         aria-multiselectable
         aria-label="Books"
         data-book-grid
+        ref={setShelves}
         className="lb-shelves grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))]"
-        style={{ gridAutoRows: ROW }}
+        style={{
+          gridAutoRows: ROW,
+          ...(w.on ? { paddingTop: w.before, paddingBottom: w.after } : {}),
+        }}
       >
-        {books.map((b) => (
+        {books.slice(w.start, w.end).map((b) => (
           <ShelfBook key={b.id} book={b} selected={selected.has(b.id)} handlers={handlers} />
         ))}
       </div>
