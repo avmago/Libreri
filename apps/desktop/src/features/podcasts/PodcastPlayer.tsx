@@ -136,33 +136,36 @@ export function PodcastPlayer({ hidden }: { hidden?: boolean }) {
         />
       )}
       {episode && !hidden && !collapsed && (
-        // Floats over the page like the read-aloud and audiobook player.
-        <div
-          role="region"
-          aria-label="Podcast player"
-          className="fixed bottom-5 left-1/2 z-30 flex w-max max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-1.5 rounded-2xl border bg-popover/95 p-1.5 text-[12.5px] text-popover-foreground shadow-xl backdrop-blur"
-        >
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-7 shrink-0"
-            aria-label="Fold the player"
-            title="Fold the player into a small box"
-            onClick={() => setCollapsed(true)}
+        // Floats over the page like the read-aloud and audiobook player;
+        // what it shows depends on the window's width.
+        <div className="pointer-events-none fixed inset-x-0 bottom-5 z-30 flex justify-center px-4 @container">
+          <div
+            role="region"
+            aria-label="Podcast player"
+            className="pointer-events-auto flex w-max max-w-full items-center gap-1.5 rounded-2xl border bg-popover/95 p-1.5 text-[12.5px] text-popover-foreground shadow-xl backdrop-blur"
           >
-            <ChevronsDown />
-          </Button>
-          <Artwork src={episode.artwork} title={episode.show} className="size-9 rounded-[10px]" />
-          <button
-            type="button"
-            className="flex min-w-0 max-w-64 flex-col px-1 text-left leading-tight"
-            title={`${episode.title} — ${episode.show}`}
-            onClick={() => showPodcasts({ kind: "show", id: episode.feed })}
-          >
-            <span className="truncate font-medium">{episode.title}</span>
-            <span className="truncate text-[11.5px] text-muted-foreground">{episode.show}</span>
-          </button>
-          <PodcastControls compact />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7 shrink-0"
+              aria-label="Fold the player"
+              title="Fold the player into a small box"
+              onClick={() => setCollapsed(true)}
+            >
+              <ChevronsDown />
+            </Button>
+            <Artwork src={episode.artwork} title={episode.show} className="size-9 rounded-[10px]" />
+            <button
+              type="button"
+              className="flex min-w-0 max-w-64 flex-col px-1 text-left leading-tight @max-3xl:hidden"
+              title={`${episode.title} — ${episode.show}`}
+              onClick={() => showPodcasts({ kind: "show", id: episode.feed })}
+            >
+              <span className="truncate font-medium">{episode.title}</span>
+              <span className="truncate text-[11.5px] text-muted-foreground">{episode.show}</span>
+            </button>
+            <PodcastControls compact />
+          </div>
         </div>
       )}
     </>
@@ -201,7 +204,7 @@ export function PodcastControls({ compact }: { compact: boolean }) {
         <RotateCw />
       </Button>
       {compact ? (
-        <div className="flex shrink-0 flex-col gap-0.5 px-1">
+        <div className="flex shrink-0 flex-col gap-1 px-1 @max-md:hidden">
           <input
             type="range"
             aria-label="Position"
@@ -210,7 +213,7 @@ export function PodcastControls({ compact }: { compact: boolean }) {
             step={1}
             value={Math.min(Math.round(p.time), Math.round(total) || 1)}
             onChange={(e) => p.seek(Number(e.target.value))}
-            className="h-1 w-32 accent-foreground"
+            className="h-3.5 w-32 accent-foreground @max-3xl:w-24"
           />
           <span className="text-[11px] text-muted-foreground tabular-nums">
             {clock(p.time)}
@@ -244,6 +247,7 @@ export function PodcastControls({ compact }: { compact: boolean }) {
         size="icon"
         aria-label="Up next"
         title="Up next"
+        className="@max-lg:hidden"
         onClick={() => showPodcasts({ kind: "list", id: "queue" })}
       >
         <ListOrdered />
@@ -262,7 +266,7 @@ function RateControl() {
   const at = i < 0 ? RATES.length - 1 : i;
   return (
     <div
-      className="flex shrink-0 items-center rounded-lg border"
+      className="flex shrink-0 items-center rounded-lg border @max-xl:hidden"
       title="Speed (kept for this show)"
     >
       <Button
@@ -307,6 +311,7 @@ function SleepMenu() {
           variant={sleep ? "outline" : "ghost"}
           size={sleep ? "sm" : "icon"}
           aria-label="Sleep timer"
+          className="@max-lg:hidden"
           title="Sleep timer"
         >
           <Timer />

@@ -30,6 +30,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ResizablePanel } from "@/components/ResizablePanel";
+import { SideOver, SideOverButton } from "@/components/SideOver";
+import { useSideOver } from "@/lib/useSideOver";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -105,6 +107,9 @@ const same = (a: PodcastPlace, b: PodcastPlace) => a.kind === b.kind && a.id ===
 export function PodcastsView() {
   const { data } = usePodcasts();
   const [finding, setFinding] = useState<FindTab | null>(null);
+  // A narrow window: the shows slide over the episodes.
+  const place = usePodcastsView((s) => s.place);
+  const side = useSideOver(800, place);
 
   if (!data) {
     return (
@@ -122,13 +127,15 @@ export function PodcastsView() {
     );
   }
   return (
-    <div className="flex h-full min-h-0">
+    <div className="relative flex h-full min-h-0">
       {data.feeds.length === 0 ? (
         <Welcome onFind={setFinding} />
       ) : (
         <>
-          <Shows data={data} onFind={() => setFinding("search")} />
-          <Episodes data={data} />
+          <SideOver roomy={side.roomy} open={side.open} onClose={() => side.setOpen(false)}>
+            <Shows data={data} onFind={() => setFinding("search")} />
+          </SideOver>
+          <Episodes data={data} onShows={side.roomy ? undefined : () => side.setOpen(true)} />
         </>
       )}
       {finding && <FindPodcastsDialog open tab={finding} onClose={() => setFinding(null)} />}
@@ -341,7 +348,7 @@ function PlaceRow({
   );
 }
 
-function Episodes({ data }: { data: FeedsDto }) {
+function Episodes({ data, onShows }: { data: FeedsDto; onShows?: () => void }) {
   const { place, show, setShow, search, setSearch, kept } = usePodcastsView();
   const q = useDeferredValue(search.trim());
   const feeds = useMemo(() => new Map(data.feeds.map((f) => [f.id, f])), [data.feeds]);
@@ -388,6 +395,7 @@ function Episodes({ data }: { data: FeedsDto }) {
   const loading = queue ? queued.isLoading : items.isLoading;
   return (
     <main className="flex min-w-0 flex-1 flex-col">
+      {onShows && <SideOverButton label="Shows and lists" onOpen={onShows} />}
       {feed ? (
         <ShowHeader feed={feed} />
       ) : (

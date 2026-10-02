@@ -14,7 +14,7 @@ async function openWindow(tab: BookTab | null) {
     title: tab ? `${tab.title} — Libreri` : "Libreri",
     width: 1100,
     height: 780,
-    minWidth: 640,
+    minWidth: 480,
     minHeight: 480,
   });
   await new Promise<void>((resolve, reject) => {

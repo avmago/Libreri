@@ -68,6 +68,7 @@ import {
 } from "../api";
 import { useAppDark } from "../hooks/useAppDark";
 import { usePinchZoom } from "../hooks/usePinchZoom";
+import { useWide } from "@/lib/useWide";
 import { PrintDialog } from "../print/PrintDialog";
 import { pageJump, parseBookLink } from "../links";
 import { useReaderPrefs } from "../prefs";
@@ -219,7 +220,11 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
   const [location, setLocation] = useState<ReaderLocation | null>(null);
   const [selection, setSelection] = useState<SelectionInfo | null>(null);
   const [menu, setMenu] = useState<{ id: string; rect: DOMRect; edit: boolean } | null>(null);
-  const [left, setLeft] = useState<LeftPanel | null>("contents");
+  // Narrow windows start with the page alone.
+  const roomy = useWide(900);
+  const [left, setLeft] = useState<LeftPanel | null>(() =>
+    window.matchMedia("(min-width: 900px)").matches ? "contents" : null,
+  );
   const [lastLeft, setLastLeft] = useState<LeftPanel>("contents");
   const [notebookOpen, setNotebookOpenRaw] = useState(false);
   // A formula shown as LaTeX (clicked, or rebuilt from selected text).
@@ -1661,61 +1666,69 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
           onSaved={fileChanged}
         />
       )}
-      <div className={cn("flex min-h-0 flex-1", (editing || comparing) && "hidden")}>
+      <div className={cn("relative flex min-h-0 flex-1", (editing || comparing) && "hidden")}>
         {left && !bare && (
-          <ContentsPanel
-            panel={left}
-            setPanel={(p) => {
-              setLeft(p);
-              setLastLeft(p);
-            }}
-            toc={toc}
-            section={location?.section}
-            annotations={annotations}
-            onGo={(target) => jump(() => r()?.goTo(target))}
-            onShow={(a) => jump(() => r()?.showAnnotation(a))}
-            onDelete={(a) => deleteAnnotation.mutate(a.id)}
-            onOpenCapture={(path, title) => setViewing({ path, title })}
-            linkCount={links.length}
-            links={
-              <LinksPanel
-                links={links}
-                page={location?.page ?? null}
-                playing={playing && links.some((l) => l.id === playing.id) ? playing : null}
-                onStop={() => setPlaying(null)}
-                onAdd={() => startLink(false)}
-                onPlay={(a) => linkAction(a, "play")}
-                onOpen={(a) => linkAction(a, "open")}
-                onCopy={(a) => linkAction(a, "copy")}
-                onShow={(a) => jump(() => r()?.showAnnotation(a))}
-                onDelete={(a) => {
-                  if (playing?.id === a.id) setPlaying(null);
-                  deleteAnnotation.mutate(a.id);
-                }}
-              />
-            }
-            markup={
-              markup.available ? (
-                <MarkupPanel
-                  m={markup}
-                  onShow={(mk) =>
-                    jump(async () => {
-                      await r()?.goTo({
-                        type: "pdf",
-                        page: mk.page,
-                        top: Math.max(0, markupModel.bounds(mk.item)[1] - 0.1),
-                      });
-                      markup.selectMark(mk.id);
-                    })
-                  }
+          // A narrow window: contents and marks lie over the page.
+          <div
+            className={cn(
+              "flex",
+              !roomy && "absolute inset-y-0 left-0 z-30 max-w-[85%] shadow-2xl",
+            )}
+          >
+            <ContentsPanel
+              panel={left}
+              setPanel={(p) => {
+                setLeft(p);
+                setLastLeft(p);
+              }}
+              toc={toc}
+              section={location?.section}
+              annotations={annotations}
+              onGo={(target) => jump(() => r()?.goTo(target))}
+              onShow={(a) => jump(() => r()?.showAnnotation(a))}
+              onDelete={(a) => deleteAnnotation.mutate(a.id)}
+              onOpenCapture={(path, title) => setViewing({ path, title })}
+              linkCount={links.length}
+              links={
+                <LinksPanel
+                  links={links}
+                  page={location?.page ?? null}
+                  playing={playing && links.some((l) => l.id === playing.id) ? playing : null}
+                  onStop={() => setPlaying(null)}
+                  onAdd={() => startLink(false)}
+                  onPlay={(a) => linkAction(a, "play")}
+                  onOpen={(a) => linkAction(a, "open")}
+                  onCopy={(a) => linkAction(a, "copy")}
+                  onShow={(a) => jump(() => r()?.showAnnotation(a))}
+                  onDelete={(a) => {
+                    if (playing?.id === a.id) setPlaying(null);
+                    deleteAnnotation.mutate(a.id);
+                  }}
                 />
-              ) : undefined
-            }
-          />
+              }
+              markup={
+                markup.available ? (
+                  <MarkupPanel
+                    m={markup}
+                    onShow={(mk) =>
+                      jump(async () => {
+                        await r()?.goTo({
+                          type: "pdf",
+                          page: mk.page,
+                          top: Math.max(0, markupModel.bounds(mk.item)[1] - 0.1),
+                        });
+                        markup.selectMark(mk.id);
+                      })
+                    }
+                  />
+                ) : undefined
+              }
+            />
+          </div>
         )}
 
         <div
-          className="relative min-w-0 flex-1"
+          className="relative min-w-0 flex-1 @container"
           style={{ background: theme.surround }}
           onPointerMove={pointerMoved}
         >

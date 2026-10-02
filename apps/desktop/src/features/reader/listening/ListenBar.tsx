@@ -137,7 +137,7 @@ export function ListenBar({
         <div
           role="tablist"
           aria-label="Listen with"
-          className="flex shrink-0 flex-col rounded-xl bg-muted p-0.5 sm:flex-row"
+          className="flex shrink-0 rounded-xl bg-muted p-0.5"
         >
           {(
             [
@@ -157,7 +157,9 @@ export function ListenBar({
                 title={id === "audio" && !audio ? "Link an audiobook in Edit details" : undefined}
                 onClick={() => onMode(id)}
                 className={cn(
-                  "rounded-[10px] px-2.5 py-1 leading-tight font-medium disabled:opacity-40",
+                  "rounded-[10px] px-2.5 py-1 leading-tight font-medium whitespace-nowrap disabled:opacity-40",
+                  // Narrow: only the one in use.
+                  mode !== id && "@max-2xl:hidden",
                   mode === id
                     ? "bg-background shadow-sm"
                     : "text-muted-foreground hover:text-foreground",
@@ -197,7 +199,7 @@ function PodcastPart({ onClose }: { onClose: () => void }) {
   if (!episode) return null;
   return (
     <>
-      <div className="flex min-w-0 max-w-64 flex-col px-1 leading-tight">
+      <div className="flex min-w-0 max-w-64 flex-col px-1 leading-tight @max-3xl:hidden">
         <span className="truncate font-medium" title={episode.title}>
           {episode.title}
         </span>
@@ -218,6 +220,7 @@ function SleepMenu({ sleep, chapters }: { sleep: ReturnType<typeof useSleep>; ch
           variant={sleep.until ? "outline" : "ghost"}
           size={sleep.until ? "sm" : "icon"}
           aria-label="Sleep timer"
+          className="@max-lg:hidden"
           title="Sleep timer"
         >
           <Timer />
@@ -253,7 +256,7 @@ function SleepMenu({ sleep, chapters }: { sleep: ReturnType<typeof useSleep>; ch
 
 function Speed({ rate, onChange }: { rate: number; onChange: (r: number) => void }) {
   return (
-    <div className="flex shrink-0 items-center rounded-lg border">
+    <div className="flex shrink-0 items-center rounded-lg border @max-xl:hidden">
       <Button
         variant="ghost"
         size="icon"
@@ -394,7 +397,7 @@ function ReadPart({ r, lang, onClose }: { r: ReadAloud; lang?: string; onClose: 
         back="Previous sentence"
         forward="Next sentence"
       />
-      <div className="flex min-w-0 flex-col px-1 leading-tight">
+      <div className="flex min-w-0 flex-col px-1 leading-tight @max-3xl:hidden">
         <label className="relative flex items-center gap-1 font-medium">
           <span className="truncate">
             Voice: {voice ? voice.name : "Default"}
@@ -616,7 +619,7 @@ function AudioPart({
         back={chapters.length ? "Previous chapter" : "Back 30 seconds"}
         forward={chapters.length ? "Next chapter" : "Forward 30 seconds"}
       />
-      <div className="flex min-w-0 max-w-64 flex-col px-1 leading-tight">
+      <div className="flex min-w-0 max-w-64 flex-col px-1 leading-tight @max-3xl:hidden">
         <span className="truncate font-medium" title={book.metadata.title ?? ""}>
           {chapters[chapter]?.title || book.metadata.title}
         </span>
@@ -639,6 +642,7 @@ function AudioPart({
         variant="ghost"
         size="icon"
         aria-label="Open the audiobook player"
+        className="@max-lg:hidden"
         title="Open the full player (chapters, bookmarks, sync points)"
         onClick={openPlayer}
       >

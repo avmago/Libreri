@@ -35,6 +35,7 @@ import {
 import { commands, type SortKey } from "@/lib/ipc";
 import { keysLabel, platform, shortcutFor, useShortcut, type ActionId } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
+import { useWide } from "@/lib/useWide";
 import { usePermissions } from "@/features/profiles";
 import { useBooks, useCollections, useFacets, useFolders, useMoveFolder } from "../api";
 import { useDetailsDialog, useFillDetails } from "@/features/details";
@@ -407,6 +408,7 @@ function useArrowKeys(books: BookView[], columns: () => number) {
 
 export function LibraryView() {
   const view = useLibraryView();
+  const roomy = useWide(1000);
   // Typing stays smooth: the list follows the search box a moment later.
   const search = useDeferredValue(view.search);
   const query = useMemo(
@@ -539,7 +541,7 @@ export function LibraryView() {
       : navTitle(nav);
 
   return (
-    <div className="flex h-full min-w-0">
+    <div className="relative flex h-full min-w-0">
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex flex-col gap-3 px-6 pt-4 pb-3">
           <div className="flex items-center gap-3">
@@ -685,7 +687,18 @@ export function LibraryView() {
           )}
         </div>
       </div>
-      {view.detailsOpen && <DetailsPanel books={books} />}
+      {view.detailsOpen &&
+        (roomy ? (
+          <DetailsPanel books={books} />
+        ) : (
+          // A narrow window: the details lie over the books, and only while
+          // a book is chosen.
+          view.selection.length > 0 && (
+            <div className="absolute inset-y-0 right-0 z-20 flex max-w-[90%] shadow-2xl">
+              <DetailsPanel books={books} />
+            </div>
+          )
+        ))}
       <DragLayer onDrop={onDrop} />
     </div>
   );

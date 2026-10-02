@@ -31,6 +31,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ResizablePanel } from "@/components/ResizablePanel";
+import { SideOver, SideOverButton } from "@/components/SideOver";
+import { useSideOver } from "@/lib/useSideOver";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input, NativeSelect } from "@/components/ui/input";
@@ -95,6 +97,9 @@ export function FeedsView() {
   const { data } = useFeedsOverview();
   const [adding, setAdding] = useState<{ tab: AddTab; folder: string | null } | null>(null);
   const [ask, setAsk] = useState<Ask | null>(null);
+  // A narrow window: folders and feeds slide over the items.
+  const place = useFeedsView((s) => s.place);
+  const side = useSideOver(800, place);
 
   if (!data) {
     return (
@@ -117,13 +122,15 @@ export function FeedsView() {
       {data.feeds.length === 0 ? (
         <Welcome onAdd={(tab) => setAdding({ tab, folder: null })} />
       ) : (
-        <div className="flex min-h-0 flex-1">
-          <Tree
-            data={data}
-            onAsk={setAsk}
-            onAdd={(folder) => setAdding({ tab: "address", folder })}
-          />
-          <Items data={data} />
+        <div className="relative flex min-h-0 flex-1">
+          <SideOver roomy={side.roomy} open={side.open} onClose={() => side.setOpen(false)}>
+            <Tree
+              data={data}
+              onAsk={setAsk}
+              onAdd={(folder) => setAdding({ tab: "address", folder })}
+            />
+          </SideOver>
+          <Items data={data} onFeeds={side.roomy ? undefined : () => side.setOpen(true)} />
         </div>
       )}
       {adding && (
@@ -685,7 +692,7 @@ function FeedRow({
   );
 }
 
-function Items({ data }: { data: FeedsDto }) {
+function Items({ data, onFeeds }: { data: FeedsDto; onFeeds?: () => void }) {
   const { place, show, setShow, topic, setTopic, search, setSearch, kept } = useFeedsView();
   const deferred = useDeferredValue(search);
   const filter = {
@@ -708,6 +715,7 @@ function Items({ data }: { data: FeedsDto }) {
 
   return (
     <section aria-label={heading} className="flex min-w-0 flex-1 flex-col">
+      {onFeeds && <SideOverButton label="Folders and feeds" onOpen={onFeeds} />}
       <div className="flex flex-col gap-2 border-b px-5 py-3">
         <div className="flex items-center gap-3">
           <h2 className="min-w-0 flex-1 truncate text-[15px] font-semibold">{heading}</h2>

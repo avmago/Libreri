@@ -98,6 +98,7 @@ import {
   useShortcut,
   type ActionId,
 } from "@/lib/shortcuts";
+import { useWide } from "@/lib/useWide";
 import { useTabs } from "@/lib/tabs";
 import { isMainWindow } from "@/lib/windows";
 import { nextTheme } from "@/lib/theme";
@@ -266,6 +267,9 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
   useShortcut("library.importArchive", () => isOwner && void pickArchiveToImport());
   // With a book shown, full screen is full-screen reading (only the page).
   const readingFullscreen = useFullscreen((s) => s.reading);
+  // A narrow window folds the sidebar to its icons (the setting is kept).
+  const roomy = useWide(860);
+  const sidebarFolded = ui.sidebarCollapsed || !roomy;
   useFullscreenSync(activeTab !== null);
   useShortcut("app.fullscreen", () => {
     if (activeTab !== null) return toggleReadingFullscreen();
@@ -622,11 +626,15 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
         <button
           type="button"
           onClick={() => ui.setPaletteOpen(true)}
-          className="mb-1.5 flex h-7 w-64 shrink-0 items-center gap-2 rounded-md border bg-background px-2.5 text-muted-foreground"
+          className="mb-1.5 flex h-7 w-64 min-w-9 shrink items-center gap-2 rounded-md border bg-background px-2.5 text-muted-foreground"
         >
           <Search className="size-3.5" aria-hidden />
-          <span className="flex-1 truncate text-left">Search or run a command…</span>
-          <Kbd action="palette.open" />
+          <span className="flex-1 truncate text-left max-[640px]:hidden">
+            Search or run a command…
+          </span>
+          <span className="max-[760px]:hidden">
+            <Kbd action="palette.open" />
+          </span>
         </button>
         <div className="mb-1 flex items-center gap-1.5">
           <ThemeMenu />
@@ -656,15 +664,15 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
       <div className="relative min-h-0 flex-1">
         <ShortcutScope active={activeTab === null && ui.settings === null}>
           <div className={cn("absolute inset-0 flex", activeTab !== null && "hidden")}>
-            <SidebarColumn collapsed={ui.sidebarCollapsed}>
+            <SidebarColumn collapsed={sidebarFolded}>
               <nav
                 aria-label="Library"
                 className={cn(
                   "flex min-w-0 flex-1 flex-col gap-2 border-r bg-sidebar pt-2",
-                  ui.sidebarCollapsed && "items-center",
+                  sidebarFolded && "items-center",
                 )}
               >
-                <div className={cn("px-2.5", ui.sidebarCollapsed && "px-0")}>
+                <div className={cn("px-2.5", sidebarFolded && "px-0")}>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -675,7 +683,7 @@ export function AppShell({ library, session }: { library: LibrarySummary; sessio
                     <PanelLeft />
                   </Button>
                 </div>
-                <LibrarySidebar library={library} collapsed={ui.sidebarCollapsed} />
+                <LibrarySidebar library={library} collapsed={sidebarFolded} />
               </nav>
             </SidebarColumn>
             <main className="min-w-0 flex-1">{home}</main>

@@ -15,8 +15,8 @@
         "title": "Libreri",
         "width": 1280,
         "height": 800,
-        "minWidth": 960,
-        "minHeight": 600,
+        "minWidth": 480,
+        "minHeight": 480,
         "center": true
       }
     ],
