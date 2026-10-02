@@ -28,7 +28,7 @@ Read, highlight, write notes by hand or by voice, and listen, all on your own co
 </div>
 
 > [!NOTE]
-> **Status:** Phases 0–9 are built, and Phase 10 (polish and release) is under way. Version 2 will bring iPhone, iPad and Android apps that sync over your home network, printing and sharing, and AI research tools. See the [development phases](docs/development-phases.md).
+> **Status:** Phases 0–9 are built, and Phase 10 (polish and release) is under way. Version 2 will bring iPhone, iPad and Android apps that sync over your home network, printing and sharing, and AI research tools.
 
 ## Why Libreri
 
@@ -276,7 +276,7 @@ crates/libreri-feeds      RSS, Atom and OPML; arXiv; podcasts (Apple and Podcast
 crates/libreri-ocr        Optional OCR models (PaddleOCR-VL), downloaded and run on this computer
 crates/libreri-voices     Natural voices for read aloud (Kokoro, Piper) with ONNX Runtime
 
-docs/                     Phases, architecture, portability and decisions (docs/adr)
+docs/                     Architecture, code structure and data portability
 ```
 
 Dependencies only point downward: interface → shell → crates → core. Read [code structure](docs/code-structure.md) before adding code, and [data portability](docs/data-portability.md) before touching anything that links notes to books.
@@ -290,16 +290,12 @@ Dependencies only point downward: interface → shell → crates → core. Read 
 | Document | About |
 |---|---|
 | [Architecture](docs/architecture.md) | The map as built: stack, layers, crates, the library folder, optional downloads |
-| [Development phases](docs/development-phases.md) | What each phase delivers, version 2, and the decisions behind them |
 | [Code structure](docs/code-structure.md) | Where code goes, feature by feature |
 | [Data portability](docs/data-portability.md) | How books, notes and links are kept, so nothing is locked in |
-| [AI research plan](docs/ai-research-plan.md) | Version 2's research tools and open-science plans |
-| [Phase 9 bugs](docs/phase9-bugs.md) | The Phase 9 bug list, the bugs found on the Mac, and what was fixed |
-| [Decisions](docs/adr) | 31 architecture decision records |
 
 ## Licence
 
-Not decided yet (see [ADR 0006](docs/adr/0006-licence-deferred.md)). All rights reserved until then.
+Not decided yet. All rights reserved until then.
 
 <div align="center">
 <br>
