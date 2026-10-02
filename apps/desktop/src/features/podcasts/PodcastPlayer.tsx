@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
+  ChevronsDown,
   ListOrdered,
   Loader2,
   Minus,
@@ -12,7 +13,9 @@ import {
   Timer,
   X,
 } from "lucide-react";
+import { MiniPlayer } from "@/components/MiniPlayer";
 import { Button } from "@/components/ui/button";
+import { useFloatingBar } from "@/lib/floating";
 import { DropdownMenu, menuContent, menuItem } from "@/components/ui/menu";
 import { cn } from "@/lib/utils";
 import { clock, initials, RATES } from "./model";
@@ -31,6 +34,9 @@ export function PodcastPlayer({ hidden }: { hidden?: boolean }) {
   const sleep = usePlayer((s) => s.sleep);
   const episode = usePlayer((s) => s.episode);
   const inBar = usePlayer((s) => s.inBar);
+  const loading = usePlayer((s) => s.loading);
+  const collapsed = useFloatingBar((s) => s.collapsed);
+  const setCollapsed = useFloatingBar((s) => s.setCollapsed);
   const attach = usePlayer((s) => s.attach);
   const sync = usePlayer((s) => s.sync);
 
@@ -114,13 +120,39 @@ export function PodcastPlayer({ hidden }: { hidden?: boolean }) {
           });
         }}
       />
-      {episode && !inBar && !hidden && (
+      {episode && !inBar && !hidden && collapsed && (
+        <MiniPlayer
+          fixed
+          label={`${episode.title} — ${episode.show}`}
+          playing={playing}
+          busy={loading && playing}
+          onToggle={() => usePlayer.getState().toggle()}
+          picture={
+            <Artwork
+              src={episode.artwork}
+              title={episode.show}
+              className="size-full rounded-none"
+            />
+          }
+        />
+      )}
+      {episode && !inBar && !hidden && !collapsed && (
         // Floats over the page like the read-aloud and audiobook player.
         <div
           role="region"
           aria-label="Podcast player"
           className="fixed bottom-5 left-1/2 z-30 flex w-max max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-1.5 rounded-2xl border bg-popover/95 p-1.5 text-[12.5px] text-popover-foreground shadow-xl backdrop-blur"
         >
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7 shrink-0"
+            aria-label="Fold the player"
+            title="Fold the player into a small box"
+            onClick={() => setCollapsed(true)}
+          >
+            <ChevronsDown />
+          </Button>
           <Artwork src={episode.artwork} title={episode.show} className="size-9 rounded-[10px]" />
           <button
             type="button"

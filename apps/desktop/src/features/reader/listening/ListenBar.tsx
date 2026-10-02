@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import {
   ChevronDown,
+  ChevronsDown,
   ExternalLink,
   Loader2,
   Minus,
@@ -20,6 +21,8 @@ import { useHelperDialog } from "@/features/helpers";
 import { useProfilePrefs } from "@/features/profiles";
 import { bookUrl, commands, unwrap, type BookDto } from "@/lib/ipc";
 import { PodcastControls, usePlayer } from "@/features/podcasts";
+import { MiniPlayer } from "@/components/MiniPlayer";
+import { useFloatingBar, useMiniPlay, useReportPlay } from "@/lib/floating";
 import { useTabs } from "@/lib/tabs";
 import { cn } from "@/lib/utils";
 import { savePosition } from "../api";
@@ -95,59 +98,90 @@ export function ListenBar({
 }) {
   const audio = audiobooks[0] ?? null;
   const podcast = usePlayer((s) => s.episode !== null);
+  const collapsed = useFloatingBar((s) => s.collapsed);
+  const setCollapsed = useFloatingBar((s) => s.setCollapsed);
+  const side = useFloatingBar((s) => s.side);
+  const mini = useMiniPlay();
+  const name = mode === "read" ? "Read aloud" : mode === "audio" ? "Audiobook" : "Podcast";
   return (
-    <div
-      role="toolbar"
-      aria-label={mode === "read" ? "Read aloud" : mode === "audio" ? "Audiobook" : "Podcast"}
-      className="absolute bottom-5 left-1/2 z-30 flex w-max max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-1.5 rounded-2xl border bg-popover/95 p-1.5 text-[12.5px] text-popover-foreground shadow-xl backdrop-blur"
-    >
-      <div
-        role="tablist"
-        aria-label="Listen with"
-        className="flex shrink-0 flex-col rounded-xl bg-muted p-0.5 sm:flex-row"
-      >
-        {(
-          [
-            ["read", "Read aloud"],
-            ["audio", "Audiobook"],
-            ["podcast", "Podcast"],
-          ] as const
-        )
-          .filter(([id]) => id !== "podcast" || podcast)
-          .map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={mode === id}
-              disabled={id === "audio" && !audio}
-              title={id === "audio" && !audio ? "Link an audiobook in Edit details" : undefined}
-              onClick={() => onMode(id)}
-              className={cn(
-                "rounded-[10px] px-2.5 py-1 leading-tight font-medium disabled:opacity-40",
-                mode === id
-                  ? "bg-background shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {label}
-            </button>
-          ))}
-      </div>
-      {mode === "read" ? (
-        <ReadPart r={r} lang={lang} onClose={onClose} />
-      ) : mode === "podcast" ? (
-        <PodcastPart onClose={onClose} />
-      ) : audio ? (
-        <AudioPart
-          key={audio.id}
-          audio={audio}
-          bookId={bookId}
-          progress={progress}
-          onClose={onClose}
+    <>
+      {collapsed && (
+        <MiniPlayer
+          label={name}
+          playing={mini.playing}
+          busy={mini.busy}
+          onToggle={() => mini.toggle?.()}
+          // Clear of the full-screen button in the corner.
+          className={side === "right" ? "right-16" : undefined}
         />
-      ) : null}
-    </div>
+      )}
+      <div
+        role="toolbar"
+        aria-label={name}
+        className={cn(
+          "absolute bottom-5 left-1/2 z-30 flex w-max max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-1.5 rounded-2xl border bg-popover/95 p-1.5 text-[12.5px] text-popover-foreground shadow-xl backdrop-blur",
+          // Folded: hidden, but still playing.
+          collapsed && "hidden",
+        )}
+      >
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7 shrink-0"
+          aria-label="Fold the player"
+          title="Fold the player into a small box"
+          onClick={() => setCollapsed(true)}
+        >
+          <ChevronsDown />
+        </Button>
+        <div
+          role="tablist"
+          aria-label="Listen with"
+          className="flex shrink-0 flex-col rounded-xl bg-muted p-0.5 sm:flex-row"
+        >
+          {(
+            [
+              ["read", "Read aloud"],
+              ["audio", "Audiobook"],
+              ["podcast", "Podcast"],
+            ] as const
+          )
+            .filter(([id]) => id !== "podcast" || podcast)
+            .map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={mode === id}
+                disabled={id === "audio" && !audio}
+                title={id === "audio" && !audio ? "Link an audiobook in Edit details" : undefined}
+                onClick={() => onMode(id)}
+                className={cn(
+                  "rounded-[10px] px-2.5 py-1 leading-tight font-medium disabled:opacity-40",
+                  mode === id
+                    ? "bg-background shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+        </div>
+        {mode === "read" ? (
+          <ReadPart r={r} lang={lang} onClose={onClose} />
+        ) : mode === "podcast" ? (
+          <PodcastPart onClose={onClose} />
+        ) : audio ? (
+          <AudioPart
+            key={audio.id}
+            audio={audio}
+            bookId={bookId}
+            progress={progress}
+            onClose={onClose}
+          />
+        ) : null}
+      </div>
+    </>
   );
 }
 
@@ -162,6 +196,9 @@ function PodcastPart({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (!episode) onClose();
   }, [episode, onClose]);
+  const playing = usePlayer((s) => s.playing);
+  const loading = usePlayer((s) => s.loading);
+  useReportPlay(playing, loading && playing, () => usePlayer.getState().toggle());
   if (!episode) return null;
   return (
     <>
@@ -320,6 +357,9 @@ function ReadPart({ r, lang, onClose }: { r: ReadAloud; lang?: string; onClose: 
     );
   }, [r.engine, lang]);
   const voice = voices.find((v) => v.id === listening.voice);
+  useReportPlay(r.status === "playing", r.status === "starting", () =>
+    r.status === "playing" ? r.pause() : r.status === "off" ? void r.start() : r.resume(),
+  );
 
   if (r.status === "noVoices")
     return (
@@ -423,6 +463,12 @@ function AudioPart({
   const update = useProfilePrefs((s) => s.update);
   const el = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
+  useReportPlay(playing, false, () => {
+    const a = el.current;
+    if (!a) return;
+    if (a.paused) void a.play().catch(() => {});
+    else a.pause();
+  });
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const { data: link } = useQuery({
