@@ -33,8 +33,6 @@ interface PlayerState {
   rate: number;
   /** Seconds to jump to once the audio is ready. */
   startAt: number;
-  /** The floating bar in a book shows the podcast (the strip then hides). */
-  inBar: boolean;
   /** Sleep: stop at this time (ms), or at the end of the episode. */
   sleep: number | "end" | null;
   el: HTMLAudioElement | null;
@@ -45,7 +43,6 @@ interface PlayerState {
   skip: (seconds: number) => void;
   setRate: (rate: number) => void;
   setSleep: (sleep: number | "end" | null) => void;
-  setInBar: (inBar: boolean) => void;
   stop: () => void;
   /** Saves where listening is (on pause, every few seconds, on leaving). */
   save: (played?: boolean) => void;
@@ -66,7 +63,6 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   duration: 0,
   rate: savedRate(),
   startAt: 0,
-  inBar: false,
   sleep: null,
   el: null,
   attach: (el) => set({ el }),
@@ -144,7 +140,6 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   },
 
   setSleep: (sleep) => set({ sleep }),
-  setInBar: (inBar) => set({ inBar }),
 
   stop: () => {
     const { el, save } = get();

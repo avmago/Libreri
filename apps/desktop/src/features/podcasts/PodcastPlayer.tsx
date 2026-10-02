@@ -33,7 +33,6 @@ export function PodcastPlayer({ hidden }: { hidden?: boolean }) {
   const playing = usePlayer((s) => s.playing);
   const sleep = usePlayer((s) => s.sleep);
   const episode = usePlayer((s) => s.episode);
-  const inBar = usePlayer((s) => s.inBar);
   const loading = usePlayer((s) => s.loading);
   const collapsed = useFloatingBar((s) => s.collapsed);
   const setCollapsed = useFloatingBar((s) => s.setCollapsed);
@@ -120,7 +119,7 @@ export function PodcastPlayer({ hidden }: { hidden?: boolean }) {
           });
         }}
       />
-      {episode && !inBar && !hidden && collapsed && (
+      {episode && !hidden && collapsed && (
         <MiniPlayer
           fixed
           label={`${episode.title} — ${episode.show}`}
@@ -136,7 +135,7 @@ export function PodcastPlayer({ hidden }: { hidden?: boolean }) {
           }
         />
       )}
-      {episode && !inBar && !hidden && !collapsed && (
+      {episode && !hidden && !collapsed && (
         // Floats over the page like the read-aloud and audiobook player.
         <div
           role="region"

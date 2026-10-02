@@ -185,14 +185,9 @@ export function ListenBar({
   );
 }
 
-/** The podcast playing (the strip at the bottom hides meanwhile). */
+/** The podcast playing (the window's podcast player hides over books). */
 function PodcastPart({ onClose }: { onClose: () => void }) {
   const episode = usePlayer((s) => s.episode);
-  const setInBar = usePlayer((s) => s.setInBar);
-  useEffect(() => {
-    setInBar(true);
-    return () => setInBar(false);
-  }, [setInBar]);
   useEffect(() => {
     if (!episode) onClose();
   }, [episode, onClose]);
