@@ -45,7 +45,7 @@ Your library is an ordinary folder. Books stay as plain files and notes are Mark
 
 ### Private by default
 
-Nothing leaves your computer unless you ask. Online lookups, feeds, podcasts and model downloads are opt-in, and the speech and maths models run on your computer.
+Nothing leaves your computer unless you ask. Online lookups, feeds, podcasts and model downloads are opt-in, and the speech, voice, OCR and maths models run on your computer.
 
 </td>
 <td width="33%" valign="top">
@@ -94,6 +94,8 @@ Highlights that link back to the page, a notebook per book, handwriting, paper n
 - **Tabs**, split view and separate windows, remembered between launches.
 - **9 page themes**, dark PDFs, brightness, contrast, text size and spacing.
 - **Full screen**, focus mode, two-page spreads, manga and webtoon modes.
+- **Zoom** with buttons, Ctrl+scroll or a two-finger pinch, and **print** PDFs (all pages, the page shown or a range).
+- Works in **narrow windows** down to a third of the screen; side panels slide over the page.
 - **ADHD reading:** bionic reading, a line highlight and a reading mask.
 - **Find in book**, contents, bookmarks, and your place kept per profile.
 - **Compare** two versions or two PDFs side by side.
@@ -118,10 +120,11 @@ Highlights that link back to the page, a notebook per book, handwriting, paper n
 
 #### Listening
 
-- **Read aloud** with sentence highlighting, page turning and maths read as words.
+- **Read aloud** with sentence highlighting, page turning and maths read as words, in the system's voices or **natural voices** made on your computer: **Kokoro** (54 voices in nine languages) and **Piper** (40+ languages, only voices free to use).
 - **Audiobooks** with chapters, sleep timer, bookmarks and media keys.
 - **Link an audiobook to its ebook:** the book follows the audio.
 - **Podcasts:** search Apple Podcasts (or Podcast Index with your own key), follow shows, stream or download episodes, **Up next**, per-show speed, and a player that keeps going while you read.
+- One **floating player** for read aloud, audiobooks and podcasts, which folds into a small box you can move to either side.
 
 </td>
 </tr>
@@ -185,9 +188,9 @@ Some formats use **helper programs** that Libreri installs for you with one clic
 | DjVuLibre | DjVu books |
 | Tesseract | OCR, searchable scans, ink to text on Linux |
 | unar | CBR, CB7 and CBA comics |
-| eSpeak NG | Read aloud where the system has no voices |
+| eSpeak NG | Read aloud where the system has no voices; turns words into sounds for natural voices |
 
-Optional **downloads**, all run on your computer: speech models (whisper.cpp) for voice notes and dictation, the pix2tex maths model, spell-check dictionaries, OCR languages and extra canvas fonts.
+Optional **downloads**, all run on your computer, each with its own Delete button: natural voices for read aloud (Kokoro and Piper, with ONNX Runtime), speech models (whisper.cpp) for voice notes and dictation, the PaddleOCR-VL model, the pix2tex maths model, spell-check dictionaries, OCR languages and extra canvas fonts.
 
 ## Your library on disk
 
@@ -268,6 +271,7 @@ crates/libreri-maths      Maths from pictures (pix2tex with candle)
 crates/libreri-links      Links: video details, offline copies, the local player
 crates/libreri-feeds      RSS, Atom and OPML; arXiv; podcasts (Apple and Podcast Index search)
 crates/libreri-ocr        Optional OCR models (PaddleOCR-VL), downloaded and run on this computer
+crates/libreri-voices     Natural voices for read aloud (Kokoro, Piper) with ONNX Runtime
 
 docs/                     Phases, architecture, portability and decisions (docs/adr)
 ```
@@ -276,7 +280,7 @@ Dependencies only point downward: interface → shell → crates → core. Read 
 
 </details>
 
-**Built with** Tauri 2, Rust, SQLite, React, TypeScript, Tailwind and shadcn/ui. Books are drawn with PDF.js, foliate-js, KaTeX and Mermaid.
+**Built with** Tauri 2, Rust, SQLite, React, TypeScript, Tailwind and shadcn/ui. Books are drawn with PDF.js, foliate-js, KaTeX and Mermaid; models run with candle, whisper.cpp and ONNX Runtime.
 
 ## Documentation
 
@@ -287,7 +291,7 @@ Dependencies only point downward: interface → shell → crates → core. Read 
 | [Data portability](docs/data-portability.md) | How books, notes and links are kept, so nothing is locked in |
 | [AI research plan](docs/ai-research-plan.md) | Version 2's research tools and open-science plans |
 | [Phase 9 bugs](docs/phase9-bugs.md) | The Phase 9 bug list and what was fixed |
-| [Decisions](docs/adr) | 29 architecture decision records |
+| [Decisions](docs/adr) | 30 architecture decision records |
 
 ## Licence
 
