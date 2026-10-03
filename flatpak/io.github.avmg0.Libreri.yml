@@ -23,13 +23,109 @@ finish-args:
   - --talk-name=org.kde.StatusNotifierWatcher
   - --talk-name=org.freedesktop.Notifications
 modules:
+  # Helper programs, built in so DjVu books, OCR and read aloud work inside
+  # the sandbox (Libreri cannot install them with a package manager here).
+  # unar (ACE comics, optional) needs GNUstep and is left out.
+
+  # DjVuLibre: DjVu pages, text and contents (GPL-2.0).
+  - name: djvulibre
+    config-opts:
+      - --disable-desktopfiles
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+      - /share/man
+    sources:
+      - type: archive
+        url: https://downloads.sourceforge.net/project/djvu/DjVuLibre/3.5.28/djvulibre-3.5.28.tar.gz
+        sha256: fcd009ea7654fde5a83600eb80757bd3a76998e47d13c66b54c8db849f8f2edc
+
+  # Leptonica: images for Tesseract (BSD-2-Clause).
+  - name: leptonica
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DBUILD_SHARED_LIBS=ON
+      - -DSW_BUILD=OFF
+      - -DBUILD_PROG=OFF
+      - -DENABLE_GIF=OFF
+      - -DENABLE_OPENJPEG=OFF
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+      - /lib/cmake
+    sources:
+      - type: archive
+        url: https://github.com/DanBloomberg/leptonica/releases/download/1.85.0/leptonica-1.85.0.tar.gz
+        sha256: 3745ae3bf271a6801a2292eead83ac926e3a9bc1bf622e9cd4dd0f3786e17205
+
+  # Tesseract: OCR for scanned books (Apache-2.0), with English. More
+  # languages are downloaded from the app as on other systems.
+  - name: tesseract
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DSW_BUILD=OFF
+      - -DBUILD_TRAINING_TOOLS=OFF
+      - -DBUILD_TESTS=OFF
+      - -DGRAPHICS_DISABLED=ON
+      - -DDISABLE_ARCHIVE=ON
+      - -DDISABLE_CURL=ON
+      - -DOPENMP_BUILD=OFF
+    post-install:
+      - install -Dm644 eng.traineddata -t /app/share/tessdata/
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+      - /lib/cmake
+    sources:
+      - type: archive
+        url: https://github.com/tesseract-ocr/tesseract/archive/refs/tags/5.5.1.tar.gz
+        sha256: a7a3f2a7420cb6a6a94d80c24163e183cf1d2f1bed2df3bbc397c81808a57237
+      - type: file
+        url: https://github.com/tesseract-ocr/tessdata_fast/raw/4.1.0/eng.traineddata
+        sha256: 7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2
+
+  # pcaudiolib: lets eSpeak NG play sound (GPL-3.0).
+  - name: pcaudiolib
+    config-opts:
+      - --without-oss
+      - --without-coreaudio
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+      - "*.la"
+    sources:
+      - type: archive
+        url: https://github.com/espeak-ng/pcaudiolib/archive/refs/tags/1.3.tar.gz
+        sha256: 86edb75048eec7fcd8d74f9568f051d50b4781982215095b96ba9c2c9c7c159b
+
+  # eSpeak NG: read aloud, and sounds for natural voices (GPL-3.0).
+  - name: espeak-ng
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DUSE_MBROLA=OFF
+      - -DUSE_LIBSONIC=OFF
+      - -DUSE_LIBPCAUDIO=ON
+      - -DUSE_SPEECHPLAYER=OFF
+      - -DBUILD_TESTING=OFF
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+      - /share/vim
+    sources:
+      - type: archive
+        url: https://github.com/espeak-ng/espeak-ng/archive/refs/tags/1.52.0.tar.gz
+        sha256: bb4338102ff3b49a81423da8a1a158b420124b055b60fa76cfb4b18677130a23
+
   - name: libreri
     buildsystem: simple
     sources:
       - type: file
         dest-filename: libreri.deb
-        url: https://github.com/avmg0/Libreri/releases/download/v0.1.0/Libreri_0.1.0_amd64.deb
-        sha256: REPLACE_WITH_THE_SHA256_OF_THE_DEB
+        url: https://github.com/avmg0/Libreri/releases/download/v0.1.0/Libreri_0.1.0_amd64.deb  # libreri-deb
+        sha256: REPLACE_WITH_THE_SHA256_OF_THE_DEB  # libreri-deb
         only-arches: [x86_64]
       - type: file
         path: io.github.avmg0.Libreri.metainfo.xml

@@ -15,6 +15,10 @@ flatpak-builder --user --install --force-clean build flatpak/io.github.avmg0.Lib
 flatpak run io.github.avmg0.Libreri
 ```
 
+## Built by GitHub
+
+When a release is published, the **Flatpak** workflow builds it from that release's `.deb` and adds `Libreri.flatpak` to the release. Anyone can install that file with `flatpak install Libreri.flatpak` (it needs the GNOME 48 runtime from Flathub). To build it again for a tag, run the workflow by hand from the Actions tab.
+
 ## Submit to Flathub (once, then for each new version)
 
 1. Make a release on GitHub (push a tag `v…`) and publish it.
@@ -24,6 +28,6 @@ flatpak run io.github.avmg0.Libreri
 
 ## What is different inside a Flatpak
 
-- **Helper programs** (DjVuLibre, Tesseract, unar, eSpeak NG) cannot be installed from inside the sandbox. DjVu books, OCR, some comic formats and read aloud without system voices need them; the AppImage, `.deb` and `.rpm` packages do not have this limit. Bundling them into the Flatpak is the next step.
+- **Helper programs** are built in, since the sandbox cannot install them: DjVuLibre (DjVu books), Tesseract with English (OCR; other languages download from the app as usual) and eSpeak NG (read aloud and sounds for natural voices). unar, for the rare ACE comic archives (`.cba`), is left out because it needs GNUstep; the other Linux packages can use it.
 - **Updates** come from Flathub (the app's own updater should be switched off in the Flatpak build).
 - The library folder can be anywhere in your home folder or Documents.

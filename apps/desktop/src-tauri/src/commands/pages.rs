@@ -137,7 +137,7 @@ pub struct HelperInfo {
 pub struct HelpersDto {
     pub helpers: Vec<HelperInfo>,
     pub installer: Option<Installer>,
-    /// "macos" | "windows" | "linux"
+    /// "macos" | "windows" | "linux" | "flatpak"
     pub platform: String,
 }
 
@@ -155,7 +155,9 @@ fn helpers_dto() -> HelpersDto {
             })
             .collect(),
         installer,
-        platform: if cfg!(target_os = "macos") {
+        platform: if libreri_helpers::in_flatpak() {
+            "flatpak".into()
+        } else if cfg!(target_os = "macos") {
             "macos".into()
         } else if cfg!(windows) {
             "windows".into()
@@ -186,6 +188,8 @@ pub async fn install_helper(app: AppHandle, helper: Helper) -> AppResult<Helpers
             "Homebrew is needed to install this. Install Homebrew from brew.sh, then try again."
         } else if cfg!(windows) {
             "winget (App Installer from the Microsoft Store) is needed to install this."
+        } else if libreri_helpers::in_flatpak() {
+            "The Flatpak version of Libreri cannot install helper programs."
         } else {
             "No package manager Libreri knows was found; install it with your system's software centre."
         })

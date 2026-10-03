@@ -197,7 +197,7 @@ Only relative paths are stored, so a library can be moved, synced or opened on a
 
 ## Install
 
-Download the installer for your system from [Releases](https://github.com/avmg0/Libreri/releases): a `.dmg` for macOS (Apple Silicon or Intel), an `.msi` or `.exe` for Windows, and an AppImage, `.deb` or `.rpm` for Linux. A Flatpak for Flathub is on its way ([details](flatpak/README.md)).
+Download the installer for your system from [Releases](https://github.com/avmg0/Libreri/releases): a `.dmg` for macOS (Apple Silicon or Intel), an `.msi` or `.exe` for Windows, and an AppImage, `.deb` or `.rpm` for Linux. Each release also has a Flatpak (`Libreri.flatpak`) with its helper programs built in; Flathub is on its way ([details](flatpak/README.md)).
 
 Until the builds are signed, macOS asks before opening Libreri the first time: right-click the app, choose **Open**, then **Open** again. Windows may show SmartScreen: choose **More info**, then **Run anyway**.
 

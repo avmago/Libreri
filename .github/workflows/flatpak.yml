@@ -1,0 +1,59 @@
+# Builds the Flatpak from a release's .deb, with the helper programs built
+# in, and adds Libreri.flatpak to that release. Runs when a release is
+# published, or by hand for any tag (Actions › Flatpak › Run workflow).
+name: Flatpak
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to build (for example v0.1.0)
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  flatpak:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
+      options: --privileged
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Point the manifest at this release's .deb
+        run: |
+          command -v python3 >/dev/null || dnf install -y python3
+          version="${TAG#v}"
+          url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Libreri_${version}_amd64.deb"
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -o libreri.deb \
+            "$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" |
+              python3 -c "import json,sys; a=[x for x in json.load(sys.stdin)['assets'] if x['name'].endswith('_amd64.deb')]; print(a[0]['url'])")" \
+            -H "Accept: application/octet-stream"
+          sum=$(sha256sum libreri.deb | cut -d' ' -f1)
+          m=flatpak/io.github.avmg0.Libreri.yml
+          sed -i -E "s|url: .*# libreri-deb|url: ${url}  # libreri-deb|; s|sha256: .*# libreri-deb|sha256: ${sum}  # libreri-deb|" "$m"
+          grep -n "libreri-deb" "$m"
+
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          manifest-path: flatpak/io.github.avmg0.Libreri.yml
+          bundle: Libreri.flatpak
+          cache-key: flatpak-builder-${{ env.TAG }}
+
+      - name: Add it to the release
+        run: |
+          curl -fsSL -X POST -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Content-Type: application/octet-stream" --data-binary @Libreri.flatpak \
+            "$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" |
+              python3 -c "import json,sys; print(json.load(sys.stdin)['upload_url'].split('{')[0])")?name=Libreri.flatpak"

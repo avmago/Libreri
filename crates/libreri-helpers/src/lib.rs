@@ -319,10 +319,19 @@ impl Installer {
     }
 }
 
+/// Running as a Flatpak: helpers come built in, and the sandbox cannot use
+/// the computer's package manager.
+pub fn in_flatpak() -> bool {
+    std::env::var_os("FLATPAK_ID").is_some()
+}
+
 /// The package manager of this computer, if Libreri knows one that is
 /// installed. On macOS without Homebrew, `None`: the app explains how to
-/// install Homebrew first.
+/// install Homebrew first. Never one inside a Flatpak.
 pub fn installer() -> Option<Installer> {
+    if in_flatpak() {
+        return None;
+    }
     let candidates: &[Installer] = if cfg!(target_os = "macos") {
         &[Installer::Homebrew]
     } else if cfg!(windows) {
