@@ -25,9 +25,11 @@ jobs:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
-          ref: ${{ env.TAG }}
+          # A release builds from its own tag; a run by hand uses the
+          # branch it was started from (so older tags get today's manifest).
+          ref: ${{ github.event.release.tag_name || github.ref }}
 
       - name: Point the manifest at this release's .deb
         run: |
