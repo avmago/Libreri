@@ -3,6 +3,7 @@ name = "libreri-links"
 description = "Links to web pages and videos: details via oEmbed, offline copies of pages, and the local player page for embedded videos."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 publish.workspace = true

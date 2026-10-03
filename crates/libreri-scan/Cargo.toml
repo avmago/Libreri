@@ -3,6 +3,7 @@ name = "libreri-scan"
 description = "Barcode scanning for Libreri: reading ISBN barcodes from pictures, and a one-time page that lets a phone on the same network send photos."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 publish.workspace = true

@@ -3,6 +3,7 @@ name = "libreri-speech"
 description = "Speech to text with whisper.cpp: models, audio decoding, transcription and audiobook sync."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 publish.workspace = true

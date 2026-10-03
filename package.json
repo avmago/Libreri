@@ -1,5 +1,6 @@
 {
   "name": "libreri",
+  "license": "GPL-3.0-or-later",
   "private": true,
   "description": "Libreri — a local-first library for books, papers, comics and audiobooks.",
   "packageManager": "pnpm@10.28.0",

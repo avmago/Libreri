@@ -3,6 +3,7 @@ name = "libreri-pdf-edit"
 description = "Writes PDFs: marked-up copies now; page edits, redaction and versions in Phase 6b."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 publish.workspace = true

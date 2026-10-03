@@ -3,6 +3,7 @@ name = "libreri-core"
 description = "Libreri domain types, IDs, errors and ports. Depends on nothing app-specific."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 publish.workspace = true

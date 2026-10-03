@@ -72,3 +72,39 @@ export function UpdatesGroup() {
     </Group>
   );
 }
+
+const REPO = "https://github.com/avmg0/Libreri";
+
+/** Settings › General › About: the licence and where the source is. */
+export function AboutGroup() {
+  const open = (url: string) => void commands.openExternalUrl(url);
+  return (
+    <Group title="About Libreri" scope="computer">
+      <Row
+        label="Free software"
+        help="Libreri is under the GNU General Public License, version 3 or later: you may use, study, change and share it. It comes with no warranty."
+      >
+        <Button size="sm" variant="outline" onClick={() => open(`${REPO}/blob/main/LICENSE`)}>
+          Licence
+        </Button>
+      </Row>
+      <Row
+        label="Source code and credits"
+        help="The code, and the libraries Libreri is built on with their licences."
+      >
+        <span className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => open(REPO)}>
+            Source
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => open(`${REPO}/blob/main/docs/third-party-licenses.md`)}
+          >
+            Credits
+          </Button>
+        </span>
+      </Row>
+    </Group>
+  );
+}

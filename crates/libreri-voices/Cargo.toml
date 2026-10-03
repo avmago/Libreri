@@ -3,6 +3,7 @@ name = "libreri-voices"
 description = "Natural voices for reading aloud (Kokoro and Piper), downloaded on request and run on this computer with ONNX Runtime."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 publish.workspace = true

@@ -3,6 +3,7 @@ name = "libreri-helpers"
 description = "Finds and installs the helper programs Libreri uses (DjVuLibre, Tesseract, unar)."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 publish.workspace = true

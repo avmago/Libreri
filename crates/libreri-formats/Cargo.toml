@@ -3,6 +3,7 @@ name = "libreri-formats"
 description = "Reads metadata, page counts and covers from book files (PDF, EPUB, Markdown, FB2, comics…)."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 publish.workspace = true

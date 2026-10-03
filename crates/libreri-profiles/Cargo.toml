@@ -3,6 +3,7 @@ name = "libreri-profiles"
 description = "Profile secrets for Libreri: 6-digit PINs (Argon2), lockout and recovery codes."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 publish.workspace = true

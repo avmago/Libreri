@@ -3,6 +3,7 @@ name = "libreri-desktop"
 description = "Libreri desktop app: the thin Tauri shell around the libreri-* crates."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 publish.workspace = true

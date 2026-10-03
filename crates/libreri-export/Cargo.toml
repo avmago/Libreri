@@ -3,6 +3,7 @@ name = "libreri-export"
 description = "Writes Libreri data in other formats (CSV, Excel, JSON, BibTeX, RIS, CSL-JSON, Obsidian, Calibre OPF), formats citations, and reads and writes Libreri archives."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 publish.workspace = true

@@ -69,7 +69,11 @@ function excalidrawAssets(): Plugin {
 export default defineConfig({
   plugins: [react(), tailwindcss(), pdfjsAssets(), excalidrawAssets()],
   resolve: {
-    alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
+    alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+      // Not bundled: EPL-2.0, not GPL-compatible (see src/lib/stubs/elk.ts).
+      "elkjs/lib/elk.bundled.js": fileURLToPath(new URL("./src/lib/stubs/elk.ts", import.meta.url)),
+    },
   },
   clearScreen: false,
   server: {

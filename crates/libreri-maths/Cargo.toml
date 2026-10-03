@@ -3,6 +3,7 @@ name = "libreri-maths"
 description = "Reading maths from pictures as LaTeX (pix2tex, run with candle), downloaded on request."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 publish.workspace = true

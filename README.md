@@ -16,6 +16,7 @@ with highlights, notes, flashcards and a reading calendar that stay yours.
 ![Rust](https://img.shields.io/badge/Rust-1.95-b7410e?style=flat-square&logo=rust&logoColor=white)
 ![React](https://img.shields.io/badge/React-TypeScript-3178c6?style=flat-square&logo=react&logoColor=white)
 ![Local-first](https://img.shields.io/badge/data-local--first-16a34a?style=flat-square)
+[![Licence: GPL v3](https://img.shields.io/badge/licence-GPL--3.0--or--later-18181b?style=flat-square)](LICENSE)
 
 [Why](#why-libreri) · [Screenshots](#screenshots) · [Features](#what-you-can-do) · [Privacy](#what-goes-online) · [Formats](#formats) · [On disk](#your-library-on-disk) · [Install](#install) · [Build](#build-from-source) · [Docs](#documentation)
 
@@ -282,10 +283,13 @@ Dependencies only point downward: interface → shell → crates → core.
 | [Architecture](docs/architecture.md) | How Libreri is built: the stack, the layers, every crate, the library folder and the optional downloads |
 | [Code structure](docs/code-structure.md) | Where each feature lives, from the interface down to the crates, and the rules for adding code |
 | [Data portability](docs/data-portability.md) | How books, notes, highlights and links are kept, moved, backed up and restored, so nothing is ever locked in |
+| [Third-party licences](docs/third-party-licenses.md) | Every library Libreri is built on, with its licence |
 
 ## Licence
 
-Not decided yet. All rights reserved until then.
+Libreri is free software: you can use it, study it, change it and share it under the terms of the [GNU General Public License](LICENSE), version 3 or (at your option) any later version. If you share a changed version, share its source under the same licence.
+
+It comes with no warranty. The libraries it is built on, and their licences, are listed in [third-party licences](docs/third-party-licenses.md).
 
 <div align="center">
 <br>

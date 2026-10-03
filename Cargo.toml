@@ -29,7 +29,8 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.95"
 authors = ["Libreri contributors"]
-# Licence to be decided (see docs/adr/0006-licence-deferred.md)
+license = "GPL-3.0-or-later"
+repository = "https://github.com/avmg0/Libreri"
 publish = false
 
 [workspace.dependencies]

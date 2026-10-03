@@ -3,6 +3,7 @@ name = "libreri-ocr"
 description = "Optional OCR models downloaded on request (PaddleOCR-VL), run on this computer with candle."
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 publish.workspace = true
