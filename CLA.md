@@ -6,7 +6,7 @@ Thank you for contributing to Libreri. This agreement lets the project keep its 
 
 By signing (on a pull request, by commenting the sentence the bot asks for), you agree to the following for every contribution you submit to Libreri, now and later.
 
-1. **Definitions.** "You" means you, the person signing, or the organisation you sign for. "Contribution" means any code, documentation, design, translation or other work you submit to the Libreri project, in any form. "Maintainer" means avmg0, who maintains Libreri, and anyone he passes the project to.
+1. **Definitions.** "You" means you, the person signing, or the organisation you sign for. "Contribution" means any code, documentation, design, translation or other work you submit to the Libreri project, in any form. "Maintainer" means the GitHub user avmg0 (github.com/avmg0), who maintains Libreri, and anyone he passes the project to.
 
 2. **Copyright licence.** You grant the Maintainer and everyone who receives Libreri from the Maintainer a perpetual, worldwide, non-exclusive, free, royalty-free, irrevocable licence to use, copy, change, publish, distribute and sublicense your Contribution and works based on it, **under any licence, including licences other than the GNU GPL**.
 
