@@ -89,6 +89,14 @@ export function AboutGroup() {
         </Button>
       </Row>
       <Row
+        label="Privacy"
+        help="Your library never leaves your computer. Libreri goes online only for what you ask for, and sends only what that needs."
+      >
+        <Button size="sm" variant="outline" onClick={() => open(`${REPO}/blob/main/PRIVACY.md`)}>
+          Privacy policy
+        </Button>
+      </Row>
+      <Row
         label="Source code and credits"
         help="The code, and the libraries Libreri is built on with their licences."
       >

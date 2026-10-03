@@ -159,7 +159,7 @@ Only what you ask for, and only the minimum:
 | Download a voice, model or dictionary | Its official download site | Nothing about you |
 | Check for updates | GitHub (Libreri's releases) | Nothing about you |
 
-Your books, notes, highlights and reading habits never leave your computer.
+Your books, notes, highlights and reading habits never leave your computer. The full [privacy policy](PRIVACY.md) explains it in more detail.
 
 ## Formats
 
@@ -197,7 +197,7 @@ Only relative paths are stored, so a library can be moved, synced or opened on a
 
 ## Install
 
-Download the installer for your system from [Releases](https://github.com/avmg0/Libreri/releases): a `.dmg` for macOS (Apple Silicon or Intel), an `.msi` or `.exe` for Windows, and an AppImage, `.deb` or `.rpm` for Linux.
+Download the installer for your system from [Releases](https://github.com/avmg0/Libreri/releases): a `.dmg` for macOS (Apple Silicon or Intel), an `.msi` or `.exe` for Windows, and an AppImage, `.deb` or `.rpm` for Linux. A Flatpak for Flathub is on its way ([details](flatpak/README.md)).
 
 Until the builds are signed, macOS asks before opening Libreri the first time: right-click the app, choose **Open**, then **Open** again. Windows may show SmartScreen: choose **More info**, then **Run anyway**.
 
@@ -284,6 +284,9 @@ Dependencies only point downward: interface → shell → crates → core.
 | [Code structure](docs/code-structure.md) | Where each feature lives, from the interface down to the crates, and the rules for adding code |
 | [Data portability](docs/data-portability.md) | How books, notes, highlights and links are kept, moved, backed up and restored, so nothing is ever locked in |
 | [Third-party licences](docs/third-party-licenses.md) | Every library Libreri is built on, with its licence |
+| [Privacy policy](PRIVACY.md) | What stays on your computer, and exactly what goes online when you ask |
+| [Terms of use](TERMS.md) | What the free-software licence means for you, in everyday words |
+| [Contributing](CONTRIBUTING.md) | Reporting bugs, sending changes, and the [contributor agreement](CLA.md) |
 
 ## Licence
 

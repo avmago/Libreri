@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Libreri
+GenericName=Book library and reader
+Comment=Your books, papers, comics, audiobooks and podcasts, with notes and flashcards
+Exec=libreri %F
+Icon=io.github.avmg0.Libreri
+Terminal=false
+Categories=Office;Viewer;Education;
+Keywords=books;ebook;pdf;epub;reader;library;notes;highlights;audiobook;podcast;flashcards;
+MimeType=application/pdf;application/epub+zip;application/x-mobipocket-ebook;application/x-fictionbook+xml;image/vnd.djvu;text/markdown;application/rtf;application/vnd.comicbook+zip;application/vnd.comicbook-rar;
+StartupWMClass=Libreri

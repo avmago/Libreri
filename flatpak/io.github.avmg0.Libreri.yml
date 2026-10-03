@@ -1,0 +1,52 @@
+# Flatpak for Libreri (Flathub). Built from the Linux .deb of a GitHub
+# release, so it is the same program as the other Linux packages.
+#
+# Before submitting a new version to Flathub: put the release's .deb
+# address and its sha256 below (see flatpak/README.md).
+app-id: io.github.avmg0.Libreri
+runtime: org.gnome.Platform
+runtime-version: "48"
+sdk: org.gnome.Sdk
+command: libreri
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --socket=pulseaudio
+  # Online details, feeds, podcasts, look-up, downloads and updates.
+  - --share=network
+  # The library is a folder anywhere you choose, opened again on each start.
+  - --filesystem=home
+  - --filesystem=xdg-documents
+  # The study timer in the tray.
+  - --talk-name=org.kde.StatusNotifierWatcher
+  - --talk-name=org.freedesktop.Notifications
+modules:
+  - name: libreri
+    buildsystem: simple
+    sources:
+      - type: file
+        dest-filename: libreri.deb
+        url: https://github.com/avmg0/Libreri/releases/download/v0.1.0/Libreri_0.1.0_amd64.deb
+        sha256: REPLACE_WITH_THE_SHA256_OF_THE_DEB
+        only-arches: [x86_64]
+      - type: file
+        path: io.github.avmg0.Libreri.metainfo.xml
+      - type: file
+        path: io.github.avmg0.Libreri.desktop
+      - type: file
+        path: libreri.sh
+    build-commands:
+      - ar x libreri.deb
+      - tar -xf data.tar.*
+      # The program and what it ships (its icons are installed below).
+      - install -Dm755 usr/bin/* -t /app/lib/libreri/
+      - install -Dm755 libreri.sh /app/bin/libreri
+      - install -Dm644 io.github.avmg0.Libreri.desktop -t /app/share/applications/
+      - install -Dm644 io.github.avmg0.Libreri.metainfo.xml -t /app/share/metainfo/
+      - |
+        for size in 32x32 128x128 256x256@2; do
+          src=$(ls usr/share/icons/hicolor/$size/apps/*.png 2>/dev/null | head -1)
+          [ -n "$src" ] && install -Dm644 "$src" "/app/share/icons/hicolor/${size%@2}/apps/io.github.avmg0.Libreri.png"
+        done

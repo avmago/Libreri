@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.avmg0.Libreri</id>
+  <name>Libreri</name>
+  <summary>Read, take notes and remember: your library on your own computer</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <developer id="io.github.avmg0">
+    <name>Aditya Vikram Mago</name>
+  </developer>
+  <description>
+    <p>
+      Libreri keeps your books, papers, comics, audiobooks and podcasts in one library: an ordinary folder you own,
+      with your notes and highlights beside it as readable files. Nothing leaves your computer unless you ask.
+    </p>
+    <ul>
+      <li>Read PDF, EPUB, MOBI, AZW3, FB2, DjVu, Markdown, RTF and comics, with tabs, page themes and full screen</li>
+      <li>Highlights, comments with maths, a notebook per book, handwriting canvases and voice notes</li>
+      <li>Daily review: flashcards from your own highlights on a spaced schedule, with export to Anki</li>
+      <li>A reading calendar with goals and streaks, and a study timer</li>
+      <li>Read aloud with natural voices made on your computer, audiobooks linked to their books, and podcasts</li>
+      <li>Feeds for arXiv, journals and newsletters, added to your library with their details</li>
+      <li>Full-text search, text recognition for scans, PDF page editing and safe redaction</li>
+      <li>Profiles with PINs, Kids profiles, and exports to BibTeX, Obsidian, Calibre and more</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">io.github.avmg0.Libreri.desktop</launchable>
+  <url type="homepage">https://github.com/avmg0/Libreri</url>
+  <url type="bugtracker">https://github.com/avmg0/Libreri/issues</url>
+  <url type="vcs-browser">https://github.com/avmg0/Libreri</url>
+  <screenshots>
+    <screenshot type="default">
+      <caption>The library</caption>
+      <image>https://raw.githubusercontent.com/avmg0/Libreri/main/assets/screenshots/library.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Reading a paper with maths and notes</caption>
+      <image>https://raw.githubusercontent.com/avmg0/Libreri/main/assets/screenshots/reader.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Feeds for arXiv, journals and newsletters</caption>
+      <image>https://raw.githubusercontent.com/avmg0/Libreri/main/assets/screenshots/feeds.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Podcasts beside your books</caption>
+      <image>https://raw.githubusercontent.com/avmg0/Libreri/main/assets/screenshots/podcasts.png</image>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1"/>
+  <categories>
+    <category>Office</category>
+    <category>Education</category>
+  </categories>
+  <releases>
+    <release version="0.1.0" date="2026-10-03">
+      <description>
+        <p>First release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

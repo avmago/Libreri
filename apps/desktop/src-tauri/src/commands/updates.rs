@@ -39,6 +39,10 @@ pub struct UpdateProgress {
 }
 
 fn configured(app: &AppHandle) -> bool {
+    // A Flatpak is updated by Flathub, not by Libreri itself.
+    if std::env::var_os("FLATPAK_ID").is_some() {
+        return false;
+    }
     app.config()
         .plugins
         .0
