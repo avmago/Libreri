@@ -1,4 +1,4 @@
-//! Comparing two documents (Phase 6c): versions of a book, two books, or a
+//! Comparing two documents: versions of a book, two books, or a
 //! book and a file on this computer. PDFs and DjVu scans; pages without
 //! text use saved OCR text when there is some.
 

@@ -1,4 +1,4 @@
-//! Reading maths from pictures (Phase 8b, ADR 0025): off until turned on
+//! Reading maths from pictures (ADR 0025): off until turned on
 //! in Settings, which downloads the model.
 
 use crate::error::{AppError, AppErrorKind, AppResult};

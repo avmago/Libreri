@@ -1,18 +1,15 @@
 # 24. Handwriting canvases and ink to text
 
-Status: accepted (2026-09-28)
+Status: accepted.
 
-Phase 8a lets you write and draw by hand beside a book, clip figures from its pages, and turn handwriting into typed text.
+Libreri lets you write and draw by hand beside a book, clip figures from its pages, and turn handwriting into typed text.
 
-## Decisions (user, 2026-09-28)
+## Decisions
 
-- **Phase 8 comes in three parts:**
-  - 8a: handwriting canvases and ink to text.
-  - 8b: camera capture of paper notes, and copying equations as LaTeX.
-  - 8c: links to web pages and videos, with a side player.
+- **Related records:** paper notes and maths as LaTeX are in ADR 0025, links to web pages and videos in ADR 0026.
 - **Canvases are Excalidraw files.**
 - **Ink to text:** the system's recogniser or Tesseract, chosen in Settings. Linux uses Tesseract.
-- **Maths from pictures (8b):**
+- **Maths from pictures:**
   - Exact LaTeX stays the default: EPUB MathML, Markdown, and a rebuild from a PDF's text layer.
   - An optional maths model (pix2tex, MIT) can be downloaded in Settings. It runs with candle, a pure-Rust engine built into Libreri, so a missing or bad model only affects that feature (see ADR 0025).
 

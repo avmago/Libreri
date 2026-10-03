@@ -1,7 +1,5 @@
 # Libreri — Data portability: links must survive backup, export and a new computer
 
-Requirement (user, 2026-09-27): when the database, metadata and every kind of note (highlights, comments, Markdown notebooks, canvases, voice notes, handwriting captures, drawings, links) are exported and imported on another computer, **every link back to a page / paragraph / position in a PDF, EPUB, DjVu, comic, Markdown or audiobook must still work.** This is a non-negotiable rule for all phases.
-
 ## Design rules that make this true
 1. **Books are identified by content, not by path.** Every book has a `bookId` derived from its BLAKE3 content hash (plus a stable UUID for the record). Links never store absolute paths or computer-specific data.
 2. **One link format everywhere:** `libreri://book/<bookId>#<anchor>` — used in the database, annotations JSON, Markdown notebooks, canvas files, voice-note metadata and exports.
@@ -30,38 +28,38 @@ Requirement (user, 2026-09-27): when the database, metadata and every kind of no
 - Merging into an existing library never duplicates notes (IDs are UUIDs; conflicts resolved by last-modified with a report).
 - Profiles: imported notes attach to the matching profile or a new one; the owner chooses.
 
-## Personal data on disk (Phase 3)
+## Personal data on disk
 - Each profile is backed up to `.library-data/profiles/<id>.json` (PIN hashes included, so a rebuild keeps them; exports leave them out) and its smart collections to `<id>.collections.json`.
 - Per book and profile, `.library-data/annotations/<profile>/<book>.json` holds reading status, rating, favourite, progress, position and every highlight, comment and bookmark (format 2; format 1 files with only annotations still load).
 - Notebooks stay Markdown in `Notes/<profile name>/`; renaming a profile renames the folder and notebook links follow. Guests leave nothing on disk.
 - See `docs/adr/0010-profiles-and-pins.md`.
 
-## How it is built (Phase 4b)
+## How it is built
 - Archives, import, re-linking, backups and the health check: `docs/adr/0014-export-import-backups.md`. Round-trip tests live in `crates/libreri-library/src/archive_tests.rs`.
 - Old ids of a book (edited file, or notes from another copy) are *aliases* kept in the database and in the book's sidecar, so links survive a rebuild and an import.
 - Exports carry only the signed-in profile's personal data (the owner may include everyone's) and never PINs or keys. Backups carry everyone's data and PIN hashes, so a restore is complete.
-- Differences from the plan above: the archive's catalogue copy is for reference and other tools; import works from the sidecars and backups, which are the source of truth. Versions history is in the archive since Phase 6b (with book files).
+- Differences from the plan above: the archive's catalogue copy is for reference and other tools; import works from the sidecars and backups, which are the source of truth. Versions history is in the archive too (with book files).
 
-## Coming from other apps (Phase 4c)
+## Coming from other apps
 - Calibre, Zotero, BibTeX/RIS and Goodreads/StoryGraph imports copy files and never change the other app's library. Zotero highlights are converted to Libreri anchors (page + rectangles, with the quoted text as fallback) and get stable ids, so importing again never duplicates them. See `docs/adr/0015-import-from-other-apps.md`.
 
-## Per-computer settings (Phase 4)
+## Per-computer settings
 - Backup settings and the file kept up to date are in `backups.json` (per library id), because they name folders on this computer.
 - Online sources in use and API keys (ComicVine, ISBNdb) are kept in `online-sources.json` in the computer's app-config folder, not in the library, so exports, backups and copies of the library folder never carry them. See `docs/adr/0013-online-details.md`.
 - Details and covers found online are saved like any edit: in the database and the book's sidecar, so they travel with the library.
 
-## Page cache and helper programs (Phase 5a)
+## Page cache and helper programs
 - Rendered DjVu pages and unpacked comic pages are kept in the app cache folder on each computer (`pages/<bookId>/`, up to 2 GB). They can always be made again from the book file, so they are never exported or backed up.
 - Helper programs (DjVuLibre, Tesseract, unar) are installed per computer and are not part of the library. On a new computer, Libreri offers to install them the first time a book needs one. See `docs/adr/0016-helpers-comics-djvu.md`.
 - The full-text search index lives in the app cache (`search/<libraryId>.sqlite`) and rebuilds itself on any computer; it is never exported.
 - OCR text is saved in the library (`.library-data/text/<bookId>.json`: each page's text and word boxes), included in backups and Libreri archives and restored with the book. OCR language files are per computer (app data `tessdata/`). See `docs/adr/0017-full-text-search-and-ocr.md`.
 
-## Markup (Phase 6a)
+## Markup
 - Drawings, text boxes, sticky notes, stamps, signatures, pictures and measurements are annotations of kind `markup`: per profile, in the profile's JSON backups, backups and Libreri archives, and restored with the book like highlights. Pictures and signatures are stored inside the mark. The book file is never changed; *Export marked-up copy* makes a separate PDF. Saved signatures and your own stamps are in your profile's preferences. See `docs/adr/0018-markup-mode.md`.
 
-## Audiobooks (Phase 7a)
+## Audiobooks
 - An audiobook's link to the book it reads, and its sync points, are in `.library-data/audio-links/<audiobook id>.json`. Each point has a time in seconds, a reader locator, a 0–1 place in the text and a label. The file follows the audiobook when its id changes, and is included in backups and Libreri archives and restored with the book. Positions and bookmarks in audiobooks are ordinary reading data, with `{"type":"audio","t":…}` locators. Read-aloud settings are profile preferences. See `docs/adr/0021-read-aloud-and-audiobooks.md`.
-- Sync points found by listening (Phase 7b) are the same sync points with `"auto": true`.
+- Sync points found by listening are the same sync points with `"auto": true`.
 - Voice notes are FLAC files in `Notes/<profile>/Voice notes/`, so they are copied, backed up and archived with the rest of the profile's notes folder.
   - **In a book:** an annotation of kind `voice`. Its locator is an ordinary reader locator (a PDF page or highlight rectangles, an EPUB CFI, a text range, or a scroll fraction) plus `"audio": "Notes/<profile>/Voice notes/<file>.flac"` and `"duration"`. The quote is the selected text, if any; `note` is the transcript.
   - **In a notebook:** a relative Markdown link to the file (`[0:42](<Voice notes/<file>.flac>)`), which also works in other editors.
@@ -82,20 +80,22 @@ Requirement (user, 2026-09-27): when the database, metadata and every kind of no
 
 ## Edited PDFs (versions)
 - Page edits create a new version with a **page map** (old page → new page). Anchors are migrated through the map; text-quote fallback catches the rest. Exports include the version history so links to older versions still resolve.
-- **As built (Phase 6b):** every change to a PDF's file (edited pages, redaction, text corrections, a filled-in form, markup saved into the PDF, a smaller copy, an OCR text layer) keeps the file as it was in `.library-data/versions/<current book id>/` (`<old id>.pdf` plus `versions.json`: date, reason and each version's page map). The book's id changes with its content and the old id stays an alias, so every link still opens. Notes, highlights, markup, reading positions and OCR text move with their pages (turning and cropping included); notes on removed pages are kept with the version and come back when it is restored. Versions stay until you delete them, travel in backups and exports that include book files (with their page maps) and are merged on import when the same file is in the library. See `docs/adr/0019-edit-pages-and-versions.md`.
+- **As built:** every change to a PDF's file (edited pages, redaction, text corrections, a filled-in form, markup saved into the PDF, a smaller copy, an OCR text layer) keeps the file as it was in `.library-data/versions/<current book id>/` (`<old id>.pdf` plus `versions.json`: date, reason and each version's page map). The book's id changes with its content and the old id stays an alias, so every link still opens. Notes, highlights, markup, reading positions and OCR text move with their pages (turning and cropping included); notes on removed pages are kept with the version and come back when it is restored. Versions stay until you delete them, travel in backups and exports that include book files (with their page maps) and are merged on import when the same file is in the library. See `docs/adr/0019-edit-pages-and-versions.md`.
 
-## Verification (built into CI from Phase 1 onward)
+## Verification (in CI)
 - Round-trip tests: create library → add books + every note type → export → import into an empty library on a different path → assert every link opens the same page / paragraph / timestamp.
 - Tests for moved files, renamed files, edited PDFs, and "same book, different file".
 - Library health check reports any broken or re-anchored link.
+
+## Feeds
 - Feeds (ADR 0027) live in `Feeds/<profile>/`, apart from `Books/` and `Notes/`.
   - `.feeds.json` holds the folders, feeds, items and settings (plain JSON). Subscriptions also export and import as standard OPML.
   - Downloads are ordinary PDFs and Markdown files (front matter with title, authors, date, publisher, address, DOI, tags and abstract), in folders named like the feed folders.
   - Adding an item to the library moves the file into `Books/` as a normal book with the feed's details.
   - Backups and whole-library exports (with notes) carry each profile's `Feeds/<profile>/` subscriptions (`.feeds.json`, `.podcasts.json`), and its downloads (papers, articles, episodes) when book files are included. Importing joins them with the profile's own: folders by name, feeds by address, items by feed and key, keeping what was read, heard and downloaded.
 
-## Phase 9 additions (2026-10-02)
-- **Podcasts** (ADR 0028) live beside the feeds: `Feeds/<profile>/.podcasts.json` (shows, folders, episodes, Up next, places, per-show speed) and downloaded episodes as ordinary audio files. Podcast Index keys are per computer (`online-sources.json`), never exported. Like feeds, backups and archives do not hold them yet; shows export to OPML.
+## Podcasts, review, calendar and more
+- **Podcasts** (ADR 0028) live beside the feeds: `Feeds/<profile>/.podcasts.json` (shows, folders, episodes, Up next, places, per-show speed) and downloaded episodes as ordinary audio files. Podcast Index keys are per computer (`online-sources.json`), never exported. Like feeds, backups and whole-library exports carry them, and shows also export to OPML.
 - **Daily review** (ADR 0032): `.library-data/profiles/<profile>.review.json` holds the review settings, books left out, each highlight's card choices and the schedule, all by highlight id (so they follow notes like every other link). It survives a rebuild. Backups and whole-library exports carry it (with notes); exports of chosen books leave it out, since it spans every book. On import it is merged into the profile's own: lists are joined without doubles, missing entries added, and settings here kept. Cards can be exported to Anki (.apkg).
 - **Reading calendar** (ADR 0031): `.library-data/profiles/<profile>.study.json` holds sessions (start, minutes, book id, pages), goals and timer settings. Book ids follow books through aliases like every other link. It survives a rebuild. Backups and whole-library exports carry it (with notes); exports of chosen books leave it out, since it spans every book. On import it is merged into the profile's own: lists are joined without doubles, missing entries added, and settings here kept; book ids are moved to where the books landed. Goals and sessions can also be exported as an .ics calendar.
 - **RTF books** are read as Markdown made from the file; anchors are character offsets into that text, with the quoted text as fallback, like Markdown.

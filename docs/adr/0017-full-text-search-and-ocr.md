@@ -1,10 +1,10 @@
 # 17. Searching inside books, and OCR on request
 
-Status: accepted (2026-09-28)
+Status: accepted.
 
-Phase 5b makes the words inside books searchable, reads scanned pages with OCR when asked, and adds the global search screen (board 15).
+Libreri makes the words inside books searchable, reads scanned pages with OCR when asked, and adds the global search screen.
 
-## Decisions (user, 2026-09-28)
+## Decisions
 
 - **The search index stays on each computer** (app cache, one SQLite file per library) and rebuilds itself. It holds nothing that cannot be read again, so it is never exported or backed up.
 - **OCR runs only when asked**: *Make searchable* on a book, a selection or all scanned books. Books without text are marked.
@@ -26,7 +26,7 @@ Phase 5b makes the words inside books searchable, reads scanned pages with OCR w
 
 - **PDF text comes from hayro** (a PDF interpreter and rasterizer in safe Rust, MIT/Apache): each drawn glyph's Unicode value and position are put back into words and lines, and hyphenated words are joined back together. Invisible OCR layers made by other apps count as text. Password-less encrypted PDFs are read, and so are PDFs whose fonts are not embedded.
 - A page with fewer than 16 letters counts as having **no text**. A book is *scanned without text* when under 10 % of its pages have text, and *partly scanned* when at least 3 pages (and over 10 %) have none.
-- **MOBI/AZW3** (also carried over from Phase 1): details, cover (EXTH 201) and text (PalmDOC and HUFF/CDIC compression). Books with DRM keep their details; their text is not read.
+- **MOBI/AZW3** (also): details, cover (EXTH 201) and text (PalmDOC and HUFF/CDIC compression). Books with DRM keep their details; their text is not read.
 
 ## Index
 
@@ -43,7 +43,7 @@ Phase 5b makes the words inside books searchable, reads scanned pages with OCR w
 - **In the reader**, OCR words become a hidden text layer over scanned PDF and DjVu pages, so they can be selected, highlighted, noted and found. *Find in book* falls back to OCR text when PDF.js finds nothing.
 - **Languages**: Tesseract ships English (and sometimes more). Other languages come from the Tesseract project's `tessdata_fast` set, downloaded into Libreri's data folder on this computer (Settings › Helper programs). A book's own language is used first, then the languages ticked as default. When languages come from both places, Tesseract's own files are copied next to the downloaded ones, because Tesseract reads from one folder.
 
-## Search screen (board 15)
+## Search screen
 
 - *Search* in the sidebar, Mod+Alt+F, or typing in the command palette and choosing *Search books, text and notes for …*.
 - Scopes: everything, inside books, titles and details (the library's own search), and notes and highlights.

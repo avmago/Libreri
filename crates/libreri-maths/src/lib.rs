@@ -1,4 +1,4 @@
-//! Reading maths from pictures as LaTeX (Phase 8b, ADR 0025).
+//! Reading maths from pictures as LaTeX (ADR 0025).
 //!
 //! Off by default: Libreri copies LaTeX exactly where a book has it. When
 //! turned on in Settings, the pix2tex model (Lukas Blecher, MIT licence,

@@ -1,8 +1,8 @@
 # 11. One registry for every keyboard shortcut
 
-Status: accepted (2026-09-27)
+Status: accepted.
 
-Every keyboard action has an id, a label, a group and default keys in `lib/shortcuts/actions.ts` (111 actions in Phase 3). Components register handlers with `useShortcut(id, handler)`; nothing else listens for key presses, apart from typing fields and the PIN pad.
+Every keyboard action has an id, a label, a group and default keys in `lib/shortcuts/actions.ts` (100+ actions). Components register handlers with `useShortcut(id, handler)`; nothing else listens for key presses, apart from typing fields and the PIN pad.
 
 - **Defaults** use Ctrl/Alt/Shift with letters (`Mod` is ⌘ on macOS). They avoid the Super key and common Linux desktop keys (Ctrl+Alt+T, Ctrl+Alt+arrows, Alt+F-keys). A unit test checks that no two defaults clash and that none of these are used.
 - **Scopes.** The library, each reader tab, the Notes hub and Organize are `ShortcutScope`s. The same keys may do different things in different places (Mod+F searches the library or finds in the book). The view that is showing wins over app-wide actions.

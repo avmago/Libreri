@@ -1,4 +1,4 @@
-//! The comparison report (Phase 6c): a PDF to send to someone. A summary
+//! The comparison report: a PDF to send to someone. A summary
 //! with every change as text, then each page pair that changed, side by
 //! side, with the changes marked in colour.
 

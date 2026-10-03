@@ -41,7 +41,7 @@ const pageUrl = (id: string, side: "a" | "b", page: number, width: number) =>
   `${bookUrl(`.compare/${id}/${side}/${page}`)}?w=${width}`;
 
 /**
- * Two documents compared (board 4e): side by side, one over the other, or
+ * Two documents compared: side by side, one over the other, or
  * as a list of changes. The first document is on the left.
  */
 export function CompareView({

@@ -1,6 +1,4 @@
-# Libreri: architecture (as built, 2026-10-02)
-
-This replaces the agreed concept (v7, 2026-09-26). The concept's decisions are now built, or written up as decision records in `docs/adr/` (32 so far). This page is the map: what Libreri is made of, where data lives, and how the parts talk. For where to put new code, see [code structure](code-structure.md). For how notes keep their links on another computer, see [data portability](data-portability.md).
+# Libreri: architecture
 
 ## Stack
 

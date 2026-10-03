@@ -1,4 +1,4 @@
-//! Spell checking and word suggestions (Phase 7c).
+//! Spell checking and word suggestions.
 //!
 //! Hunspell dictionaries are read with spellbook (pure Rust), so checking
 //! is the same on every system. A word is fine when a chosen dictionary

@@ -1,5 +1,4 @@
-//! Links to web pages and videos from a place in a book (Phase 8c,
-//! ADR 0026).
+//! Links to web pages and videos from a place in a book (ADR 0026).
 //!
 //! - [`address`]: what an address is (a YouTube or Vimeo video and its
 //!   start time, a web page), with no network.

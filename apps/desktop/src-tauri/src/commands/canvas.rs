@@ -1,4 +1,4 @@
-//! Handwriting canvases (Phase 8a): Excalidraw files in the profile's
+//! Handwriting canvases: Excalidraw files in the profile's
 //! notes folder, and reading handwriting as text.
 
 use crate::error::{AppError, AppErrorKind, AppResult};

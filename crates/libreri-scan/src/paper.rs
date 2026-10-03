@@ -1,4 +1,4 @@
-//! Photos of paper pages (Phase 8b): finding the page in a photo,
+//! Photos of paper pages: finding the page in a photo,
 //! straightening it, and cleaning it up so it reads like a scan.
 
 use image::{DynamicImage, GrayImage, ImageBuffer, Luma, Rgb, RgbImage};

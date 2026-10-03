@@ -1,4 +1,4 @@
-//! Changing a PDF's file (Phase 6b): page edits, redaction, corrections,
+//! Changing a PDF's file: page edits, redaction, corrections,
 //! filled-in forms and markup saved as PDF annotations. Every change is
 //! saved as a new version; the old file is kept (see `versions.rs`).
 

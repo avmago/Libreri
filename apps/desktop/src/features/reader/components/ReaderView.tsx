@@ -1003,7 +1003,7 @@ function BookReader({ tab, active }: { tab: BookTab; active: boolean }) {
     }
   };
 
-  // Links to web pages, videos, files and other books (Phase 8c).
+  // Links to web pages, videos, files and other books.
   /** Adding a link: where it goes ("p. 4", or the selected words). */
   const [linking, setLinking] = useState<string | null>(null);
   const linkAt = useRef<typeof voiceAt.current>(null);

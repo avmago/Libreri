@@ -19,7 +19,7 @@ import { usePortability } from "../store";
 
 const GROUPS = ["Everything", "Tables and data", "Citations", "Other apps"] as const;
 
-/** Board 24: choose a format, what to include, and where to save. */
+/** Choose a format, what to include, and where to save. */
 export function ExportDialog() {
   const exporting = usePortability((s) => s.exporting);
   const close = usePortability((s) => s.close);

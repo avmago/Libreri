@@ -1,4 +1,4 @@
-//! Editing a PDF's pages (Phase 6b): order, rotation, cropping, pages from
+//! Editing a PDF's pages: order, rotation, cropping, pages from
 //! other files, blank and photographed pages, redaction, small text
 //! corrections, an OCR text layer and compression. Always writes a new
 //! file; the caller keeps the old one as a version.

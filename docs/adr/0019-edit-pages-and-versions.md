@@ -1,10 +1,10 @@
 # 19. Edit pages, redaction and version history
 
-Status: accepted (2026-09-28)
+Status: accepted.
 
-Phase 6b lets you change a PDF's file (board 4c): reorder, turn, delete, insert, extract, split, merge, crop, redact, correct small bits of text, fill in forms, save markup into the file, make it smaller and write OCR text into it. Every change keeps the file as it was.
+Libreri lets you change a PDF's file: reorder, turn, delete, insert, extract, split, merge, crop, redact, correct small bits of text, fill in forms, save markup into the file, make it smaller and write OCR text into it. Every change keeps the file as it was.
 
-## Decisions (user, 2026-09-28)
+## Decisions
 
 - **Save makes a new version; the original is kept.** The old file goes to `.library-data/versions/`, is kept until you delete it, and travels in backups and exports that include book files. Notes, highlights, markup and reading positions move with their pages.
 - **Text corrections cover the old words and write the new text over them.** The old words are removed from the file (as with redaction) and the new text is written in a standard PDF font; letters those fonts lack are drawn as a picture.

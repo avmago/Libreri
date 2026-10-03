@@ -1,4 +1,4 @@
-//! Reading handwriting with the system's own recogniser (Phase 8a): Apple's
+//! Reading handwriting with the system's own recogniser: Apple's
 //! Vision framework on macOS (it reads handwriting as well as print) and
 //! Windows' text recognition. Both are driven by a small script run by the
 //! system's own tools (osascript, Windows PowerShell), so nothing native is

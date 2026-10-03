@@ -23,8 +23,3 @@ Thumbs.db
 /tmp-library*/
 apps/desktop/public/pdfjs/
 apps/desktop/public/excalidraw/
-
-# Planning notes kept on this computer only (not published)
-docs/development-phases.md
-docs/phase9-bugs.md
-docs/ai-research-plan.md

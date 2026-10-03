@@ -131,10 +131,7 @@ export const commands = {
 	 *  the first page of a PDF rendered with PDF.js.
 	 */
 	saveCover: (id: string, imageBase64: string) => typedError<null, AppError>(__TAURI_INVOKE("save_cover", { id, imageBase64 })),
-	/**
-	 *  Opens the book in the system's default app (until Libreri's own reader
-	 *  arrives in Phase 2).
-	 */
+	/**  Opens the book in the system's default app. */
 	openBookExternally: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("open_book_externally", { id })),
 	/**  Shows the book's file in Finder / Explorer / the file manager. */
 	revealBook: (id: string) => typedError<null, AppError>(__TAURI_INVOKE("reveal_book", { id })),
@@ -1372,7 +1369,7 @@ export type ExportFormat =
 /**  A copy of the catalogue database. */
 "sqlite";
 
-/**  What the export dialog asks for (board 24). */
+/**  What the export dialog asks for. */
 export type ExportRequestDto = {
 	format: ExportFormat,
 	/**  `None` = every book. */

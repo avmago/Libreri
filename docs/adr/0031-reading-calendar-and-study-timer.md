@@ -1,8 +1,8 @@
 # 31. Reading calendar and study timer
 
-Status: accepted (2026-10-02). Built.
+Status: accepted. Built.
 
-## Decisions (user, 2026-10-02)
+## Decisions
 
 - **A reading calendar, not a general calendar:** days read, timer sessions, reading goals and due dates. Each profile has its own.
 - **Timer:** focus sessions (25 minutes of reading, a 5-minute break, a 15-minute break every 4 rounds; all can be changed), a plain countdown and a stopwatch.

@@ -1,6 +1,6 @@
 /**
  * Maths selected in a PDF, rebuilt as LaTeX from where each character sits
- * on the page (Phase 8b). A PDF's text is only characters in reading
+ * on the page. A PDF's text is only characters in reading
  * order, so "∑ n=1 ∞" or "x2n" say nothing of limits or scripts; their
  * positions and sizes do. Smaller characters raised after a base are a
  * superscript, lowered ones a subscript, characters stacked over and

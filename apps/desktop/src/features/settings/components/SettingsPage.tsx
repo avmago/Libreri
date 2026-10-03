@@ -61,7 +61,7 @@ const SECTIONS: { id: SettingsSection; label: string; Icon: LucideIcon }[] = [
   { id: "shortcuts", label: "Shortcuts", Icon: Keyboard },
 ];
 
-/** Boards 16–23: Settings, one page per section. */
+/** Settings, one page per section. */
 export function SettingsPage({
   library,
   session,

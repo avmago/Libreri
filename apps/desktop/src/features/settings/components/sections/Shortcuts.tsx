@@ -17,7 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Group, Row, Switch } from "../parts";
 
-/** Board 23b: every action, its keys, and changing them. */
+/** Every action, its keys, and changing them. */
 export function ShortcutSettings() {
   const prefs = useProfilePrefs((s) => s.prefs);
   const update = useProfilePrefs((s) => s.update);

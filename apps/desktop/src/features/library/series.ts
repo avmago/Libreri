@@ -1,5 +1,5 @@
 /**
- * Series (Phase 10): books grouped by their series, in reading order, with
+ * Series: books grouped by their series, in reading order, with
  * how far you are and which book comes next.
  */
 import type { BookView } from "./model";

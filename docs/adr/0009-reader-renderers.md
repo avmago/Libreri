@@ -1,6 +1,6 @@
 # 9. One renderer interface, three engines
 
-Status: accepted (2026-09-27)
+Status: accepted.
 
 The reader talks to books only through `readers/types.ts` (`Renderer`). Three engines implement it:
 

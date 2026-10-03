@@ -7,9 +7,9 @@
 //! .library-data/annotations/<profile>/<book>.json
 //! .library-data/profiles/<profile>.json  (and .collections.json)
 //! .library-data/covers/<book>.jpg
-//! .library-data/text/<book>.json         OCR text (Phase 5)
-//! .library-data/versions/<book>/…        earlier versions, with book files (Phase 6b)
-//! .library-data/audio-links/<book>.json  an audiobook's link and sync points (Phase 7a)
+//! .library-data/text/<book>.json         OCR text
+//! .library-data/versions/<book>/…        earlier versions, with book files
+//! .library-data/audio-links/<book>.json  an audiobook's link and sync points
 //! Notes/<profile name>/…                 notebooks and notes, as Markdown
 //! Books/…                                book files, when included
 //! database/library.db                    a copy of the catalogue, for reference

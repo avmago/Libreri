@@ -1,4 +1,4 @@
-//! Captured paper notes (Phase 8b): photographed pages, straightened and
+//! Captured paper notes: photographed pages, straightened and
 //! cleaned, saved as one searchable PDF in `Notes/<profile>/Captures/` and
 //! linked from a place in a book by a "capture" annotation.
 

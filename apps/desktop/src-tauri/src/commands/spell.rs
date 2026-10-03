@@ -1,4 +1,4 @@
-//! Spell check and word suggestions (Phase 7c): dictionaries, checking,
+//! Spell check and word suggestions: dictionaries, checking,
 //! corrections, completing words, and the person's own dictionary.
 
 use crate::error::{AppError, AppErrorKind, AppResult};

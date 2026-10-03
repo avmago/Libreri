@@ -1,5 +1,5 @@
 /**
- * Edit pages (Phase 6b): the pages as they will be, and what else changes,
+ * Edit pages: the pages as they will be, and what else changes,
  * kept in the interface until Save. Everything here is plain data so it
  * can be undone step by step and tested without a PDF.
  *

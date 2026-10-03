@@ -52,7 +52,7 @@ const ShelfBook = memo(function ShelfBook({
 });
 
 /**
- * Board 9: books standing on shelves. Each row of the grid sits on a board
+ * Books standing on shelves. Each row of the grid sits on a board
  * drawn by the background, so any window width fills whole shelves.
  */
 export function BookShelf({

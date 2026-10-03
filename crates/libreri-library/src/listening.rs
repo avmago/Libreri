@@ -1,4 +1,4 @@
-//! Audiobooks (Phase 7a): length and chapters, and the link between an
+//! Audiobooks: length and chapters, and the link between an
 //! audiobook and the book it reads, with sync points ("this moment is this
 //! place in the text").
 //!
@@ -28,7 +28,7 @@ pub struct SyncPoint {
     pub progress: f64,
     #[serde(default)]
     pub label: Option<String>,
-    /// Found by listening rather than set by hand (Phase 7b).
+    /// Found by listening rather than set by hand.
     #[serde(default)]
     pub auto: bool,
 }

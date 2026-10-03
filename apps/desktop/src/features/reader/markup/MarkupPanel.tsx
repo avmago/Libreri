@@ -6,7 +6,7 @@ import type { MarkupState } from "./useMarkup";
 
 const { describe, DEFAULT_LAYER } = markupModel;
 
-/** Board 4b: every mark by page, layers to show or hide, and where new marks go. */
+/** Every mark by page, layers to show or hide, and where new marks go. */
 export function MarkupPanel({ m, onShow }: { m: MarkupState; onShow: (mark: Mark) => void }) {
   const [newLayer, setNewLayer] = useState("");
   const layers = useMemo(() => {

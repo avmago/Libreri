@@ -95,7 +95,7 @@
   }
 }
 
-/* Shelf view: a board under every row of books (board 9). */
+/* Shelf view: a board under every row of books. */
 .lb-shelves {
   --shelf: color-mix(in srgb, var(--foreground) 12%, var(--background));
   --shelf-edge: color-mix(in srgb, var(--foreground) 22%, var(--background));

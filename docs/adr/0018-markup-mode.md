@@ -1,13 +1,13 @@
 # 18. Markup mode and the measure tool
 
-Status: accepted (2026-09-28)
+Status: accepted.
 
-Phase 6a lets you draw and write on fixed pages (PDF, DjVu, comics) and measure on them (boards 4b, and the measure part of 4d).
+Libreri lets you draw and write on fixed pages (PDF, DjVu, comics) and measure on them.
 
-## Decisions (user, 2026-09-28)
+## Decisions
 
 - **Markup is kept in Libreri, like highlights.** Every mark is an annotation of the new kind `markup`, stored per profile. It goes into the sidecar backups, Libreri archives and backups like any note. The book file is never changed.
-- *Export marked-up copy* makes a new PDF with the markup drawn in. *Save into the PDF* (standard PDF annotations, as a new version) comes with version history in 6b.
+- *Export marked-up copy* makes a new PDF with the markup drawn in. *Save into the PDF* (standard PDF annotations, as a new version) keeps the earlier file as a version (ADR 0019).
 
 ## Marks
 
@@ -53,4 +53,4 @@ The locator is `{"type":"markup","page":N,"layer":"…","item":{…}}`. Position
 
 - `AnnotationKind::Markup`, checked on save (valid locator, at most 3 MB).
 - New commands: `export_marked_up`, `read_picture`, `measure_scales`. New preference group `markup` (signatures, own stamps, last colour and width, snap).
-- Not yet: lasso selection, pixel eraser, markup on EPUB/Markdown (only highlights there), handwriting recognition (Phase 8).
+- Not yet: lasso selection, pixel eraser, markup on EPUB/Markdown (only highlights there), handwriting recognition.

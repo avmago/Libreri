@@ -1,6 +1,6 @@
 //! Goodreads and StoryGraph exports: what you read, want to read and how
 //! you rated it. They have no book files; Libreri only uses them to update
-//! books it already has (user, 2026-09-28).
+//! books it already has.
 
 use super::{ForeignBook, ForeignError, ForeignLibrary, ForeignPersonal, ForeignSource};
 use libreri_core::{BookMetadata, ReadingStatus};

@@ -51,7 +51,7 @@ pub struct AppState {
     pub extras_dir: std::path::PathBuf,
     /// Extra font downloads running, to cancel them.
     pub font_downloads: Mutex<std::collections::HashMap<String, Arc<AtomicBool>>>,
-    /// Links (Phase 8c): video and audio files on this computer being
+    /// Links: video and audio files on this computer being
     /// played (token → file), the local player page for embedded videos,
     /// and details fetched for a link being added (address → details).
     pub media_files: Mutex<std::collections::HashMap<String, std::path::PathBuf>>,

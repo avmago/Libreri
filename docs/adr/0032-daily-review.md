@@ -1,8 +1,8 @@
 # 32. Daily review
 
-Status: accepted (2026-10-02). Built.
+Status: accepted. Built.
 
-## Decisions (user, 2026-10-02)
+## Decisions
 
 - **Scheduling:** FSRS (the algorithm modern Anki uses), through `ts-fsrs`.
 - **Which highlights:** every highlight becomes a card by itself, with a switch per book (and one for the whole feature) to leave books out.

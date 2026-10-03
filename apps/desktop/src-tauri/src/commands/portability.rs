@@ -39,7 +39,7 @@ async fn blocking<T: Send + 'static>(
         .map_err(|e| AppError::new(AppErrorKind::Io, e.to_string()))?
 }
 
-/// What the export dialog asks for (board 24).
+/// What the export dialog asks for.
 #[derive(Debug, Clone, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportRequestDto {

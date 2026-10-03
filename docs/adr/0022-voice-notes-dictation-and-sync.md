@@ -1,10 +1,10 @@
 # 22. Voice notes, dictation and automatic audiobook sync
 
-Status: accepted (2026-09-28)
+Status: accepted.
 
-Phase 7b adds speech recognition: voice notes, dictation and finding an audiobook's places in its book by listening. All of it runs on the computer.
+Libreri adds speech recognition: voice notes, dictation and finding an audiobook's places in its book by listening. All of it runs on the computer.
 
-## Decisions (user, 2026-09-28)
+## Decisions
 
 - **Whisper is built into the app** (whisper.cpp through whisper-rs), not a helper program.
 - **Models:** Tiny and Small are offered first; Medium and Large (turbo) can be downloaded from Settings too. Only a downloaded model can be chosen as the one to use.
@@ -29,7 +29,7 @@ Phase 7b adds speech recognition: voice notes, dictation and finding an audioboo
   - Voice notes on selected text are drawn with a dotted underline.
   - They are listed under *Voice notes* in the Marks panel, with a player.
   - The Notes hub has a *Voice notes* filter.
-  - Deleting the voice note keeps the recording in the notes folder (changed in 8b), so the Notes hub's *Undo* brings it back whole.
+  - Deleting the voice note keeps the recording in the notes folder, so the Notes hub's *Undo* brings it back whole.
 - **In notebooks and notes:** a microphone button records and inserts `**Voice note** [0:42](<Voice notes/….flac>)` with the transcript as a quote. The relative link also works in other Markdown editors. The preview shows a player in place of the link.
 - **Validation:** a voice annotation must name an audio file under `Notes/`, with no `..` parts. The `book://` protocol serves only the signed-in profile's own notes folder.
 

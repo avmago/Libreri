@@ -1,10 +1,10 @@
 # 26. Links to web pages, videos and recordings
 
-Status: accepted (2026-09-29)
+Status: accepted.
 
-Phase 8c lets you link web pages, videos, recordings on your computer and other books to a passage or a page. Videos play in the side panel from a start time.
+Libreri lets you link web pages, videos, recordings on your computer and other books to a passage or a page. Videos play in the side panel from a start time.
 
-## Decisions (user, 2026-09-29)
+## Decisions
 
 - **Players:** YouTube and Vimeo; other video sites that offer oEmbed (PeerTube, Dailymotion, TED and the like); and video and audio files on this computer.
 - **Details:** fetched online once, when the link is added (title, channel or author, length, picture), then kept offline.
@@ -53,7 +53,7 @@ Phase 8c lets you link web pages, videos, recordings on your computer and other 
 - **Files on this computer** play in `<video>` or `<audio>` through `book://…/.media/<token>/<name>`, with range requests so seeking works.
   - The token is made when the link is played, and it maps only to that file.
   - *Open in another app* hands the file to the system.
-- **No site logos:** a video, globe, file or book icon plus the site's name, as board 4h asks.
+- **No site logos:** a video, globe, file or book icon plus the site's name.
 
 ## In the app
 

@@ -1,4 +1,4 @@
-//! Links to web pages, videos and files (Phase 8c, ADR 0026): details
+//! Links to web pages, videos and files (ADR 0026): details
 //! fetched once when a link is added, offline copies of web pages, the
 //! player for embedded videos, and video and audio files on this computer.
 

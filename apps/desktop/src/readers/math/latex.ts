@@ -1,5 +1,5 @@
 /**
- * Copying maths as LaTeX (Phase 8b). Exact where the book has the maths:
+ * Copying maths as LaTeX. Exact where the book has the maths:
  * the TeX KaTeX keeps with Markdown formulas, TeX annotations in EPUB
  * MathML, or the MathML itself turned into LaTeX. From a PDF's text only
  * the symbols can be rebuilt, so that is a best attempt to correct by hand.

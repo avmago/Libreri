@@ -31,7 +31,7 @@ function counts(lists: string[][]): [string, number][] {
   return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 }
 
-/** Board 10: change details of many books at once. */
+/** Change details of many books at once. */
 export function BulkEditDialog() {
   const books = useLibraryDialogs((s) => s.bulkEdit);
   const close = useLibraryDialogs((s) => s.closeBulkEdit);

@@ -1,10 +1,10 @@
 # 20. Comparing documents
 
-Status: accepted (2026-09-28)
+Status: accepted.
 
-Phase 6c finds what changed between two documents (board 4e).
+Libreri finds what changed between two documents.
 
-## Decisions (user, 2026-09-28)
+## Decisions
 
 - **What:** versions of a book (an earlier version with the current file), two books in the library, or a book and a PDF or DjVu file on this computer.
 - **How:** text and looks. Words that were removed, added or changed are marked, and so are pages whose drawings or pictures look different. Pages are paired even when some were added or removed.

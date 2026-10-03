@@ -29,7 +29,7 @@ import {
 import { useDetailsDialog } from "../store";
 import { ScanDialog } from "./ScanDialog";
 
-/** Board 5: look a book up online and pick, field by field, what to keep. */
+/** Look a book up online and pick, field by field, what to keep. */
 export function FindDetailsDialog() {
   const bookId = useDetailsDialog((s) => s.bookId);
   const close = useDetailsDialog((s) => s.close);

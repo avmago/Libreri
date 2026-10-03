@@ -49,7 +49,7 @@ const WHOLE: Corner[] = [
 const spec = (p: Page) => ({ id: p.photo.id, corners: p.corners, clean: p.clean, turns: p.turns });
 
 /**
- * Capturing paper notes (Phase 8b): photos from the camera, a phone or
+ * Capturing paper notes: photos from the camera, a phone or
  * picture files; each page's corners can be moved, and it is straightened
  * and cleaned. Saved as one searchable PDF in the notes folder.
  */

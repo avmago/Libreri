@@ -1,7 +1,7 @@
 //! Removing what lies under boxes on a page: the characters of text, the
 //! pixels of pictures, and small drawings (vector outlines of letters,
 //! underlines, marks). The rest of the page is left as it was, so it stays
-//! sharp and selectable (user, 2026-09-28).
+//! sharp and selectable.
 //!
 //! The page's drawing instructions are walked with the text, graphics and
 //! transformation state tracked, so the place of every character is known.

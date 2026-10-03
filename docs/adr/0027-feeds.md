@@ -1,10 +1,10 @@
 # 27. Feeds: papers, articles and newsletters from RSS and Atom
 
-Status: accepted (2026-09-29)
+Status: accepted.
 
 Libreri follows RSS and Atom feeds, so new papers, preprints, articles and newsletters come in by themselves. Each can be downloaded or deleted, and what is kept can be added to the library.
 
-## Decisions (user, 2026-09-29)
+## Decisions
 
 - **Whose:** each profile has its own subscriptions and downloads. Guests have none.
 - **When:** new items are looked for while Libreri is open: soon after the library opens, then every hour by default (30 minutes to 12 hours, or only on Refresh). Nothing runs while the app is closed.
@@ -25,7 +25,7 @@ Libreri follows RSS and Atom feeds, so new papers, preprints, articles and newsl
 - **Downloads** are `Feeds/<profile>/<folder>/<subfolder>/<feed>/<title>.pdf|md`, mirroring the folders.
 - **Articles are Markdown**, so they are books Libreri can read and other apps can open: the readable part of the page (picked out as for links' offline copies, ADR 0026), converted with `htmd`, pictures inside as data. Front matter carries the title, authors, date, publisher (the feed), address, DOI, tags (the topics) and abstract, which the library reads on import.
 - **Profiles:** the folder follows a renamed profile and goes to the system trash with a deleted one. `book://` serves `Feeds/` files only to their own profile.
-- **Backups and archives (2026-10-02):** Backups and whole-library exports (with notes) carry each profile's `Feeds/<profile>/` subscriptions (`.feeds.json`, `.podcasts.json`), and its downloads (papers, articles, episodes) when book files are included. Importing joins them with the profile's own: folders by name, feeds by address, items by feed and key, keeping what was read, heard and downloaded (`State::absorb`).
+- **Backups and archives:** Backups and whole-library exports (with notes) carry each profile's `Feeds/<profile>/` subscriptions (`.feeds.json`, `.podcasts.json`), and its downloads (papers, articles, episodes) when book files are included. Importing joins them with the profile's own: folders by name, feeds by address, items by feed and key, keeping what was read, heard and downloaded (`State::absorb`).
 
 ## Reading feeds (`libreri-feeds`)
 
@@ -35,7 +35,7 @@ Libreri follows RSS and Atom feeds, so new papers, preprints, articles and newsl
 - **Refreshing** reads six feeds at a time, with If-None-Match and If-Modified-Since. A check already running is not started twice; a profile switch during a check stops it from writing.
 - **Limits:** feeds 16 MB, pages 8 MB, PDFs 300 MB (checked to start with `%PDF`).
 - **arXiv:** categories are arXiv's taxonomy (built in), each followed at `https://rss.arxiv.org/rss/<code>` in *arXiv › <group>*. Searches use arXiv's API (`export.arxiv.org/api/query`, newest 50, sorted by date) in *arXiv › Searches*; plain words must all appear, and arXiv's own syntax (`au:`, `ti:`, `cat:`, AND/OR) is kept.
-- **Suggested sources** were checked to answer as feeds on 2026-09-29: Nature, PLOS ONE, PLOS Biology, eLife, JOSS, Quanta Magazine, IEEE Spectrum, MIT Technology Review and Hacker News. bioRxiv's and medRxiv's addresses could not be confirmed, and Science and PNAS refuse automated readers, so they are left out; they can still be added by address.
+- **Suggested sources** were checked to answer as feeds: Nature, PLOS ONE, PLOS Biology, eLife, JOSS, Quanta Magazine, IEEE Spectrum, MIT Technology Review and Hacker News. bioRxiv's and medRxiv's addresses could not be confirmed, and Science and PNAS refuse automated readers, so they are left out; they can still be added by address.
 
 ## Adding to the library
 
@@ -47,7 +47,7 @@ The download is imported into the chosen folder of `Books/` (moved, as imports d
 - **Feeds screen:** folders and feeds on the left, with their menus (auto-download, check now, mark all seen, rename, move, remove / stop following); items on the right. *Follow feeds* has four tabs: Address, arXiv, Suggested, OPML file. The ⋯ menu has New folder, Import and Export OPML, Show the Feeds folder, how often to check, and how long to keep items.
 - **Reading a download:** PDFs in Libreri's PDF reader, articles in its Markdown reader, inside a window; or *Open in another app*.
 
-## Changes (2026-10-01)
+## Changes
 
 - **Read opens a tab** in the library's own reader (PDF or article), instead of a separate window: page appearance, ADHD reading, read aloud, find and reading maths all work, and the place is kept on this computer. Highlights, bookmarks and notes come once it is added to the library; *Add to library* in the tab replaces it with the book.
 - **Opened items stay in New** until you choose another list or feed, so they do not vanish while being read (they are marked seen at once).

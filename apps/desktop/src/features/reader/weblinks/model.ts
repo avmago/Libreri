@@ -1,5 +1,5 @@
 /**
- * Links from a place in a book (Phase 8c): what a "link" annotation's
+ * Links from a place in a book: what a "link" annotation's
  * locator holds, and times written as "1:30".
  */
 import type { KnownVideo } from "@/lib/ipc";

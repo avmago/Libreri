@@ -1,4 +1,4 @@
-//! Extra fonts for canvases (Phase 8a): Excalidraw's handwriting font for
+//! Extra fonts for canvases: Excalidraw's handwriting font for
 //! Chinese, Japanese and Korean (Xiaolai, 13 MB) is not shipped with
 //! Libreri; it can be downloaded from Settings into the app's data folder.
 //! It comes from the same Excalidraw release Libreri is built with, as

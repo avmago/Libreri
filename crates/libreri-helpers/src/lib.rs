@@ -6,8 +6,8 @@
 //! This crate finds them — on `PATH` and in the places their installers use,
 //! which apps started from the Finder or the Start menu do not see — and
 //! installs them on request with the computer's own package manager
-//! (Homebrew, winget, apt, dnf, pacman, zypper). Libreri's own signed
-//! downloads replace the package managers in Phase 9 (user, 2026-09-28).
+//! (Homebrew, winget, apt, dnf, pacman, zypper). In the Flatpak they are
+//! built in instead.
 
 pub mod download;
 pub mod fonts;

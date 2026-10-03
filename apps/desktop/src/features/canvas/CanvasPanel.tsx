@@ -12,7 +12,7 @@ const selectClass =
   "h-7 min-w-0 rounded-md border border-input bg-background px-1.5 text-[12.5px] outline-none focus-visible:border-ring";
 
 /**
- * The reader's canvas panel (Phase 8a): this book's handwriting canvases,
+ * The reader's canvas panel: this book's handwriting canvases,
  * drawn beside the page, with figures clipped from it.
  */
 export function CanvasPanel({

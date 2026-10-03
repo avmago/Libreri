@@ -1,5 +1,5 @@
 /**
- * Clipping a figure from a page (Phase 8a): the part of a page under a
+ * Clipping a figure from a page: the part of a page under a
  * rectangle drawn on the screen, as a picture for a canvas.
  */
 import type { Rect } from "./types";

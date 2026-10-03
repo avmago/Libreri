@@ -1,4 +1,4 @@
-//! Listening (Phase 7a): audiobook chapters, links between audiobooks and
+//! Listening: audiobook chapters, links between audiobooks and
 //! their text with sync points, and speaking with eSpeak NG where the
 //! system has no voices.
 

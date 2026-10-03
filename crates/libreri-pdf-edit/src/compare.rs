@@ -1,4 +1,4 @@
-//! Comparing two documents (Phase 6c): which pages belong together, which
+//! Comparing two documents: which pages belong together, which
 //! words were removed, added or changed, and where drawings and pictures
 //! look different.
 //!

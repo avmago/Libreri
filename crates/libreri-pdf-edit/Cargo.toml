@@ -1,6 +1,6 @@
 [package]
 name = "libreri-pdf-edit"
-description = "Writes PDFs: marked-up copies now; page edits, redaction and versions in Phase 6b."
+description = "Writes PDFs: marked-up copies, page edits, redaction and comparisons."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

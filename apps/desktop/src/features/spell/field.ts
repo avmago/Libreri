@@ -1,5 +1,5 @@
 /**
- * Libreri's spell check and word completion on a text box (Phase 7c).
+ * Libreri's spell check and word completion on a text box.
  *
  * A text box cannot draw underlines itself, so a layer with the same text
  * (invisible) and the same layout sits over it and draws a wavy line under

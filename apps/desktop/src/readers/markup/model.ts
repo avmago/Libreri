@@ -6,7 +6,7 @@
  * origin), so marks stay put at any zoom. Widths and text sizes are
  * fractions of the page width. Items are stored as annotations of kind
  * "markup" whose locator is `{type:"markup", page, layer, item}`; the book
- * file is never changed (user, 2026-09-28).
+ * file is never changed.
  */
 
 export type Pt = [x: number, y: number];

@@ -1,10 +1,10 @@
 # 30. Natural voices for reading aloud
 
-Status: accepted (2026-10-02). Kokoro and Piper built.
+Status: accepted. Kokoro and Piper built.
 
 Read aloud used the system's voices (ADR 0021). On macOS and Windows they are good. On Linux they are often missing or robotic (eSpeak NG). Natural voices that run on the computer fix that everywhere.
 
-## Decisions (user, 2026-10-02)
+## Decisions
 
 - **Offered on macOS, Windows and Linux** as optional downloads in **Settings › Reader › Read aloud voices**. Each download has **Download**, **Delete**, and a switch to turn its voices **on or off**. System voices are always there.
 - **Only voices free to use**, including for work.

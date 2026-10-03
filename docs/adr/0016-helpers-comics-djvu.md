@@ -1,22 +1,22 @@
 # 16. Helper programs, comics and DjVu
 
-Status: accepted (2026-09-28)
+Status: accepted.
 
-Phase 5a opens every page-image format in the reader: DjVu and comics (CBZ, CBR, CB7, CBT, CBA).
+Libreri opens every page-image format in the reader: DjVu and comics (CBZ, CBR, CB7, CBT, CBA).
 
-## Helper programs (user, 2026-09-28: "Install button now, own downloads later")
+## Helper programs
 
 Some formats need open-source programs Libreri runs as separate processes, never links:
 
 | Helper | Programs | Used for | Licence |
 |---|---|---|---|
 | DjVuLibre | `ddjvu`, `djvutxt`, `djvused` | DjVu pages, text layer, contents, details | GPL-2.0 |
-| Tesseract | `tesseract` | OCR (Phase 5b) | Apache-2.0 |
+| Tesseract | `tesseract` | OCR | Apache-2.0 |
 | unar | `unar`, `lsar` | ACE comics (.cba), optional | LGPL-2.1 |
 
 - `libreri-helpers` finds them on `PATH` and in the usual install folders (Homebrew, `/usr/local`, Program Files), reports version and missing programs, and runs them without a console window on Windows.
 - **Install…** (Settings › Helper programs, and the reader's error panel when a book needs one) shows the exact command and runs it with the computer's package manager: Homebrew on macOS, winget on Windows, apt/dnf/pacman/zypper through `pkexec` on Linux. Output streams into the dialog. Without a package manager the dialog says where to get the program.
-- Phase 10 (release) replaces this with signed downloads built by Libreri, so no package manager is needed.
+- The Flatpak cannot use a package manager, so DjVuLibre, Tesseract and eSpeak NG are built into it; unar is left out.
 - Helpers are per computer; nothing about them goes into the library or backups.
 
 ## Comics

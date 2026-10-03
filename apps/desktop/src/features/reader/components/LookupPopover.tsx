@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { Floating } from "./Popovers";
 
 /**
- * Look up (Phase 10): the selected word's meanings (Wiktionary) and, for
+ * Look up: the selected word's meanings (Wiktionary) and, for
  * names and things, a short Wikipedia summary, in the book's language.
  */
 export function LookupPopover({

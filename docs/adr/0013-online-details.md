@@ -1,6 +1,6 @@
 # 13. Book details from online sources, and barcode scanning
 
-Status: accepted (2026-09-28)
+Status: accepted.
 
 ## Online details
 
@@ -14,7 +14,7 @@ A new crate, `libreri-metadata`, asks free sources about a book and returns **ca
 - **Keys.** ComicVine and ISBNdb need the reader's own key. Keys and the list of sources in use live in `online-sources.json` in the computer's app-config folder (readable only by the user on macOS and Linux), never in the library, so they are never exported or synced. The interface only ever sees the last four characters.
 - **Only profiles that can change the library** (owner and standard) can look up, save details or change these settings.
 
-### Picking what to keep (board 5)
+### Picking what to keep
 
 *Find details online* (Mod+Shift+D, the globe button in the details panel, the book menu) opens a search form filled with the book's identifiers, title and author, searches at once, and lists the matches best first. Choosing a match shows a table: each field of the book next to the match's value, with a tick to use it. By default only empty fields, new tags and categories, and a more specific type than "Book" are ticked; nothing the reader typed is replaced unless they tick it. Fields can be taken from different matches (the row says whose value is used). Tags and categories are **added**, never replaced. The cover is shown side by side and ticked when the book has none.
 

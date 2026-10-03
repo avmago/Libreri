@@ -1,4 +1,4 @@
-//! Speech to text (Phase 7b), with whisper.cpp built into the app
+//! Speech to text, with whisper.cpp built into the app
 //! (whisper-rs, MIT): downloadable models, audio decoding (symphonia),
 //! transcription, voice-note files (FLAC) and finding an audiobook's place
 //! in its text.

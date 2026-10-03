@@ -29,7 +29,7 @@ pub struct AutoExport {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct BackupSettings {
-    /// Off until the owner turns it on (user, 2026-09-28).
+    /// Off until the owner turns it on.
     pub enabled: bool,
     pub folder: Option<String>,
     /// 24 (daily) or 168 (weekly).

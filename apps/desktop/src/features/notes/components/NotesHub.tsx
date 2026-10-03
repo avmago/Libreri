@@ -50,7 +50,7 @@ const SWATCH: Record<HighlightColor, string> = {
   pink: "#f472b6",
 };
 
-/** Board 12: every highlight, comment, bookmark and notebook in one place. */
+/** Every highlight, comment, bookmark and notebook in one place. */
 export function NotesHub() {
   const [tab, setTab] = useState<"marks" | "notebooks" | "canvases">("marks");
   const [search, setSearch] = useState("");

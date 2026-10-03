@@ -8,7 +8,7 @@ use rusqlite::Connection;
 
 /// Migrations in order. Index 0 upgrades version 0 → 1, and so on.
 pub const MIGRATIONS: &[&str] = &[
-    // 1 — foundations (Phase 0). Later phases add their own tables.
+    // 1 — foundations. Later migrations add their own tables.
     r#"
     CREATE TABLE library_meta (
         key   TEXT PRIMARY KEY,
@@ -33,7 +33,7 @@ pub const MIGRATIONS: &[&str] = &[
         added_at    TEXT NOT NULL
     ) STRICT;
     "#,
-    // 2 — library MVP (Phase 1): full book records, tags, categories,
+    // 2 — library MVP: full book records, tags, categories,
     // per-profile state and metadata search. `books` was always empty in v1.
     r#"
     DROP TABLE books;
@@ -118,7 +118,7 @@ pub const MIGRATIONS: &[&str] = &[
         prefix = '2 3'
     );
     "#,
-    // 3 — reader (Phase 2): reading position, highlights and bookmarks,
+    // 3 — reader: reading position, highlights and bookmarks,
     // and where each profile's notebook for a book lives.
     r#"
     ALTER TABLE book_user ADD COLUMN position TEXT;   -- JSON locator of the last place read
@@ -148,7 +148,7 @@ pub const MIGRATIONS: &[&str] = &[
         PRIMARY KEY (book_id, profile_id)
     ) STRICT;
     "#,
-    // 4 — profiles and organising (Phase 3): profile kinds, PIN lockout,
+    // 4 — profiles and organising: profile kinds, PIN lockout,
     // Kids folders, interface preferences, and smart collections.
     r#"
     ALTER TABLE profiles ADD COLUMN kind TEXT NOT NULL DEFAULT 'standard';
@@ -171,7 +171,7 @@ pub const MIGRATIONS: &[&str] = &[
     ) STRICT;
     CREATE INDEX collections_profile ON collections(profile_id, position);
     "#,
-    // 5 — export and import (Phase 4b): why an old id points to a book.
+    // 5 — export and import: why an old id points to a book.
     // 'changed' = the file was edited; 'otherFile' = notes imported from
     // another copy or edition of the book (they re-anchor by quoted text).
     r#"

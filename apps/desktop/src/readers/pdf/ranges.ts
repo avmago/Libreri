@@ -16,7 +16,8 @@ async function get(url: string, start: number, end: number): Promise<Uint8Array>
   while (at < end) {
     const to = Math.min(end, at + PIECE);
     const r = await fetch(url, { headers: { Range: `bytes=${at}-${to - 1}` } });
-    if (r.status !== 206 && r.status !== 200) throw new Error(`the book could not be read (${r.status})`);
+    if (r.status !== 206 && r.status !== 200)
+      throw new Error(`the book could not be read (${r.status})`);
     const bytes = new Uint8Array(await r.arrayBuffer());
     if (!bytes.length) throw new Error("the book could not be read");
     if (r.status === 200) {

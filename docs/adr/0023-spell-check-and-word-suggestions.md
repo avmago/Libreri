@@ -1,10 +1,10 @@
 # 23. Spell check and word suggestions
 
-Status: accepted (2026-09-28)
+Status: accepted.
 
-Phase 7c checks spelling everywhere you write, suggests corrections, and completes words from your books and notes.
+Libreri checks spelling everywhere you write, suggests corrections, and completes words from your books and notes.
 
-## Decisions (user, 2026-09-28)
+## Decisions
 
 - **Checker:** Libreri's own, not the web view's, so it behaves the same on every system and can know the words of your books.
 - **Dictionaries:** English (US and UK) comes with the app. Other languages are downloaded from Settings.

@@ -1,6 +1,6 @@
 // Before `pnpm tauri dev`: makes sure the installed packages match
 // pnpm-lock.yaml, and installs them if not. After a pull that adds a
-// package (Excalidraw in Phase 8a, say), the app would otherwise start and
+// package (Excalidraw, say), the app would otherwise start and
 // fail only when that part is opened.
 //
 // pnpm keeps a copy of the lockfile it installed from in

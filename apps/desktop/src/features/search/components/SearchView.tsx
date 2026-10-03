@@ -285,7 +285,7 @@ function IndexLine() {
   return <span>Searching the text of {n === 1 ? "1 book" : `${n} books`}</span>;
 }
 
-/** Board 15: one search over the words inside books, their details and notes. */
+/** One search over the words inside books, their details and notes. */
 export function SearchView() {
   const initial = useLibraryView((s) => (s.nav.kind === "search" ? (s.nav.query ?? "") : ""));
   const [query, setQuery] = useState(initial);

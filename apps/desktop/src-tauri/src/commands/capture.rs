@@ -1,4 +1,4 @@
-//! Capturing paper notes (Phase 8b): photos from the camera, the phone or
+//! Capturing paper notes: photos from the camera, the phone or
 //! picture files are straightened and cleaned, then saved as one
 //! searchable PDF in the profile's notes folder.
 

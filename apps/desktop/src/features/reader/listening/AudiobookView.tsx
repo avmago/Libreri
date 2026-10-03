@@ -59,7 +59,7 @@ const points = (link: AudioLinkDto | undefined) =>
   (link?.points ?? []).map((p) => ({ ...p, t: p.t ?? 0, progress: p.progress ?? 0 }));
 
 /**
- * The audiobook player (Phase 7a): chapters, speed, sleep timer,
+ * The audiobook player: chapters, speed, sleep timer,
  * bookmarks, and the book it reads kept in step through sync points.
  */
 export function AudiobookView({ tab, active }: { tab: BookTab; active: boolean }) {

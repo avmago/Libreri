@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/input";
 import { Floating } from "./Popovers";
 
 /**
- * A formula as LaTeX (Phase 8b): shown with a live preview so it can be
+ * A formula as LaTeX: shown with a live preview so it can be
  * checked and corrected, then copied or added to the notebook.
  */
 export function MathPopover({

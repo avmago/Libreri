@@ -1,4 +1,4 @@
-//! Comparing documents (Phase 6c): versions of a book, two books, or a book
+//! Comparing documents: versions of a book, two books, or a book
 //! and a file. Pages are shown through `book://…/.compare/<id>/<a|b>/<page>`.
 
 use crate::error::{AppError, AppErrorKind, AppResult};

@@ -121,8 +121,7 @@ fn book_path(state: &AppState, id: &str) -> AppResult<std::path::PathBuf> {
         .ok_or_else(|| AppError::invalid("the book's path is not valid"))
 }
 
-/// Opens the book in the system's default app (until Libreri's own reader
-/// arrives in Phase 2).
+/// Opens the book in the system's default app.
 #[tauri::command]
 #[specta::specta]
 pub fn open_book_externally(

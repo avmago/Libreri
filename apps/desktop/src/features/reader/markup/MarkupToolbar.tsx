@@ -90,7 +90,7 @@ function ToolButton({
 
 const sep = <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden />;
 
-/** Board 4b: the markup tools, shown under the reader toolbar in markup mode. */
+/** The markup tools, shown under the reader toolbar in markup mode. */
 export function MarkupToolbar({
   m,
   onPickImage,

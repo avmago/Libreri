@@ -1,4 +1,4 @@
-//! The person's own dictionary (Phase 7c): words spell check should
+//! The person's own dictionary: words spell check should
 //! accept, one per line in `Notes/<profile>/Dictionary.txt`. It is an
 //! ordinary file in their notes folder, so it can be edited by hand and
 //! travels with their notes in backups and archives.

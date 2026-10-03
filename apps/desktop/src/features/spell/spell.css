@@ -1,4 +1,4 @@
-/* Libreri's spell check (Phase 7c): the layer over a text box that marks
+/* Libreri's spell check: the layer over a text box that marks
    misspelt words, and the lists of corrections and completions. */
 .lb-spell-overlay {
   position: absolute;

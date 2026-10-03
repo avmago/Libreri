@@ -1,4 +1,4 @@
-//! Updates (Phase 10): Libreri looks for a new version on its GitHub
+//! Updates: Libreri looks for a new version on its GitHub
 //! releases (`latest.json`, signed with the project's updater key), and
 //! installs it when asked, then restarts. Nothing is sent but the request.
 

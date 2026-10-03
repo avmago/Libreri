@@ -1,5 +1,5 @@
 /**
- * Full-screen reading (Phase 9): the window fills the screen and only the
+ * Full-screen reading: the window fills the screen and only the
  * page shows. The reader brings its toolbar and page bar back at the top
  * and bottom edges; Esc, F11 or the button on the page leave.
  *

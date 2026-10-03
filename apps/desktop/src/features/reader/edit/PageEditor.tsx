@@ -71,7 +71,7 @@ type Dialog =
   | null;
 
 /**
- * Edit pages (board 4c): a grid of the book's pages to reorder, turn,
+ * Edit pages: a grid of the book's pages to reorder, turn,
  * delete, insert, crop, redact and correct, then save as a new version
  * (the old file is kept) or as new books.
  */

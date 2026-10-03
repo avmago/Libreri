@@ -1,5 +1,5 @@
 /**
- * Updates (Phase 10): looking for a new version, and installing it. The
+ * Updates: looking for a new version, and installing it. The
  * window saves what is pending (notes, place, preferences) before Libreri
  * restarts into the new version.
  */

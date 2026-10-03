@@ -1,10 +1,10 @@
 # 15. Importing from Calibre, Zotero, Mendeley, Goodreads and StoryGraph
 
-Status: accepted (2026-09-28)
+Status: accepted.
 
 *Import from another app* (the Import menu, Settings › Export & import, the command palette) reads another app's library and brings it into Libreri. Owners and standard profiles can import; reading data goes to the signed-in profile.
 
-## Rules (user, 2026-09-28)
+## Rules
 
 - **Files are copied.** The other app's folder is only read (Calibre's `metadata.db` read-only, Zotero's database through a temporary copy because Zotero locks it), so Calibre and Zotero keep working as before.
 - **One file per book.** Calibre: the first format in an order the reader can change in the dialog (default EPUB, PDF, AZW3, MOBI, FB2, DjVu, comics, text, audio). Zotero: the attachment with the most highlights, then PDFs.

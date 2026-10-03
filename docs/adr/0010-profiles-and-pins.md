@@ -1,6 +1,6 @@
 # 10. Profiles, PINs and who is signed in
 
-Status: accepted (2026-09-27)
+Status: accepted.
 
 Several people share one library. Each profile keeps its own reading status, ratings, favourites, positions, highlights, bookmarks, notebooks, smart collections and interface preferences; book files, folders and book details are shared.
 

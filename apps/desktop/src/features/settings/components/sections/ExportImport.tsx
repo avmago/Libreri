@@ -44,7 +44,7 @@ function change(s: BackupSettingsDto): BackupSettingsChange {
   };
 }
 
-/** Board 25: export, import, backups, and a file kept up to date. */
+/** Export, import, backups, and a file kept up to date. */
 export function ExportImportSettings({ session }: { session: SessionDto }) {
   const portability = usePortability();
   const { data: settings } = useBackupSettings();

@@ -72,8 +72,8 @@ function useSleep(stop: () => void) {
 }
 
 /**
- * The floating player at the bottom of the page (board 4, "Read aloud ·
- * Audiobook"): reads the book aloud with a system voice, or plays its
+ * The floating player at the bottom of the page: reads the book aloud
+ * with a system voice, or plays its
  * linked audiobook from the place being read. Either way the book follows
  * along and turns pages.
  */

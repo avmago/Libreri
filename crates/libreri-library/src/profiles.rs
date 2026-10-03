@@ -94,8 +94,8 @@ impl Library {
         Ok(())
     }
 
-    /// Writes every profile's backup (after opening, so libraries made
-    /// before Phase 3 get them too).
+    /// Writes every profile's backup (after opening, so older libraries
+    /// get them too).
     pub(crate) fn backup_all_profiles(&self) -> Result<()> {
         for p in self.with_db(|db| db.profiles())? {
             self.profile_backup(&p)?;

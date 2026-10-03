@@ -7,7 +7,7 @@
 //! app win over what Libreri reads from the file; tags and categories are
 //! added together. Personal data (status, rating, highlights, notes) goes to
 //! the signed-in profile. Goodreads and StoryGraph only update books that
-//! are already here (user, 2026-09-28).
+//! are already here.
 
 use crate::paths::{self, folder_abs, unique_path};
 use crate::{covers, now, sidecar, Error, Library, Progress, Result};

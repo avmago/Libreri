@@ -1,4 +1,4 @@
-//! Changing PDF files (Phase 6b): page edits, redaction, corrections,
+//! Changing PDF files: page edits, redaction, corrections,
 //! forms, markup saved into the PDF, and the versions kept of each change.
 
 use crate::dto::BookDto;

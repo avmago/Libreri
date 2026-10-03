@@ -1,12 +1,12 @@
 # 25. Paper notes and maths as LaTeX
 
-Status: accepted (2026-09-28)
+Status: accepted.
 
-Phase 8b lets you photograph paper notes and keep them beside the page they belong to. It also lets you copy maths as LaTeX.
+Libreri lets you photograph paper notes and keep them beside the page they belong to. It also lets you copy maths as LaTeX.
 
-## Decisions (user, 2026-09-28)
+## Decisions
 
-- **Capture from:** the computer's camera, the phone (the one-time phone page from Phase 4a) and picture files.
+- **Capture from:** the computer's camera, the phone (the one-time phone page) and picture files.
 - **Saved as:** a PDF in the profile's notes folder, linked to the page.
 - **Maths:**
   - Exact LaTeX is the default.
@@ -44,7 +44,7 @@ Phase 8b lets you photograph paper notes and keep them beside the page they belo
     - TeX's maths-italic letters (𝑥, 𝜋) become plain letters and commands, and function names become `\sin` and the like.
     - Tested on PDFs made by pdfLaTeX and by Chrome: 14 of 14 TeX formulas were exact.
     - Bars and roots drawn as lines cannot be seen, so the popover asks you to check. When the maths model is on, it offers *Read it from the picture instead*.
-  - Fixed after 8b was first delivered (user, 2026-09-29): a PDF's sums lost their limits, and scripts kept only their first character.
+  - Fixed later: a PDF's sums lost their limits, and scripts kept only their first character.
 - **The popover:** a live KaTeX preview, the LaTeX to correct, *Copy LaTeX*, *Copy as $…$* and *Add to notebook* (a `$$` block).
 - **From pictures, optional** (`libreri-maths`):
   - The model is pix2tex (Lukas Blecher, MIT): a ResNet and vision-transformer encoder with a transformer decoder.

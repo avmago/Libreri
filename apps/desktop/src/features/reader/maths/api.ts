@@ -1,5 +1,5 @@
 /**
- * Reading maths from pictures (Phase 8b): off until turned on in
+ * Reading maths from pictures: off until turned on in
  * Settings › Writing, which downloads the model to this computer.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";

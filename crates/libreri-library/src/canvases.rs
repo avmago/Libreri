@@ -1,4 +1,4 @@
-//! Handwriting canvases (Phase 8a): Excalidraw drawings kept as ordinary
+//! Handwriting canvases: Excalidraw drawings kept as ordinary
 //! `.excalidraw` files in `Notes/<profile>/Canvases/`, so they open in
 //! excalidraw.com and other tools too. Libreri's own details (the book a
 //! canvas belongs to, its paper) are in a `libreri` object that other tools

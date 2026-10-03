@@ -1,10 +1,10 @@
 # 29. OCR models: optional downloads beside Tesseract
 
-Status: accepted (2026-10-01). PaddleOCR-VL built; TeleOCR listed for later.
+Status: accepted. PaddleOCR-VL built; TeleOCR listed for later.
 
 Tesseract reads scanned pages quickly, in many languages, but as plain lines. Newer document models read a page more like a person does: headings, tables, formulas and charts come out in reading order. They are large and slow, so they are optional.
 
-## Decisions (user, 2026-10-01)
+## Decisions
 
 - **Optional downloads** in Settings › Helper programs › *Reading scanned pages*, each with **Download** and **Delete**. One is chosen at a time; Tesseract stays the default and the fallback.
 - **PaddleOCR-VL 1.6** now (PaddlePaddle, Apache 2.0, 0.9 billion parameters, 109 languages).

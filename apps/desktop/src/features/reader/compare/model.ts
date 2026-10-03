@@ -1,5 +1,5 @@
 /**
- * Compare (Phase 6c): helpers for showing a comparison. The comparing is
+ * Compare: helpers for showing a comparison. The comparing is
  * done in Rust; this file only groups and describes the result.
  */
 import type { Change, ChangeKind, PagePair } from "@/lib/ipc";

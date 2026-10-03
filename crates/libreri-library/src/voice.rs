@@ -1,4 +1,4 @@
-//! Voice notes (Phase 7b): recordings kept in the profile's notes folder,
+//! Voice notes: recordings kept in the profile's notes folder,
 //! `Notes/<profile>/Voice notes/`, so they are ordinary files the person
 //! owns, travel with the notes and are included in archives. A voice note
 //! in a book is an annotation (kind "voice") whose locator names its

@@ -1,10 +1,10 @@
 # 14. Export, import, backups and the library health check
 
-Status: accepted (2026-09-28)
+Status: accepted.
 
 ## Export
 
-A new crate, `libreri-export`, turns books and notes into other formats. It is pure: the library crate collects the data and the crate writes bytes. Formats (board 24):
+A new crate, `libreri-export`, turns books and notes into other formats. It is pure: the library crate collects the data and the crate writes bytes. Formats:
 
 | Format | What it holds |
 |---|---|
@@ -37,7 +37,7 @@ Notes are matched by id: new ones are added, the newer version of a changed one 
 
 ## Backups
 
-Settings › Export & import › Backups. **Off until the owner turns it on** (user, 2026-09-28). A backup is a Libreri archive of the whole library with everyone's notes and profiles *including PIN hashes*, so a restore brings the PINs back; the notes themselves are plain Markdown in the library anyway, so the hashes add nothing an attacker could not already read. Options: folder (refused inside the library folder), every day or week, keep the last 3–50, with or without book files. Settings are kept per computer in `backups.json` in the app-config folder, keyed by library id, because the folder is a path on this computer. While a library is open, a check every five minutes starts a backup when one is due (a failed one is retried after an hour); only files that are this library's backups (read from their manifests) are ever removed. *Back up now* and the list of backups (Show, Restore…) are there too. *Restore from a backup…* on the Welcome screen makes a new library from an archive, and the archive's owner becomes its owner.
+Settings › Export & import › Backups. **Off until the owner turns it on**. A backup is a Libreri archive of the whole library with everyone's notes and profiles *including PIN hashes*, so a restore brings the PINs back; the notes themselves are plain Markdown in the library anyway, so the hashes add nothing an attacker could not already read. Options: folder (refused inside the library folder), every day or week, keep the last 3–50, with or without book files. Settings are kept per computer in `backups.json` in the app-config folder, keyed by library id, because the folder is a path on this computer. While a library is open, a check every five minutes starts a backup when one is due (a failed one is retried after an hour); only files that are this library's backups (read from their manifests) are ever removed. *Back up now* and the list of backups (Show, Restore…) are there too. *Restore from a backup…* on the Welcome screen makes a new library from an archive, and the archive's owner becomes its owner.
 
 **Keep a file up to date.** The same page can keep a BibTeX, CSL-JSON, RIS, CSV or JSON file of the whole catalogue (details only, never notes) in a place of the reader's choosing, rewritten only when its content changes.
 
@@ -51,4 +51,4 @@ Settings › Library & storage (and › Export & import, and the command palette
 
 - New dependencies: `csv`, `rust_xlsxwriter` and writing with `zip` (already used for reading).
 - Round-trip tests (`libreri-library/src/archive_tests.rs`) export and import into a new library at another path and check that every note, link, notebook, collection and profile comes back, that importing twice changes nothing, that missing books reconnect when their file is added, and that notes move to another copy of a book.
-- Imports from Calibre, Zotero/Mendeley and Goodreads/StoryGraph follow in 4c.
+- Imports from Calibre, Zotero/Mendeley and Goodreads/StoryGraph are in ADR 0015.

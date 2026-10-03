@@ -1,15 +1,15 @@
 # 21. Read aloud and audiobooks
 
-Status: accepted (2026-09-28)
+Status: accepted.
 
-Phase 7a lets you listen to any book: text read aloud by the system's voices, and audiobooks in a player that can keep the book they read in step.
+Libreri lets you listen to any book: text read aloud by the system's voices, and audiobooks in a player that can keep the book they read in step.
 
-## Decisions (user, 2026-09-28)
+## Decisions
 
-- **Phase 7 comes in three parts:** 7a is read aloud and audiobooks, 7b is voice notes and dictation, and 7c is spell check and word suggestions.
-- **Voices:** read aloud uses the system's voices; the optional offline neural voices (Piper) come later.
-- **Audiobooks and text:** an audiobook can be linked to the book it reads, with sync points set by hand. Automatic sync by listening, using a locally run whisper.cpp, comes in 7b together with dictation, because both need the same speech-recognition model.
-- **Voice notes** will live as audio files in `Notes/<profile>/` (7b).
+- **Related records:** voice notes and dictation are in ADR 0022, spell check and word suggestions in ADR 0023.
+- **Voices:** read aloud uses the system's voices; natural voices made on the computer (Kokoro and Piper) are in ADR 0030.
+- **Audiobooks and text:** an audiobook can be linked to the book it reads, with sync points set by hand. Automatic sync by listening, using a locally run whisper.cpp, is in ADR 0022, together with dictation, because both need the same speech-recognition model.
+- **Voice notes** live as audio files in `Notes/<profile>/` (ADR 0022).
 
 ## Read aloud
 

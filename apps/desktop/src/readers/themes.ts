@@ -1,6 +1,6 @@
 /**
  * Page themes: the colours of the page itself, not the app around it
- * (board 4i). "Follow app theme" picks Night when the app is dark.
+ *. "Follow app theme" picks Night when the app is dark.
  */
 export type PageThemeId =
   "original" | "sepia" | "paper" | "night" | "dim" | "oled" | "sepiaDark" | "nord" | "solarized";

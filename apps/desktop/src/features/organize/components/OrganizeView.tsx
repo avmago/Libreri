@@ -38,7 +38,7 @@ const done = (n: number, what: string) =>
   toast.success(`${what} on ${n === 1 ? "1 book" : `${n} books`}`);
 const failed = (what: string) => (e: unknown) => toast.error(what, { description: String(e) });
 
-/** Board 11: tidy tags and categories across the whole library. */
+/** Tidy tags and categories across the whole library. */
 export function OrganizeView() {
   const { data: facets } = useFacets();
   const { data: similar = [] } = useSimilarTags();

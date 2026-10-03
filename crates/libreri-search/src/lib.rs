@@ -1,7 +1,7 @@
 //! The full-text search index: the words inside every book.
 //!
 //! The index is an SQLite FTS5 database in the app's cache folder on each
-//! computer, one per library (user, 2026-09-28). It holds nothing that
+//! computer, one per library. It holds nothing that
 //! cannot be read again from the books and their saved OCR text, so it is
 //! never exported or backed up, and it rebuilds itself when it is missing,
 //! damaged or from an older version.

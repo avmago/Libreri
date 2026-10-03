@@ -1,6 +1,6 @@
 # 12. Split view and book windows
 
-Status: accepted (2026-09-27)
+Status: accepted.
 
 **Split view** shows two book tabs side by side in one window (Mod+\\ splits the current book with the previous tab; "Open beside the current book" in the book menu). The side you click or switch to with Mod+Shift+\\ gets the keyboard. The split is saved with the tabs.
 

@@ -1,4 +1,4 @@
-//! Libraries of 10,000+ books (Phase 10): how long the everyday work takes.
+//! Libraries of 10,000+ books: how long the everyday work takes.
 //! Run with `cargo test -p libreri-library --release scale -- --ignored --nocapture`.
 
 use crate::testutil::*;

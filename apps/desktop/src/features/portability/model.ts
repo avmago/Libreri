@@ -14,7 +14,7 @@ export interface FormatInfo {
   selection: boolean;
 }
 
-/** Board 24: every export format, in the order the dialog shows them. */
+/** Every export format, in the order the dialog shows them. */
 export const FORMATS: FormatInfo[] = [
   {
     id: "archive",

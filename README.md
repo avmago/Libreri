@@ -171,13 +171,13 @@ Your books, notes, highlights and reading habits never leave your computer. The 
 | **Comics** | CBZ, CBR, CB7, CBT, CBA |
 | **Audio** | MP3, M4B, M4A, AAC, OGG, Opus, FLAC, and podcasts |
 
-A few formats use small **helper programs**, which Libreri installs with one click (Homebrew, winget, apt, dnf, pacman or zypper):
+A few formats use small **helper programs**, which Libreri installs with one click (Homebrew, winget, apt, dnf, pacman or zypper). The Flatpak has them built in, except unar:
 
 | Helper | Used for |
 |---|---|
 | DjVuLibre | DjVu books |
 | Tesseract | OCR and searchable scans |
-| unar | CBR, CB7 and CBA comics |
+| unar | CBA (ACE) comics; optional |
 | eSpeak NG | Read aloud where the system has no voices, and natural voices |
 
 Optional **downloads**, each with its own Delete button: natural voices (Kokoro and Piper), speech models (whisper.cpp), the PaddleOCR-VL model, the pix2tex maths model, dictionaries, OCR languages and canvas fonts.

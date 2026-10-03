@@ -2,7 +2,7 @@
 //! one-time page (its address holds a random token and is shown as a QR
 //! code). The phone takes a photo with its own camera app and sends it:
 //! of a barcode (the computer reads it), or of a paper page to add to a
-//! PDF (Phase 6b, [`PhoneMode::Pages`]).
+//! PDF ([`PhoneMode::Pages`]).
 //!
 //! The server listens only on the computer's local network address, only
 //! answers requests carrying the token, accepts only pictures and short

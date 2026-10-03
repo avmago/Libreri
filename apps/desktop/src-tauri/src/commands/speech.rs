@@ -1,4 +1,4 @@
-//! Speech recognition (Phase 7b): whisper models, dictation, voice notes
+//! Speech recognition: whisper models, dictation, voice notes
 //! and finding an audiobook's places in its text by listening.
 
 use crate::error::{AppError, AppErrorKind, AppResult};

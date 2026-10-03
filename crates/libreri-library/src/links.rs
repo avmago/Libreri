@@ -1,4 +1,4 @@
-//! Links from a place in a book (Phase 8c): the pictures of linked videos
+//! Links from a place in a book: the pictures of linked videos
 //! and pages (`Notes/<profile>/Links/`) and offline copies of web pages
 //! (`Notes/<profile>/Web pages/`), linked by "link" annotations.
 

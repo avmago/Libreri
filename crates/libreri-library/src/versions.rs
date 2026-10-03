@@ -1,4 +1,4 @@
-//! Earlier versions of edited books (Phase 6b).
+//! Earlier versions of edited books.
 //!
 //! When Libreri changes a book's file (page edits, redaction, a filled-in
 //! form, markup saved into the PDF), the old file is kept in

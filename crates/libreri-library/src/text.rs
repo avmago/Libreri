@@ -3,7 +3,7 @@
 //!
 //! OCR is slow and runs only when asked ("Make searchable"), so its results
 //! are saved in the library (`.library-data/text/<bookId>.json`), where they
-//! travel with the library, its backups and exports (user, 2026-09-28). The
+//! travel with the library, its backups and exports. The
 //! search index is only a fast copy of text that can always be read again,
 //! so it lives in this computer's cache and is filled in the background.
 
