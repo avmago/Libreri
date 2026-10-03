@@ -1688,7 +1688,7 @@ export type HelperStatus = {
 export type HelpersDto = {
 	helpers: HelperInfo[],
 	installer: Installer | null,
-	/**  "macos" | "windows" | "linux" */
+	/**  "macos" | "windows" | "linux" | "flatpak" */
 	platform: string,
 };
 
