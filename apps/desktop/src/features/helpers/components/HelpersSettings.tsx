@@ -27,7 +27,7 @@ export function HelpersList() {
             <span className="text-[12.5px] text-muted-foreground">{h.purpose}</span>
           </div>
           <Button variant="outline" size="sm" onClick={() => open(h.helper)}>
-            {h.installed ? "Details" : "Install…"}
+            {h.installed || data.platform === "flatpak" ? "Details" : "Install…"}
           </Button>
         </div>
       ))}

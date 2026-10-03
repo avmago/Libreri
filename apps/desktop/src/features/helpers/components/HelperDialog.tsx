@@ -43,6 +43,13 @@ function NoInstaller({ data }: { data: HelpersDto }) {
         the Microsoft Store. Install or update App Installer, then press Check again.
       </p>
     );
+  if (data.platform === "flatpak")
+    return (
+      <p className="text-[13px]">
+        This helper is not included in the Flatpak version of Libreri, and programs cannot be added
+        to it from inside. The AppImage, .deb and .rpm versions can use it.
+      </p>
+    );
   return (
     <p className="text-[13px]">
       Libreri did not find apt, dnf, pacman or zypper. Install the helper with your system&apos;s
@@ -124,7 +131,7 @@ function Body({ info, data, onDone }: { info: HelperInfo; data: HelpersDto; onDo
         <Button variant="ghost" onClick={onDone}>
           Close
         </Button>
-        {!info.plan && (
+        {!info.plan && data.platform !== "flatpak" && (
           <Button variant="outline" disabled={isFetching} onClick={() => void refetch()}>
             Check again
           </Button>
@@ -172,7 +179,13 @@ export function HelperDialog() {
     <Dialog
       open={helper !== null}
       onOpenChange={(o) => !o && close()}
-      title={info ? `Install ${info.name}` : "Helper program"}
+      title={
+        info
+          ? data?.platform === "flatpak"
+            ? info.name
+            : `Install ${info.name}`
+          : "Helper program"
+      }
       className="w-[520px]"
     >
       {info && data ? (
