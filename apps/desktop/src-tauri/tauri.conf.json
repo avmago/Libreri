@@ -42,7 +42,7 @@
     },
     "license": "GPL-3.0-or-later",
     "licenseFile": "../../../LICENSE",
-    "copyright": "Copyright © 2026 Aditya Vikram Mago and Libreri contributors. Licensed under the GNU GPL v3 or later."
+    "copyright": "Copyright © 2026 avmg0 and Libreri contributors. Licensed under the GNU GPL v3 or later."
   },
   "plugins": {
     "updater": {
